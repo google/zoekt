@@ -17,7 +17,6 @@ package codesearch
 import (
 	"fmt"
 	"log"
-	"strings"
 )
 
 var _ = log.Println
@@ -74,31 +73,4 @@ func (b *IndexBuilder) AddFile(name string, content []byte) {
 			offset:   b.contentEnd,
 		})
 	b.contentEnd += uint32(len(content))
-}
-
-func (b *IndexBuilder) search(query *SubstringQuery) ([]candidateMatch, error) {
-	pattern := strings.ToLower(query.Pattern) // TODO - do something with UTF-8
-	if len(pattern) < NGRAM {
-		return nil, fmt.Errorf("too short")
-	}
-	if len(b.files) == 0 {
-		return nil, fmt.Errorf("no files")
-	}
-
-	first := pattern[:NGRAM]
-	last := pattern[len(pattern)-NGRAM:]
-
-	input := searchInput{
-		first: b.postings[first],
-		last:  b.postings[last],
-		pat:   pattern,
-	}
-
-	for _, f := range b.files {
-		input.ends = append(input.ends, f.end())
-	}
-
-	input.ends = append(input.ends, b.files[len(b.files)-1].end())
-
-	return input.search(), nil
 }

@@ -28,8 +28,9 @@ func TestBoundary(t *testing.T) {
 
 	b.AddFile("f1", []byte("x the"))
 	b.AddFile("f1", []byte("reader"))
+	searcher := searcherForTest(t, b)
 
-	matches, err := b.search(&SubstringQuery{Pattern: "there"})
+	matches, err := searcher.Search(&SubstringQuery{Pattern: "there"})
 	if err != nil {
 		t.Errorf("search: %v", err)
 	}
@@ -43,27 +44,20 @@ var _ = log.Println
 func TestBasic(t *testing.T) {
 	b := NewIndexBuilder()
 
-	b.AddFile("f1", []byte("there is no water in the well"))
-	// -------------------- 0123456789012345678901234567890123456789
 	b.AddFile("f2", []byte("to carry water in the no later bla"))
 	// -------------------- 0123456789012345678901234567890123456789
 
-	matches, err := b.search(&SubstringQuery{Pattern: "water"})
+	searcher := searcherForTest(t, b)
+	fmatches, err := searcher.Search(&SubstringQuery{Pattern: "water"})
 	if err != nil {
 		t.Errorf("search: %v", err)
 	}
-	if len(matches) != 2 {
-		t.Fatalf("got %v, want 2 matches", matches)
+	if len(fmatches) != 1 {
+		t.Fatalf("got %v, want 1 matches", fmatches)
 	}
 
-	got := matches[0].String()
-	want := "0:12"
-	if got != want {
-		t.Errorf("0: got %s, want %s", got, want)
-	}
-
-	got = matches[1].String()
-	want = "1:9"
+	got := fmt.Sprintf("%s:%d", fmatches[0].Name, fmatches[0].Matches[0].Offset)
+	want := "f2:9"
 	if got != want {
 		t.Errorf("1: got %s, want %s", got, want)
 	}
@@ -134,15 +128,19 @@ func TestNewlines(t *testing.T) {
 	}
 	matches, err := searcher.Search(&SubstringQuery{Pattern: "ne2"})
 
-	want := []Match{{
+	want := []FileMatch{{
 		Rank:        0,
 		Name:        "filename",
-		Offset:      8,
-		Line:        "line2",
-		LineNum:     2,
-		LineOff:     2,
-		MatchLength: 3,
-	}}
+		Matches: []Match{
+			{
+			Offset:      8,
+			Line:        "line2",
+			LineNum:     2,
+			LineOff:     2,
+			MatchLength: 3,
+			},
+		}}}
+
 	if !reflect.DeepEqual(matches, want) {
 		t.Errorf("got %v, want %v", matches, want)
 	}
@@ -235,6 +233,18 @@ func TestDelta(t *testing.T) {
 	}
 }
 
+func searcherForTest(t *testing.T, b *IndexBuilder) Searcher {
+	var buf bytes.Buffer
+	b.Write(&buf)
+	f := &memSeeker{buf.Bytes(), 0}
+
+	searcher, err := NewSearcher(f)
+	if err != nil {
+		t.Fatalf("NewSearcher: %v", err)
+	}
+	return searcher
+}
+
 func TestFileBasedSearch(t *testing.T) {
 	b := NewIndexBuilder()
 
@@ -245,35 +255,32 @@ func TestFileBasedSearch(t *testing.T) {
 	// -----------0123456789012345678901234567890123456789
 	b.AddFile("f2", c2)
 
-	var buf bytes.Buffer
-	b.Write(&buf)
-	f := &memSeeker{buf.Bytes(), 0}
-
-	searcher, err := NewSearcher(f)
-	if err != nil {
-		t.Fatalf("NewSearcher: %v", err)
-	}
+	searcher := searcherForTest(t, b)
 	matches, err := searcher.Search(&SubstringQuery{Pattern: "ananas"})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
 
-	want := []Match{{
+	want := []FileMatch{{
 		Rank:        0,
 		Name:        "f1",
+		Matches: []Match{{
 		Offset:      8,
 		Line:        string(c1),
 		LineNum:     1,
 		LineOff:     8,
 		MatchLength: 6,
+		}},
 	}, {
 		Rank:        1,
 		Name:        "f2",
+		Matches: []Match{{
 		Line:        string(c2),
 		LineNum:     1,
 		LineOff:     10,
 		Offset:      10,
 		MatchLength: 6,
+		}},
 	}}
 	if !reflect.DeepEqual(matches, want) {
 		t.Errorf("got matches %#v, want %#v", matches, want)
@@ -287,14 +294,7 @@ func TestCaseFold(t *testing.T) {
 	// ---------- 012345678901234567890123456
 	b.AddFile("f1", c1)
 
-	var buf bytes.Buffer
-	b.Write(&buf)
-	f := &memSeeker{buf.Bytes(), 0}
-
-	searcher, err := NewSearcher(f)
-	if err != nil {
-		t.Fatalf("NewSearcher: %v", err)
-	}
+	searcher := searcherForTest(t, b)
 	matches, err := searcher.Search(
 		&SubstringQuery{
 			Pattern:       "bananas",
@@ -319,7 +319,41 @@ func TestCaseFold(t *testing.T) {
 
 	if len(matches) != 1 {
 		t.Errorf("no foldcase: got %v, want 1 matches", matches)
-	} else if matches[0].Offset != 7 {
+	} else if matches[0].Matches[0].Offset != 7 {
 		t.Errorf("foldcase: got %v, want offsets 7", matches)
+	}
+}
+
+
+func TestAndSearch(t *testing.T) {
+	b := NewIndexBuilder()
+
+	b.AddFile("f1", []byte("x banana y"))
+	b.AddFile("f2", []byte("x apple y"))
+	b.AddFile("f3", []byte("x banana apple y"))
+	// ---------------------0123456789012345
+	searcher := searcherForTest(t, b)
+	matches, err := searcher.Search(
+		&AndQuery{
+			Children: []Query{
+				&SubstringQuery{
+					Pattern:       "banana",
+				},
+				&SubstringQuery{
+					Pattern:       "apple",
+				},
+			},
+		})
+
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+
+	if len(matches) != 1 {
+		t.Fatalf("got %v, want 1 match", matches)
+	}
+
+	if matches[0].Matches[0].Offset != 2 || matches[0].Matches[1].Offset != 9 {
+		t.Fatalf("got %v, want offsets 2,9", matches)
 	}
 }

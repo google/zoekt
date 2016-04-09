@@ -15,62 +15,178 @@
 package codesearch
 
 import (
+	"fmt"
 	"log"
+	"sort"
 )
 
 var _ = log.Println
 
-type searchInput struct {
-	pat string
-
-	first []uint32
-	last  []uint32
-	ends  []uint32
+// All the matches for a given file.
+type mergedCandidateMatch struct {
+	fileID  uint32
+	matches map[*SubstringQuery][]candidateMatch
 }
 
-type candidateMatch struct {
-	file   uint32
-	offset uint32
-}
-
-func (s *searchInput) search() []candidateMatch {
-	fileIdx := 0
-	diff := uint32(len(s.pat) - NGRAM)
-
-	var candidates []candidateMatch
-	for {
-		if len(s.first) == 0 || len(s.last) == 0 {
-			break
-		}
-		p1 := s.first[0]
-		p2 := s.last[0]
-
-		for fileIdx < len(s.ends) && s.ends[fileIdx] <= p1 {
-			fileIdx++
-		}
-
-		if p1+diff < p2 {
-			s.first = s.first[1:]
-		} else if p1+diff > p2 {
-			s.last = s.last[1:]
-		} else {
-			s.first = s.first[1:]
-			s.last = s.last[1:]
-
-			if p1+uint32(len(s.pat)) >= s.ends[fileIdx] {
-				continue
-			}
-
-			fileStart := uint32(0)
-			if fileIdx > 0 {
-				fileStart += s.ends[fileIdx-1]
-			}
-			candidates = append(candidates,
-				candidateMatch{
-					uint32(fileIdx),
-					p1 - fileStart,
-				})
-		}
+func mergeCandidates(iters []*docIterator) []mergedCandidateMatch {
+	var cands [][]candidateMatch
+	for _, i := range iters {
+		iterCands := i.next()
+		cands = append(cands, iterCands)
 	}
-	return candidates
+
+	var merged []mergedCandidateMatch
+	var nextDoc uint32
+
+done:
+	for {
+		found := true
+		var newCands [][]candidateMatch
+		for _, ms := range cands {
+			for len(ms) > 0 && ms[0].file < nextDoc {
+				ms = ms[1:]
+			}
+			if len(ms) == 0 {
+				break done
+			}
+			if ms[0].file > nextDoc {
+				nextDoc = ms[0].file
+				found = false
+			}
+			newCands = append(newCands, ms)
+		}
+		cands = newCands
+		if !found {
+			continue
+		}
+
+		newCands = newCands[:0]
+		mc := mergedCandidateMatch{
+			fileID: nextDoc,
+			matches: map[*SubstringQuery][]candidateMatch{},
+		}
+		for _, ms := range cands {
+			var sqMatches []candidateMatch
+			for len(ms) > 0 && ms[0].file == nextDoc {
+				sqMatches = append(sqMatches, ms[0])
+				ms = ms[1:]
+			}
+
+			mc.matches[sqMatches[0].query] = sqMatches
+			newCands = append(newCands, ms[:])
+		}
+
+		merged = append(merged, mc)
+	}
+
+	return merged
+}
+
+func (s *searcher) andSearch(andQ *andQuery) ([]FileMatch, error) {
+	var caseSensitive bool
+	var iters []*docIterator
+	for _, atom := range andQ.atoms {
+		if atom.Negate {
+			return nil, fmt.Errorf("not implemented: negation")
+		}
+		caseSensitive = caseSensitive || atom.CaseSensitive
+
+		// TODO - postingsCache
+		i, err := s.reader.getDocIterator(s.indexData, atom)
+		if err != nil {
+			return nil, err
+		}
+		iters = append(iters, i)
+	}
+
+	// TODO merge mergeCandidates and following loop.
+	cands := mergeCandidates(iters)
+
+	var fileMatches []FileMatch
+	lastFile := uint32(0xFFFFFFFF)
+	var content []byte
+	var caseBits []byte
+	var newlines []uint32
+
+nextFileMatch:
+	for _, c := range cands {
+		if lastFile != c.fileID {
+			// needed for caseSensitive and for
+			// reconstructing the data.
+			caseBits = s.reader.readCaseBits(s.indexData, c.fileID)
+		}
+
+		if caseSensitive {
+			trimmed := map[*SubstringQuery][]candidateMatch{}
+			for q, req := range c.matches {
+				matching := []candidateMatch{}
+				for _, m := range req {
+					if m.caseMatches(caseBits) {
+						matching = append(matching, m)
+					}
+				}
+				if len(matching) == 0 {
+					continue nextFileMatch
+				}
+				trimmed[q] = matching
+			}
+
+			c.matches = trimmed
+		}
+
+		if lastFile != c.fileID {
+			content = s.reader.readContents(s.indexData, c.fileID)
+			newlines = s.reader.readNewlines(s.indexData, c.fileID)
+			lastFile = c.fileID
+		}
+
+		trimmed := map[*SubstringQuery][]candidateMatch{}
+		for q, req := range c.matches {
+			matching := []candidateMatch{}
+			for _, m := range req {
+				if m.matchContent(content) {
+					matching = append(matching, m)
+				}
+			}
+			if len(matching) == 0 {
+				continue nextFileMatch
+			}
+			trimmed[q] = matching
+		}
+		c.matches = trimmed
+
+		fMatch := FileMatch{
+			Name: s.indexData.fileNames[c.fileID],
+			Rank: int(c.fileID),
+		}
+
+		for _, req := range c.matches {
+			for _, m := range req {
+				num, off, data := m.line(newlines, content, caseBits)
+				fMatch.Matches = append(fMatch.Matches,
+					Match{
+						Offset: m.offset,
+						Line: string(data),
+						LineNum:     num,
+						LineOff:     off,
+						MatchLength: len(m.substrBytes),
+					})
+			}
+		}
+
+		sortMatches(fMatch.Matches)
+		fileMatches = append(fileMatches, fMatch)
+
+	}
+	return fileMatches, nil
+}
+
+
+type matchOffsetSlice []Match
+func (m matchOffsetSlice) Len() int { return len(m) }
+func (m matchOffsetSlice) Swap(i, j int) { m[i],m[j] = m[j],m[i] }
+func (m matchOffsetSlice) Less(i, j int) bool { return m[i].Offset <= m[j].Offset }
+
+func sortMatches(ms []Match) {
+	sort.Sort(matchOffsetSlice(ms))
 }

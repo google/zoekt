@@ -15,7 +15,6 @@
 package codesearch
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -144,14 +143,16 @@ func (r *reader) readNewlines(d *indexData, i uint32) []uint32 {
 	return fromDeltas(blob)
 }
 
-func (r *reader) readSearch(data *indexData, query *SubstringQuery) (*searchInput, error) {
+func (r *reader) getDocIterator(data *indexData, query *SubstringQuery) (*docIterator, error) {
 	str := strings.ToLower(query.Pattern) // UTF-8
 	if len(str) < NGRAM {
-		return nil, fmt.Errorf("patter must be at least %d bytes", NGRAM)
+		return nil, fmt.Errorf("pattern must be at least %d bytes", NGRAM)
 	}
 
-	input := &searchInput{
-		pat: str,
+	input := &docIterator{
+		query: query,
+		patLen: uint32(len(str)),
+		ends: data.fileEnds,
 	}
 	first, ok := data.ngrams[stringToNGram(str[:NGRAM])]
 	if !ok {
@@ -171,13 +172,11 @@ func (r *reader) readSearch(data *indexData, query *SubstringQuery) (*searchInpu
 	if r.err != nil {
 		return nil, r.err
 	}
-	input.ends = data.fileEnds
-
 	return input, nil
 }
 
 type Searcher interface {
-	Search(query Query) ([]Match, error)
+	Search(query Query) ([]FileMatch, error)
 	Close() error
 }
 
@@ -208,112 +207,36 @@ func NewSearcher(r ReadSeekCloser) (Searcher, error) {
 	return s, nil
 }
 
-type Match struct {
+type FileMatch struct {
 	// Ranking; the lower, the better.
 	Rank    int
+	Name    string
+	Matches []Match
+}
+
+type Match struct {
 	Line    string
 	LineNum int
 	LineOff int
 
-	Name        string
 	Offset      uint32
 	MatchLength int
 }
 
-func (s *searcher) Search(query Query) ([]Match, error) {
-	pat, ok := query.(*SubstringQuery)
-	if !ok {
-		return nil, fmt.Errorf("only takes SubstringQuery")
-	}
-
-	input, err := s.reader.readSearch(s.indexData, pat)
+func (s *searcher) Search(query Query) ([]FileMatch, error) {
+	orQ, err := standardize(query)
 	if err != nil {
 		return nil, err
 	}
-	cands := input.search()
 
-	asBytes := []byte(pat.Pattern)
-	patLen := len(pat.Pattern)
-
-	// Find bitmasks for case sensitive search
-
-	var patternCaseBits, patternCaseMask [][]byte
-
-	if pat.CaseSensitive {
-		patternCaseMask, patternCaseBits = findCaseMasks(asBytes)
-	}
-	asBytes = toLower(asBytes)
-
-	var matches []Match
-	lastFile := uint32(0xFFFFFFFF)
-	var content []byte
-	var caseBits []byte
-	var newlines []uint32
-	for _, c := range cands {
-		if lastFile != c.file {
-			caseBits = s.reader.readCaseBits(s.indexData, c.file)
-		}
-
-		if pat.CaseSensitive {
-			startExtend := c.offset % 8
-			patEnd := c.offset + uint32(patLen)
-			endExtend := (8 - (patEnd % 8)) % 8
-
-			start := c.offset - startExtend
-			end := c.offset + uint32(patLen) + endExtend
-
-			fileBits := append([]byte{}, caseBits[start/8:end/8]...)
-			mask := patternCaseMask[startExtend]
-			bits := patternCaseBits[startExtend]
-
-			diff := false
-			for i := range fileBits {
-				if fileBits[i]&mask[i] != bits[i] {
-					diff = true
-					break
-				}
-			}
-			if diff {
-				continue
-			}
-		}
-
-		if lastFile != c.file {
-			content = s.reader.readContents(s.indexData, c.file)
-			newlines = s.reader.readNewlines(s.indexData, c.file)
-			lastFile = c.file
-		}
-
-		if bytes.Compare(content[c.offset:c.offset+uint32(patLen)], asBytes) == 0 {
-			idx := sort.Search(len(newlines), func(n int) bool {
-				return newlines[n] >= c.offset
-			})
-
-			end := uint32(len(content))
-			if idx < len(newlines) {
-				end = newlines[idx]
-			}
-
-			start := 0
-			if idx > 0 {
-				start = int(newlines[idx-1] + 1)
-			}
-
-			matches = append(matches, Match{
-				Rank:   int(c.file),
-				Offset: c.offset,
-				Line: string(toOriginal(
-					content, caseBits, start, int(end))),
-				LineNum:     idx + 1,
-				LineOff:     int(c.offset) - start,
-				Name:        s.indexData.fileNames[c.file],
-				MatchLength: patLen,
-			})
-		}
+	if len(orQ.ands) != 1 {
+		return nil, fmt.Errorf("not implemented: OrQuery")
 	}
 
-	return matches, nil
+	andQ := orQ.ands[0]
+	return s.andSearch(andQ)
 }
+
 
 type shardedSearcher struct {
 	searchers []Searcher
@@ -347,7 +270,7 @@ func NewShardedSearcher(indexGlob string) (Searcher, error) {
 	return &ss, nil
 }
 
-type matchSlice []Match
+type matchSlice []FileMatch
 
 func (m matchSlice) Len() int           { return len(m) }
 func (m matchSlice) Less(i, j int) bool { return m[i].Rank < m[j].Rank }
@@ -360,9 +283,9 @@ func (ss *shardedSearcher) Close() error {
 	return nil
 }
 
-func (ss *shardedSearcher) Search(pat Query) ([]Match, error) {
+func (ss *shardedSearcher) Search(pat Query) ([]FileMatch, error) {
 	type res struct {
-		m   []Match
+		m   []FileMatch
 		err error
 	}
 	all := make(chan res, len(ss.searchers))
@@ -373,7 +296,7 @@ func (ss *shardedSearcher) Search(pat Query) ([]Match, error) {
 		}(s)
 	}
 
-	var aggregate []Match
+	var aggregate []FileMatch
 	for _ = range ss.searchers {
 		r := <-all
 		if r.err != nil {

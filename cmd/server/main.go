@@ -133,12 +133,14 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 	}
 
 	for _, m := range matches {
+		// TODO - visualize all the matches.
+		l := m.Matches[0].LineOff
 		res.Matches = append(res.Matches, MatchData{
 			FileName:  m.Name,
-			LineNum:   m.LineNum,
-			Pre:       m.Line[:m.LineOff],
-			MatchText: m.Line[m.LineOff : m.LineOff+len(query)],
-			Post:      m.Line[m.LineOff+len(query):],
+			LineNum:   m.Matches[0].LineNum,
+			Pre:       m.Matches[0].Line[:l],
+			MatchText: m.Matches[0].Line[l : l+len(query)],
+			Post:      m.Matches[0].Line[l+len(query):],
 		})
 	}
 
