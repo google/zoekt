@@ -144,7 +144,7 @@ func (r *reader) readNewlines(d *indexData, i uint32) []uint32 {
 	return fromDeltas(blob)
 }
 
-func (r *reader) readSearch(data *indexData, query *Query) (*searchInput, error) {
+func (r *reader) readSearch(data *indexData, query *SubstringQuery) (*searchInput, error) {
 	str := strings.ToLower(query.Pattern) // UTF-8
 	if len(str) < NGRAM {
 		return nil, fmt.Errorf("patter must be at least %d bytes", NGRAM)
@@ -177,7 +177,7 @@ func (r *reader) readSearch(data *indexData, query *Query) (*searchInput, error)
 }
 
 type Searcher interface {
-	Search(query *Query) ([]Match, error)
+	Search(query Query) ([]Match, error)
 	Close() error
 }
 
@@ -220,12 +220,12 @@ type Match struct {
 	MatchLength int
 }
 
-type Query struct {
-	Pattern       string
-	CaseSensitive bool
-}
+func (s *searcher) Search(query Query) ([]Match, error) {
+	pat, ok := query.(*SubstringQuery)
+	if !ok {
+		return nil, fmt.Errorf("only takes SubstringQuery")
+	}
 
-func (s *searcher) Search(pat *Query) ([]Match, error) {
 	input, err := s.reader.readSearch(s.indexData, pat)
 	if err != nil {
 		return nil, err
@@ -360,7 +360,7 @@ func (ss *shardedSearcher) Close() error {
 	return nil
 }
 
-func (ss *shardedSearcher) Search(pat *Query) ([]Match, error) {
+func (ss *shardedSearcher) Search(pat Query) ([]Match, error) {
 	type res struct {
 		m   []Match
 		err error

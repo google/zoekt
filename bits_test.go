@@ -47,7 +47,6 @@ func TestCaseMasks(t *testing.T) {
 func TestNgram(t *testing.T) {
 	in := "abc"
 	n := stringToNGram(in)
-	log.Println(ngramToBytes(0xf0e010))
 	if n.String() != "abc" {
 		t.Errorf("got %q, want %q", n, "abc")
 	}

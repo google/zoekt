@@ -29,7 +29,7 @@ func TestBoundary(t *testing.T) {
 	b.AddFile("f1", []byte("x the"))
 	b.AddFile("f1", []byte("reader"))
 
-	matches, err := b.search(&Query{Pattern: "there"})
+	matches, err := b.search(&SubstringQuery{Pattern: "there"})
 	if err != nil {
 		t.Errorf("search: %v", err)
 	}
@@ -48,7 +48,7 @@ func TestBasic(t *testing.T) {
 	b.AddFile("f2", []byte("to carry water in the no later bla"))
 	// -------------------- 0123456789012345678901234567890123456789
 
-	matches, err := b.search(&Query{Pattern: "water"})
+	matches, err := b.search(&SubstringQuery{Pattern: "water"})
 	if err != nil {
 		t.Errorf("search: %v", err)
 	}
@@ -132,7 +132,7 @@ func TestNewlines(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSearcher: %v", err)
 	}
-	matches, err := searcher.Search(&Query{Pattern: "ne2"})
+	matches, err := searcher.Search(&SubstringQuery{Pattern: "ne2"})
 
 	want := []Match{{
 		Rank:        0,
@@ -253,7 +253,7 @@ func TestFileBasedSearch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSearcher: %v", err)
 	}
-	matches, err := searcher.Search(&Query{Pattern: "ananas"})
+	matches, err := searcher.Search(&SubstringQuery{Pattern: "ananas"})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -296,7 +296,7 @@ func TestCaseFold(t *testing.T) {
 		t.Fatalf("NewSearcher: %v", err)
 	}
 	matches, err := searcher.Search(
-		&Query{
+		&SubstringQuery{
 			Pattern:       "bananas",
 			CaseSensitive: true,
 		})
@@ -309,7 +309,7 @@ func TestCaseFold(t *testing.T) {
 	}
 
 	matches, err = searcher.Search(
-		&Query{
+		&SubstringQuery{
 			Pattern:       "BaNaNAS",
 			CaseSensitive: true,
 		})

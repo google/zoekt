@@ -103,7 +103,7 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 
 	startT := time.Now()
 
-	q := codesearch.Query{
+	q := codesearch.SubstringQuery{
 		Pattern: query,
 	}
 

@@ -56,7 +56,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	q := &codesearch.Query{
+	q := &codesearch.SubstringQuery{
 		Pattern:       pat,
 		CaseSensitive: *caseSensitive || strings.ToLower(pat) != pat,
 	}

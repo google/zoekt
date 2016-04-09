@@ -76,7 +76,7 @@ func (b *IndexBuilder) AddFile(name string, content []byte) {
 	b.contentEnd += uint32(len(content))
 }
 
-func (b *IndexBuilder) search(query *Query) ([]candidateMatch, error) {
+func (b *IndexBuilder) search(query *SubstringQuery) ([]candidateMatch, error) {
 	pattern := strings.ToLower(query.Pattern) // TODO - do something with UTF-8
 	if len(pattern) < NGRAM {
 		return nil, fmt.Errorf("too short")
