@@ -187,8 +187,8 @@ func TestReadWrite(t *testing.T) {
 	if r.err != nil {
 		t.Errorf("got read error %v", r.err)
 	}
-	if toc.contents.sz != 5 {
-		t.Errorf("got contents size %d, want 5", toc.contents.sz)
+	if toc.contents.data.sz != 5 {
+		t.Errorf("got contents size %d, want 5", toc.contents.data.sz)
 	}
 
 	data := r.readIndexData(&toc)
@@ -196,26 +196,19 @@ func TestReadWrite(t *testing.T) {
 		t.Errorf("got filenames %s, want %v", data.fileNames, want)
 	}
 
-	if want := "abcbcdcde"; want != string(data.ngramText) {
-		t.Fatalf("got ngram text %q, want %q", data.ngramText, want)
+	if len(data.ngrams) != 3 {
+		t.Fatalf("got ngrams %v, want 3 ngrams", data.ngrams)
 	}
 
 	if want := []uint32{5}; !reflect.DeepEqual(data.fileEnds, want) {
 		t.Fatalf("got fileEnds %v, want %v", data.fileEnds, want)
 	}
 
-	if _, ok := data.findNgramIdx("bcq"); ok {
-		t.Errorf("found nonexistent ngram")
-	}
-	if idx, ok := data.findNgramIdx("bcd"); !ok || idx != 1 {
-		t.Errorf("got %v,%v want true,1", ok, idx)
+	if _, ok := data.ngrams[stringToNGram("bcq")]; ok {
+		t.Errorf("found ngram bcd in %v", data.ngrams)
 	}
 
-	got, err := r.readPostingData(data, 1)
-	if err != nil {
-		t.Errorf("readPostingData: %V", err)
-	}
-
+	got := fromDeltas(r.readSectionBlob(data.ngrams[stringToNGram("bcd")]))
 	if want := []uint32{1}; !reflect.DeepEqual(got, want) {
 		t.Errorf("got posting data %v, want %v", got, want)
 	}
@@ -236,16 +229,7 @@ func TestDelta(t *testing.T) {
 	r.readTOC(&toc)
 	data := r.readIndexData(&toc)
 
-	idx, ok := data.findNgramIdx("abc")
-	if !ok {
-		t.Errorf("did not find ngram")
-	}
-
-	got, err := r.readPostingData(data, idx)
-	if err != nil {
-		t.Errorf("readPostingData: %V", err)
-	}
-
+	got := fromDeltas(r.readSectionBlob(data.ngrams[stringToNGram("abc")]))
 	if want := []uint32{0, 4}; !reflect.DeepEqual(got, want) {
 		t.Errorf("got posting data %v, want %v", got, want)
 	}

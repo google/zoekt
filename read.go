@@ -28,56 +28,29 @@ import (
 
 var _ = log.Println
 
-type reader struct {
-	r   ReadSeekCloser
-	err error
-}
-
-func (r *reader) readSection(s *section) {
-	s.off = r.U32()
-	s.sz = r.U32()
-}
-
-func (r *reader) U32() uint32 {
-	if r.err != nil {
-		return 0
-	}
-	var b [4]byte
-	_, r.err = r.r.Read(b[:])
-	return binary.BigEndian.Uint32(b[:])
-}
-
 func (r *reader) readTOC(toc *indexTOC) {
 	if r.err != nil {
 		return
 	}
 
 	r.r.Seek(-8, 2)
-	var tocSection section
-	r.readSection(&tocSection)
+	var tocSection simpleSection
+	tocSection.read(r)
 	_, r.err = r.r.Seek(int64(tocSection.off), 0)
 	for _, s := range toc.sections() {
-		r.readSection(s)
+		s.read(r)
 	}
 }
 
-type ngramText []byte
-
-func (t ngramText) get(i int) []byte {
-	return t[i*NGRAM : (i+1)*NGRAM]
-}
-func (t ngramText) length() int {
-	return len(t) / NGRAM
-}
 
 // indexData holds the pattern independent data that we have to have
 // in memory to search.
 type indexData struct {
-	ngramText        ngramText
-	ngramFrequencies []uint32
-	postingIndex     []uint32
-	newlinesIndex    []uint32
-	caseBitsIndex    []uint32
+	ngrams map[ngram]simpleSection
+
+	postingsIndex []uint32
+	newlinesIndex []uint32
+	caseBitsIndex []uint32
 
 	// offsets of file contents. Includes end of last file.
 	boundaries []uint32
@@ -86,28 +59,18 @@ type indexData struct {
 	fileNames []string
 }
 
-func (d *indexData) findNgramIdx(ngram string) (uint32, bool) {
-	asBytes := []byte(ngram)
-	idx := sort.Search(d.ngramText.length(), func(j int) bool {
-		return bytes.Compare(d.ngramText.get(j), asBytes) >= 0
-	})
-	if idx == d.ngramText.length() {
-		return 0, false
-	}
-	if bytes.Compare(asBytes, d.ngramText.get(idx)) != 0 {
-		return 0, false
-	}
-	return uint32(idx), true
-}
 
-func (r *reader) readSectionBlob(sec section) []byte {
+func (r *reader) readSectionBlob(sec simpleSection) []byte {
 	d := make([]byte, sec.sz)
 	r.r.Seek(int64(sec.off), 0)
 	_, r.err = r.r.Read(d)
 	return d
 }
 
-func (r *reader) readSectionU32(sec section) []uint32 {
+func (r *reader) readSectionU32(sec simpleSection) []uint32 {
+	if sec.sz%4 != 0 {
+		log.Panic("barf", sec.sz)
+	}
 	blob := r.readSectionBlob(sec)
 	arr := make([]uint32, 0, len(blob)/4)
 	for len(blob) > 0 {
@@ -122,91 +85,63 @@ func (r *reader) readIndexData(toc *indexTOC) *indexData {
 		return nil
 	}
 
-	textContent := r.readSectionBlob(toc.ngramText)
+	toc.postings.readIndex(r)
+	toc.caseBits.readIndex(r)
+	toc.newlines.readIndex(r)
+	toc.contents.readIndex(r)
+
 	d := indexData{
-		ngramText:        ngramText(textContent),
-		ngramFrequencies: r.readSectionU32(toc.ngramFrequencies),
-		postingIndex:     r.readSectionU32(toc.postingsIndex),
-		caseBitsIndex:    r.readSectionU32(toc.caseBitsIndex),
-		boundaries:       r.readSectionU32(toc.contentBoundaries),
-		newlinesIndex:    r.readSectionU32(toc.newlinesIndex),
+		postingsIndex: toc.postings.absoluteIndex(),
+		caseBitsIndex: toc.caseBits.absoluteIndex(),
+		boundaries:    toc.contents.absoluteIndex(),
+		newlinesIndex: toc.newlines.absoluteIndex(),
+		ngrams: map[ngram]simpleSection{},
 	}
 
-	d.boundaries = append(d.boundaries, d.boundaries[0]+toc.contents.sz)
-	d.postingIndex = append(d.postingIndex, toc.postings.off+toc.postings.sz)
-	d.fileEnds = make([]uint32, 0, len(d.boundaries))
-	d.newlinesIndex = append(d.newlinesIndex, toc.newlines.off+toc.newlines.sz)
-	d.caseBitsIndex = append(d.caseBitsIndex, toc.caseBits.off+toc.caseBits.sz)
-	for _, b := range d.boundaries[1:] {
-		d.fileEnds = append(d.fileEnds, b-d.boundaries[0])
-	}
-
-	fnBlob := r.readSectionBlob(toc.names)
-	fnIndex := r.readSectionU32(toc.nameIndex)
-	for i, n := range fnIndex {
-		end := toc.names.sz
-		if i < len(fnIndex)-1 {
-			end = fnIndex[i+1] - fnIndex[0]
+	textContent := r.readSectionBlob(toc.ngramText)
+	for i := 0; i < len(textContent); i += NGRAM {
+		j := i/NGRAM
+		d.ngrams[bytesToNGram(textContent[i:i+NGRAM])] = simpleSection{
+			d.postingsIndex[j],
+			d.postingsIndex[j+1] - d.postingsIndex[j],
 		}
-		n -= fnIndex[0]
-		d.fileNames = append(d.fileNames, string(fnBlob[n:end]))
+	}
+
+	d.fileEnds = toc.contents.relativeIndex()[1:]
+
+	toc.names.readIndex(r)
+	fnIndex := toc.names.relativeIndex()
+	fnBlob := r.readSectionBlob(toc.names.data)
+	for i, n := range fnIndex {
+		if i == 0 {
+			continue
+		}
+		d.fileNames = append(d.fileNames, string(fnBlob[fnIndex[i-1]:n]))
 	}
 	return &d
 }
 
 func (r *reader) readContents(d *indexData, i uint32) []byte {
-	return r.readSectionBlob(section{
+	return r.readSectionBlob(simpleSection{
 		off: d.boundaries[i],
 		sz:  d.boundaries[i+1] - d.boundaries[i],
 	})
 }
 
 func (r *reader) readCaseBits(d *indexData, i uint32) []byte {
-	return r.readSectionBlob(section{
+	return r.readSectionBlob(simpleSection{
 		off: d.caseBitsIndex[i],
 		sz:  d.caseBitsIndex[i+1] - d.caseBitsIndex[i],
 	})
 }
 
 func (r *reader) readNewlines(d *indexData, i uint32) []uint32 {
-	blob := r.readSectionBlob(section{
+	blob := r.readSectionBlob(simpleSection{
 		off: d.newlinesIndex[i],
 		sz:  d.newlinesIndex[i+1] - d.newlinesIndex[i],
 	})
-	last := -1
 
-	var res []uint32
-	for len(blob) > 0 {
-		delta, m := binary.Uvarint(blob)
-		next := int(delta) + last
-		res = append(res, uint32(next))
-		last = next
-		blob = blob[m:]
-	}
-
-	return res
-}
-
-func (r *reader) readPostingData(d *indexData, idx uint32) ([]uint32, error) {
-	sec := section{
-		off: d.postingIndex[idx],
-		sz:  d.postingIndex[idx+1] - d.postingIndex[idx],
-	}
-
-	data := r.readSectionBlob(sec)
-	if r.err != nil {
-		return nil, r.err
-	}
-	var ps []uint32
-	var last uint32
-	for len(data) > 0 {
-		delta, m := binary.Uvarint(data)
-		offset := last + uint32(delta)
-		last = offset
-		data = data[m:]
-		ps = append(ps, offset)
-	}
-	return ps, nil
+	return fromDeltas(blob)
 }
 
 func (r *reader) readSearch(data *indexData, query *Query) (*searchInput, error) {
@@ -218,26 +153,26 @@ func (r *reader) readSearch(data *indexData, query *Query) (*searchInput, error)
 	input := &searchInput{
 		pat: str,
 	}
-
-	firstIdx, ok := data.findNgramIdx(str[:NGRAM])
-	if !ok {
-		return input, nil
-	}
-	lastIdx, ok := data.findNgramIdx(str[len(str)-NGRAM:])
+	first, ok := data.ngrams[stringToNGram(str[:NGRAM])]
 	if !ok {
 		return input, nil
 	}
 
-	var err error
-	input.first, err = r.readPostingData(data, firstIdx)
-	if err != nil {
-		return nil, err
+	last, ok := data.ngrams[stringToNGram(str[len(str)-NGRAM:])]
+	if !ok {
+		return input, nil
 	}
-	input.last, err = r.readPostingData(data, lastIdx)
-	if err != nil {
-		return nil, err
+
+	input.first = fromDeltas(r.readSectionBlob(first))
+	if r.err != nil {
+		return nil, r.err
+	}
+	input.last = fromDeltas(r.readSectionBlob(last))
+	if r.err != nil {
+		return nil, r.err
 	}
 	input.ends = data.fileEnds
+
 	return input, nil
 }
 

@@ -1,9 +1,12 @@
 package codesearch
 
 import (
+	"log"
 	"reflect"
 	"testing"
 )
+
+var _ = log.Println
 
 func TestBitFunctions(t *testing.T) {
 	orig := []byte("abCDef")
@@ -38,5 +41,14 @@ func TestCaseMasks(t *testing.T) {
 	}
 	if b[1][0] != (0 | 4) {
 		t.Errorf("b[1]")
+	}
+}
+
+func TestNgram(t *testing.T) {
+	in := "abc"
+	n := stringToNGram(in)
+	log.Println(ngramToBytes(0xf0e010))
+	if n.String() != "abc" {
+		t.Errorf("got %q, want %q", n, "abc")
 	}
 }

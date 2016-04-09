@@ -16,7 +16,6 @@ package codesearch
 
 import (
 	"bufio"
-	"encoding/binary"
 	"io"
 	"log"
 	"sort"
@@ -24,95 +23,29 @@ import (
 
 var _ = log.Println
 
-type writer struct {
-	err error
-	w   io.Writer
-	off uint32
-}
-
-func (w *writer) Write(b []byte) error {
-	if w.err != nil {
-		return w.err
-	}
-
-	var n int
-	n, w.err = w.w.Write(b)
-	w.off += uint32(n)
-	return w.err
-}
-
-func (w *writer) Off() uint32 { return w.off }
-
-func (w *writer) B(b byte) {
-	s := []byte{b}
-	w.Write(s)
-}
-
-func (w *writer) U32(n uint32) {
-	var enc [4]byte
-	binary.BigEndian.PutUint32(enc[:], n)
-	w.Write(enc[:])
-}
-
-func (w *writer) Varint(n uint32) {
-	var enc [8]byte
-	m := binary.PutUvarint(enc[:], uint64(n))
-	w.Write(enc[:m])
-}
-
-func (w *writer) startSection(s *section) {
-	s.off = w.Off()
-}
-
-func (w *writer) endSection(s *section) {
-	s.sz = w.Off() - s.off
-}
-
-type section struct {
-	off uint32
-	sz  uint32
-}
-
-func (w *writer) writeSection(s *section) {
-	w.U32(s.off)
-	w.U32(s.sz)
-}
-
 type indexTOC struct {
-	contents          section
-	contentBoundaries section
-	caseBits          section
-	caseBitsIndex     section
-	newlines          section
-	newlinesIndex     section
-	ngramText         section
-	ngramFrequencies  section
-	postings          section
-	postingsIndex     section
-	names             section
-	nameIndex         section
+	contents  compoundSection
+	caseBits  compoundSection
+	newlines  compoundSection
+	ngramText simpleSection
+	postings  compoundSection
+	names     compoundSection
 }
 
-func (t *indexTOC) sections() []*section {
-	return []*section{
+func (t *indexTOC) sections() []section {
+	return []section{
 		&t.contents,
-		&t.contentBoundaries,
 		&t.caseBits,
-		&t.caseBitsIndex,
 		&t.newlines,
-		&t.newlinesIndex,
 		&t.ngramText,
-		&t.ngramFrequencies,
 		&t.postings,
-		&t.postingsIndex,
 		&t.names,
-		&t.nameIndex,
 	}
 }
 
 func (w *writer) writeTOC(toc *indexTOC) {
 	for _, s := range toc.sections() {
-		w.writeSection(s)
+		s.write(w)
 	}
 }
 
@@ -122,53 +55,24 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 
 	w := &writer{w: buffered}
 	toc := indexTOC{}
-	var items []uint32
-	w.startSection(&toc.contents)
+
+	toc.contents.start(w)
 	for _, f := range b.files {
-		items = append(items, w.Off())
-		w.Write(f.content)
+		toc.contents.addItem(w, f.content)
 	}
-	w.endSection(&toc.contents)
+	toc.contents.end(w)
 
-	w.startSection(&toc.contentBoundaries)
-	for _, off := range items {
-		w.U32(off)
-	}
-	w.endSection(&toc.contentBoundaries)
-
-	w.startSection(&toc.caseBits)
-	items = items[:0]
+	toc.caseBits.start(w)
 	for _, f := range b.files {
-		items = append(items, w.Off())
-		w.Write(f.caseBits)
+		toc.caseBits.addItem(w, f.caseBits)
 	}
-	w.endSection(&toc.caseBits)
+	toc.caseBits.end(w)
 
-	w.startSection(&toc.caseBitsIndex)
-	for _, f := range items {
-		w.U32(f)
-	}
-	w.endSection(&toc.caseBitsIndex)
-
-	w.startSection(&toc.newlines)
-	items = items[:0]
+	toc.newlines.start(w)
 	for _, f := range b.files {
-		items = append(items, w.Off())
-		last := -1
-		for i, c := range f.content {
-			if c == '\n' {
-				w.Varint(uint32(i - last))
-				last = i
-			}
-		}
+		toc.newlines.addItem(w, toDeltas(newLinesIndices(f.content)))
 	}
-	w.endSection(&toc.newlines)
-
-	w.startSection(&toc.newlinesIndex)
-	for _, off := range items {
-		w.U32(off)
-	}
-	w.endSection(&toc.newlinesIndex)
+	toc.newlines.end(w)
 
 	var keys []string
 	for k := range b.postings {
@@ -176,58 +80,40 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 	}
 	sort.Strings(keys)
 
-	w.startSection(&toc.ngramText)
+	toc.ngramText.start(w)
 	for _, k := range keys {
 		w.Write([]byte(k))
 	}
-	w.endSection(&toc.ngramText)
+	toc.ngramText.end(w)
 
-	w.startSection(&toc.postings)
-	items = items[:0]
+	toc.postings.start(w)
 	for _, k := range keys {
-		var last uint32
-		items = append(items, w.Off())
-		for _, p := range b.postings[k] {
-			delta := p - last
-			w.Varint(delta)
-			last = p
-		}
+		toc.postings.addItem(w, toDeltas(b.postings[k]))
 	}
-	w.endSection(&toc.postings)
+	toc.postings.end(w)
 
-	w.startSection(&toc.ngramFrequencies)
-	for _, k := range keys {
-		n := uint32(len(b.postings[k]))
-		w.U32(n)
-	}
-	w.endSection(&toc.ngramFrequencies)
-
-	w.startSection(&toc.postingsIndex)
-	for _, off := range items {
-		w.U32(off)
-	}
-	w.endSection(&toc.postingsIndex)
-
-	w.startSection(&toc.names)
-	items = items[:0]
+	toc.names.start(w)
 	for _, f := range b.files {
-		items = append(items, w.Off())
-		w.Write([]byte(f.name))
+		toc.names.addItem(w, []byte(f.name))
 	}
-	w.endSection(&toc.names)
+	toc.names.end(w)
 
-	w.startSection(&toc.nameIndex)
-	for _, off := range items {
-		w.U32(off)
-	}
-	w.endSection(&toc.nameIndex)
+	var tocSection simpleSection
 
-	var tocSection section
-	w.startSection(&tocSection)
+	tocSection.start(w)
 	w.writeTOC(&toc)
 
-	w.endSection(&tocSection)
-	w.writeSection(&tocSection)
-
+	tocSection.end(w)
+	tocSection.write(w)
 	return w.err
+}
+
+func newLinesIndices(in []byte) []uint32 {
+	out := make([]uint32, 0, len(in)/30)
+	for i, c := range in {
+		if c == '\n' {
+			out = append(out, uint32(i))
+		}
+	}
+	return out
 }

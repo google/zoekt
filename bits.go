@@ -101,3 +101,21 @@ func findCaseMasks(pattern []byte) (mask [][]byte, bits [][]byte) {
 
 	return mask, bits
 }
+
+type ngram uint32
+
+func bytesToNGram(b []byte) ngram {
+	return ngram(uint32(b[0]) << 16 | uint32(b[1]) << 8 | uint32(b[2]))
+}
+
+func stringToNGram(s string) ngram {
+	return bytesToNGram([]byte(s))
+}
+
+func ngramToBytes(n ngram) []byte {
+	return []byte{byte(n >> 16), byte(n >> 8), byte(n)}
+}
+
+func (n ngram) String() string {
+	return string(ngramToBytes(n))
+}

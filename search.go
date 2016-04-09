@@ -14,6 +14,12 @@
 
 package codesearch
 
+import (
+	"log"
+)
+
+var _ = log.Println
+
 type searchInput struct {
 	pat string
 
@@ -66,6 +72,5 @@ func (s *searchInput) search() []candidateMatch {
 				})
 		}
 	}
-
 	return candidates
 }

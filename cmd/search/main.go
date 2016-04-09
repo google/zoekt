@@ -37,7 +37,7 @@ func main() {
 	caseSensitive := flag.Bool("case", false, "case sensitive search by default ")
 
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage:\n\n  %s [option] PATTERN\n" +
+		fmt.Fprintf(os.Stderr, "Usage:\n\n  %s [option] PATTERN\n"+
 			"\nIf PATTERN has uppercase characters, the search is case sensitive.\n\n", os.Args[0])
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\n")
@@ -55,7 +55,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 
 	q := &codesearch.Query{
 		Pattern:       pat,
