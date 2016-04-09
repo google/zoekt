@@ -18,19 +18,11 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
+	"strings"
 
 	"github.com/hanwen/codesearch"
 )
-
-// go1.4
-func lastIndex(b string, c byte) int {
-	for i := len(b) - 1; i >= 0; i-- {
-		if b[i] == c {
-			return i
-		}
-	}
-	return -1
-}
 
 const CONTEXT = 20
 
@@ -42,18 +34,34 @@ func displayMatches(matches []codesearch.Match, pat string) {
 
 func main() {
 	index := flag.String("index", ".csindex.*", "index file glob to use")
+	caseSensitive := flag.Bool("case", false, "case sensitive search by default ")
+
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage:\n\n  %s [option] PATTERN\n" +
+			"\nIf PATTERN has uppercase characters, the search is case sensitive.\n\n", os.Args[0])
+		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\n")
+	}
+
 	flag.Parse()
+	if len(flag.Args()) == 0 {
+		fmt.Fprintf(os.Stderr, "Pattern is missing.\n")
+		flag.Usage()
+		os.Exit(2)
+	}
+	pat := flag.Arg(0)
 
 	searcher, err := codesearch.NewShardedSearcher(*index)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	if len(flag.Args()) == 0 {
-		log.Fatal("needs argument")
+
+	q := &codesearch.Query{
+		Pattern:       pat,
+		CaseSensitive: *caseSensitive || strings.ToLower(pat) != pat,
 	}
-	pat := flag.Arg(0)
-	ms, err := searcher.Search(pat)
+	ms, err := searcher.Search(q)
 	if err != nil {
 		log.Fatal(err)
 	}

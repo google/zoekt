@@ -17,6 +17,7 @@ package codesearch
 import (
 	"fmt"
 	"log"
+	"strings"
 )
 
 var _ = log.Println
@@ -24,9 +25,13 @@ var _ = log.Println
 const NGRAM = 3
 
 type fileEntry struct {
+	// lower cased file content.
 	content []byte
-	name    string
-	offset  uint32
+
+	// Bit vector describing where we found uppercase letters
+	caseBits []byte
+	name     string
+	offset   uint32
 }
 
 func (e *fileEntry) end() uint32 {
@@ -51,6 +56,9 @@ func NewIndexBuilder() *IndexBuilder {
 
 func (b *IndexBuilder) AddFile(name string, content []byte) {
 	off := b.contentEnd
+
+	var diff []byte
+	content, diff = splitCase(content)
 	for i := range content {
 		if i+NGRAM > len(content) {
 			break
@@ -60,28 +68,30 @@ func (b *IndexBuilder) AddFile(name string, content []byte) {
 	}
 	b.files = append(b.files,
 		fileEntry{
-			name:    name,
-			content: content,
-			offset:  b.contentEnd,
+			name:     name,
+			content:  content,
+			caseBits: diff,
+			offset:   b.contentEnd,
 		})
 	b.contentEnd += uint32(len(content))
 }
 
-func (b *IndexBuilder) search(str string) ([]candidateMatch, error) {
-	if len(str) < NGRAM {
+func (b *IndexBuilder) search(query *Query) ([]candidateMatch, error) {
+	pattern := strings.ToLower(query.Pattern) // TODO - do something with UTF-8
+	if len(pattern) < NGRAM {
 		return nil, fmt.Errorf("too short")
 	}
 	if len(b.files) == 0 {
 		return nil, fmt.Errorf("no files")
 	}
 
-	first := str[:NGRAM]
-	last := str[len(str)-NGRAM:]
+	first := pattern[:NGRAM]
+	last := pattern[len(pattern)-NGRAM:]
 
 	input := searchInput{
 		first: b.postings[first],
 		last:  b.postings[last],
-		pat:   str,
+		pat:   pattern,
 	}
 
 	for _, f := range b.files {

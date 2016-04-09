@@ -29,7 +29,7 @@ func TestBoundary(t *testing.T) {
 	b.AddFile("f1", []byte("x the"))
 	b.AddFile("f1", []byte("reader"))
 
-	matches, err := b.search("there")
+	matches, err := b.search(&Query{Pattern: "there"})
 	if err != nil {
 		t.Errorf("search: %v", err)
 	}
@@ -48,7 +48,7 @@ func TestBasic(t *testing.T) {
 	b.AddFile("f2", []byte("to carry water in the no later bla"))
 	// -------------------- 0123456789012345678901234567890123456789
 
-	matches, err := b.search("water")
+	matches, err := b.search(&Query{Pattern: "water"})
 	if err != nil {
 		t.Errorf("search: %v", err)
 	}
@@ -132,7 +132,7 @@ func TestNewlines(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSearcher: %v", err)
 	}
-	matches, err := searcher.Search("ne2")
+	matches, err := searcher.Search(&Query{Pattern: "ne2"})
 
 	want := []Match{{
 		Rank:        0,
@@ -145,6 +145,29 @@ func TestNewlines(t *testing.T) {
 	}}
 	if !reflect.DeepEqual(matches, want) {
 		t.Errorf("got %v, want %v", matches, want)
+	}
+}
+
+func TestCaseBits(t *testing.T) {
+	b := NewIndexBuilder()
+	b.AddFile("filename", []byte("abCDE"))
+
+	var buf bytes.Buffer
+	b.Write(&buf)
+	f := &memSeeker{buf.Bytes(), 0}
+
+	r := reader{r: f}
+
+	var toc indexTOC
+	r.readTOC(&toc)
+	if r.err != nil {
+		t.Errorf("got read error %v", r.err)
+	}
+	data := r.readIndexData(&toc)
+	got := r.readContents(data, 0)
+
+	if want := []byte("abcde"); bytes.Compare(got, want) != 0 {
+		t.Errorf("got %q, want %q", got, want)
 	}
 }
 
@@ -246,7 +269,7 @@ func TestFileBasedSearch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSearcher: %v", err)
 	}
-	matches, err := searcher.Search("ananas")
+	matches, err := searcher.Search(&Query{Pattern: "ananas"})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -270,5 +293,49 @@ func TestFileBasedSearch(t *testing.T) {
 	}}
 	if !reflect.DeepEqual(matches, want) {
 		t.Errorf("got matches %#v, want %#v", matches, want)
+	}
+}
+
+func TestCaseFold(t *testing.T) {
+	b := NewIndexBuilder()
+
+	c1 := []byte("I love BaNaNAS.")
+	// ---------- 012345678901234567890123456
+	b.AddFile("f1", c1)
+
+	var buf bytes.Buffer
+	b.Write(&buf)
+	f := &memSeeker{buf.Bytes(), 0}
+
+	searcher, err := NewSearcher(f)
+	if err != nil {
+		t.Fatalf("NewSearcher: %v", err)
+	}
+	matches, err := searcher.Search(
+		&Query{
+			Pattern:       "bananas",
+			CaseSensitive: true,
+		})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+
+	if len(matches) != 0 {
+		t.Errorf("foldcase: got %v, want 0 matches", matches)
+	}
+
+	matches, err = searcher.Search(
+		&Query{
+			Pattern:       "BaNaNAS",
+			CaseSensitive: true,
+		})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+
+	if len(matches) != 1 {
+		t.Errorf("no foldcase: got %v, want 1 matches", matches)
+	} else if matches[0].Offset != 7 {
+		t.Errorf("foldcase: got %v, want offsets 7", matches)
 	}
 }

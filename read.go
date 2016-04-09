@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 )
 
 var _ = log.Println
@@ -76,11 +77,13 @@ type indexData struct {
 	ngramFrequencies []uint32
 	postingIndex     []uint32
 	newlinesIndex    []uint32
+	caseBitsIndex    []uint32
 
 	// offsets of file contents. Includes end of last file.
 	boundaries []uint32
-	fileEnds   []uint32
-	fileNames  []string
+
+	fileEnds  []uint32
+	fileNames []string
 }
 
 func (d *indexData) findNgramIdx(ngram string) (uint32, bool) {
@@ -124,6 +127,7 @@ func (r *reader) readIndexData(toc *indexTOC) *indexData {
 		ngramText:        ngramText(textContent),
 		ngramFrequencies: r.readSectionU32(toc.ngramFrequencies),
 		postingIndex:     r.readSectionU32(toc.postingsIndex),
+		caseBitsIndex:    r.readSectionU32(toc.caseBitsIndex),
 		boundaries:       r.readSectionU32(toc.contentBoundaries),
 		newlinesIndex:    r.readSectionU32(toc.newlinesIndex),
 	}
@@ -132,6 +136,7 @@ func (r *reader) readIndexData(toc *indexTOC) *indexData {
 	d.postingIndex = append(d.postingIndex, toc.postings.off+toc.postings.sz)
 	d.fileEnds = make([]uint32, 0, len(d.boundaries))
 	d.newlinesIndex = append(d.newlinesIndex, toc.newlines.off+toc.newlines.sz)
+	d.caseBitsIndex = append(d.caseBitsIndex, toc.caseBits.off+toc.caseBits.sz)
 	for _, b := range d.boundaries[1:] {
 		d.fileEnds = append(d.fileEnds, b-d.boundaries[0])
 	}
@@ -153,6 +158,13 @@ func (r *reader) readContents(d *indexData, i uint32) []byte {
 	return r.readSectionBlob(section{
 		off: d.boundaries[i],
 		sz:  d.boundaries[i+1] - d.boundaries[i],
+	})
+}
+
+func (r *reader) readCaseBits(d *indexData, i uint32) []byte {
+	return r.readSectionBlob(section{
+		off: d.caseBitsIndex[i],
+		sz:  d.caseBitsIndex[i+1] - d.caseBitsIndex[i],
 	})
 }
 
@@ -197,7 +209,8 @@ func (r *reader) readPostingData(d *indexData, idx uint32) ([]uint32, error) {
 	return ps, nil
 }
 
-func (r *reader) readSearch(data *indexData, str string) (*searchInput, error) {
+func (r *reader) readSearch(data *indexData, query *Query) (*searchInput, error) {
+	str := strings.ToLower(query.Pattern) // UTF-8
 	if len(str) < NGRAM {
 		return nil, fmt.Errorf("patter must be at least %d bytes", NGRAM)
 	}
@@ -229,7 +242,7 @@ func (r *reader) readSearch(data *indexData, str string) (*searchInput, error) {
 }
 
 type Searcher interface {
-	Search(pat string) ([]Match, error)
+	Search(query *Query) ([]Match, error)
 	Close() error
 }
 
@@ -272,27 +285,71 @@ type Match struct {
 	MatchLength int
 }
 
-func (s *searcher) Search(pat string) ([]Match, error) {
+type Query struct {
+	Pattern       string
+	CaseSensitive bool
+}
+
+func (s *searcher) Search(pat *Query) ([]Match, error) {
 	input, err := s.reader.readSearch(s.indexData, pat)
 	if err != nil {
 		return nil, err
 	}
 	cands := input.search()
 
-	asBytes := []byte(pat)
+	asBytes := []byte(pat.Pattern)
+	patLen := len(pat.Pattern)
+
+	// Find bitmasks for case sensitive search
+
+	var patternCaseBits, patternCaseMask [][]byte
+
+	if pat.CaseSensitive {
+		patternCaseMask, patternCaseBits = findCaseMasks(asBytes)
+	}
+	asBytes = toLower(asBytes)
 
 	var matches []Match
 	lastFile := uint32(0xFFFFFFFF)
 	var content []byte
+	var caseBits []byte
 	var newlines []uint32
 	for _, c := range cands {
+		if lastFile != c.file {
+			caseBits = s.reader.readCaseBits(s.indexData, c.file)
+		}
+
+		if pat.CaseSensitive {
+			startExtend := c.offset % 8
+			patEnd := c.offset + uint32(patLen)
+			endExtend := (8 - (patEnd % 8)) % 8
+
+			start := c.offset - startExtend
+			end := c.offset + uint32(patLen) + endExtend
+
+			fileBits := append([]byte{}, caseBits[start/8:end/8]...)
+			mask := patternCaseMask[startExtend]
+			bits := patternCaseBits[startExtend]
+
+			diff := false
+			for i := range fileBits {
+				if fileBits[i]&mask[i] != bits[i] {
+					diff = true
+					break
+				}
+			}
+			if diff {
+				continue
+			}
+		}
+
 		if lastFile != c.file {
 			content = s.reader.readContents(s.indexData, c.file)
 			newlines = s.reader.readNewlines(s.indexData, c.file)
 			lastFile = c.file
 		}
 
-		if bytes.Compare(content[c.offset:c.offset+uint32(len(pat))], asBytes) == 0 {
+		if bytes.Compare(content[c.offset:c.offset+uint32(patLen)], asBytes) == 0 {
 			idx := sort.Search(len(newlines), func(n int) bool {
 				return newlines[n] >= c.offset
 			})
@@ -308,13 +365,14 @@ func (s *searcher) Search(pat string) ([]Match, error) {
 			}
 
 			matches = append(matches, Match{
-				Rank:        int(c.file),
-				Offset:      c.offset,
-				Line:        string(content[start:end]),
+				Rank:   int(c.file),
+				Offset: c.offset,
+				Line: string(toOriginal(
+					content, caseBits, start, int(end))),
 				LineNum:     idx + 1,
 				LineOff:     int(c.offset) - start,
 				Name:        s.indexData.fileNames[c.file],
-				MatchLength: len(pat),
+				MatchLength: patLen,
 			})
 		}
 	}
@@ -367,7 +425,7 @@ func (ss *shardedSearcher) Close() error {
 	return nil
 }
 
-func (ss *shardedSearcher) Search(pat string) ([]Match, error) {
+func (ss *shardedSearcher) Search(pat *Query) ([]Match, error) {
 	type res struct {
 		m   []Match
 		err error

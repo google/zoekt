@@ -81,6 +81,8 @@ func (w *writer) writeSection(s *section) {
 type indexTOC struct {
 	contents          section
 	contentBoundaries section
+	caseBits          section
+	caseBitsIndex     section
 	newlines          section
 	newlinesIndex     section
 	ngramText         section
@@ -95,6 +97,8 @@ func (t *indexTOC) sections() []*section {
 	return []*section{
 		&t.contents,
 		&t.contentBoundaries,
+		&t.caseBits,
+		&t.caseBitsIndex,
 		&t.newlines,
 		&t.newlinesIndex,
 		&t.ngramText,
@@ -131,6 +135,20 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 		w.U32(off)
 	}
 	w.endSection(&toc.contentBoundaries)
+
+	w.startSection(&toc.caseBits)
+	items = items[:0]
+	for _, f := range b.files {
+		items = append(items, w.Off())
+		w.Write(f.caseBits)
+	}
+	w.endSection(&toc.caseBits)
+
+	w.startSection(&toc.caseBitsIndex)
+	for _, f := range items {
+		w.U32(f)
+	}
+	w.endSection(&toc.caseBitsIndex)
 
 	w.startSection(&toc.newlines)
 	items = items[:0]

@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/hanwen/codesearch"
@@ -30,7 +31,13 @@ func (s *httpServer) serveSearchBox(w http.ResponseWriter, r *http.Request) {
 <body>
 <div style="margin: 3em; padding 3em; position: center;">
   <form action="search">
-    Search some code: <input type="text" name="q"> Max results:  <input type="text" name="num" value="50"><br>
+    Search some code: <input type="text" name="q"> Max results:  <input type="text" name="num" value="50">
+  <select name="case">
+    <option value="auto">auto</option>
+    <option value="no">no</option>
+    <option value="yes">yes</option>
+  </select>
+<br>
     <input type="submit" value="Search">
   </form>
 </div>
@@ -53,10 +60,11 @@ type MatchData struct {
 }
 
 type ResultsPage struct {
-	Query      string
-	MatchCount int
-	Duration   time.Duration
-	Matches    []MatchData
+	Query         string
+	CaseSensitive bool
+	MatchCount    int
+	Duration      time.Duration
+	Matches       []MatchData
 }
 
 var resultTemplate = template.Must(template.New("page").Parse(`<html>
@@ -65,7 +73,9 @@ var resultTemplate = template.Must(template.New("page").Parse(`<html>
   </head>
 <body>
   Found {{.MatchCount}} results for
-  <pre style="background: #ffc;">{{.Query}}</pre> in {{.Duration}}:
+  {{if .CaseSensitive}}case sensitive{{end}} search of
+  <pre style="background: #ffc;">{{.Query}}</pre>
+  in {{.Duration}}:
   <p>
   {{range .Matches}}
     <tt>{{.FileName}}:{{.LineNum}}</tt>
@@ -92,15 +102,30 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 	}
 
 	startT := time.Now()
-	matches, err := s.searcher.Search(query)
+
+	q := codesearch.Query{
+		Pattern: query,
+	}
+
+	if c := qvals.Get("case"); c != "" {
+		switch c {
+		case "auto":
+			q.CaseSensitive = strings.ToLower(query) != query
+		default:
+			q.CaseSensitive = c == "yes"
+		}
+	}
+
+	matches, err := s.searcher.Search(&q)
 	if err != nil {
 		return err
 	}
 
 	res := ResultsPage{
-		Query:      query,
-		MatchCount: len(matches),
-		Duration:   time.Now().Sub(startT),
+		Query:         query,
+		CaseSensitive: q.CaseSensitive,
+		MatchCount:    len(matches),
+		Duration:      time.Now().Sub(startT),
 	}
 
 	if len(matches) > num {
