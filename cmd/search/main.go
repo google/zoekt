@@ -27,9 +27,11 @@ import (
 
 const CONTEXT = 20
 
-func displayMatches(matches []codesearch.FileMatch, pat string) {
-	for _, m := range matches {
-		fmt.Printf("%s:%d:%s\n", m.Name, m.Matches[0].LineNum, m.Matches[0].Line)
+func displayMatches(files []codesearch.FileMatch, pat string) {
+	for _, f := range files {
+		for _, m := range f.Matches {
+			fmt.Printf("%s:%d:%s\n", f.Name, m.LineNum, m.Line)
+		}
 	}
 }
 

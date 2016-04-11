@@ -71,6 +71,11 @@ type MatchLine struct {
 	Line    string
 }
 
+type FileMatchData struct {
+	FileName  string
+	Matches   []MatchData
+}
+
 type MatchData struct {
 	FileName  string
 	Pre       string
@@ -82,8 +87,9 @@ type MatchData struct {
 type ResultsPage struct {
 	Query         string
 	MatchCount    int
+	FileCount     int
 	Duration      time.Duration
-	Matches       []MatchData
+	FileMatches       []FileMatchData
 }
 
 var resultTemplate = template.Must(template.New("page").Parse(`<html>
@@ -92,16 +98,17 @@ var resultTemplate = template.Must(template.New("page").Parse(`<html>
   </head>
 <body>` + searchBox +
 `  <hr>
-  Found {{.MatchCount}} results for
+  Found {{.MatchCount}} results in {{.FileCount}} files for
   <pre style="background: #ffc;">{{.Query}}</pre>
   in {{.Duration}}:
   <p>
-  {{range .Matches}}
-    <tt>{{.FileName}}:{{.LineNum}}</tt>
-    <br>
-    <div style="background: #eef;">
-      <pre>{{.Pre}}<b>{{.MatchText}}</b>{{.Post}}</pre>
-    </div>
+  {{range .FileMatches}}
+    <b><tt>{{.FileName}}:</tt></b>
+      <div style="background: #eef;">
+    {{range .Matches}}
+        <pre>{{.LineNum}}: {{.Pre}}<b>{{.MatchText}}</b>{{.Post}}</pre>
+    {{end}}
+      </div>
   {{end}}
 </body>
 </html>
@@ -127,31 +134,45 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 
 	startT := time.Now()
 
-	matches, err := s.searcher.Search(q)
+	files, err := s.searcher.Search(q)
 	if err != nil {
 		return err
 	}
 
+
 	res := ResultsPage{
 		Query:         q.String(),
-		MatchCount:    len(matches),
+		FileCount:    len(files),
 		Duration:      time.Now().Sub(startT),
 	}
-
-	if len(matches) > num {
-		matches = matches[:num]
+	for _, f := range files {
+		res.MatchCount += len(f.Matches)
 	}
 
-	for _, m := range matches {
-		// TODO - visualize all the matches.
-		l := m.Matches[0].LineOff
-		res.Matches = append(res.Matches, MatchData{
-			FileName:  m.Name,
-			LineNum:   m.Matches[0].LineNum,
-			Pre:       m.Matches[0].Line[:l],
-			MatchText: m.Matches[0].Line[l : l+len(query)],
-			Post:      m.Matches[0].Line[l+len(query):],
-		})
+	if len(files) > num {
+		files = files[:num]
+	}
+
+	for _, f := range files {
+		fMatch := FileMatchData{
+			FileName:  f.Name,
+		}
+		for _, m := range f.Matches {
+			l := m.LineOff
+			e := l+m.MatchLength
+			if e > len(m.Line) {
+				e = len(m.Line)
+				log.Printf("%s %#v", f.Name, m)
+			}
+			fMatch.Matches = append(fMatch.Matches, MatchData{
+				FileName: f.Name,
+				LineNum:   m.LineNum,
+				Pre:       m.Line[:l],
+				MatchText: m.Line[l : e],
+				Post:      m.Line[e:],
+			})
+		}
+		res.FileMatches = append(res.FileMatches, fMatch)
 	}
 
 	var buf bytes.Buffer
