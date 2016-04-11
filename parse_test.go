@@ -21,6 +21,9 @@ func TestParseQuery(t *testing.T) {
 		}}, false},
 		{"-abc", &SubstringQuery{Pattern: "abc", Negate: true}, false},
 
+		{"abccase:yes", &SubstringQuery{Pattern: "abccase:yes"}, false},
+		{"file:abc", &SubstringQuery{Pattern: "abc", FileName: true}, false},
+
 		// case
 		{"abc case:yes", &SubstringQuery{Pattern: "abc", CaseSensitive: true}, false},
 		{"abc case:auto", &SubstringQuery{Pattern: "abc", CaseSensitive: false}, false},

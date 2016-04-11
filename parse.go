@@ -47,6 +47,7 @@ func parseStringLiteral(in []byte) (lit []byte, n int, err error) {
 }
 
 var casePrefix = []byte("case:")
+var filePrefix = []byte("file:")
 
 type setCase string
 
@@ -104,6 +105,11 @@ func tryConsumeCase(in []byte) (string, int, bool, error) {
 	return string(arg), n, true, nil
 }
 
+func tryConsumeFile(in []byte) (string, int, bool, error) {
+	arg, n, ok, err := consumeKeyword(in, filePrefix)
+	return string(arg), n, ok, err
+}
+
 func Parse(qStr string) (Query, error) {
 	b := []byte(qStr)
 
@@ -119,6 +125,7 @@ func Parse(qStr string) (Query, error) {
 	}
 
 	setCase := "auto"
+	inWord := false
 	for len(b) > 0 {
 		c := b[0]
 
@@ -128,26 +135,39 @@ func Parse(qStr string) (Query, error) {
 			continue
 		}
 
-		if q, n, ok, err := tryConsumeCase(b); err != nil {
-			return nil, err
-		} else if ok {
-			setCase = q
-			b = b[n:]
-			continue
-		}
-
-		if c == '"' {
-			parse, n, err := parseStringLiteral(b)
-			if err != nil {
+		if !inWord {
+			if q, n, ok, err := tryConsumeCase(b); err != nil {
 				return nil, err
+			} else if ok {
+				setCase = q
+				b = b[n:]
+				continue
 			}
-			b = b[n:]
+			if fn, n, ok, err := tryConsumeFile(b); err != nil {
+				return nil, err
+			} else if ok {
+				add(&SubstringQuery{
+					Pattern:  fn,
+					FileName: true,
+				})
+				b = b[n:]
+				continue
+			}
 
-			current = append(current, parse...)
-			continue
+			if c == '"' {
+				parse, n, err := parseStringLiteral(b)
+				if err != nil {
+					return nil, err
+				}
+				b = b[n:]
+
+				current = append(current, parse...)
+				continue
+			}
 		}
 
 		if isSpace(c) {
+			inWord = false
 			if len(current) > 0 {
 				add(&SubstringQuery{Pattern: string(current)})
 				current = current[:0]
@@ -156,6 +176,7 @@ func Parse(qStr string) (Query, error) {
 			continue
 		}
 
+		inWord = true
 		current = append(current, c)
 		b = b[1:]
 	}

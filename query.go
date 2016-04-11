@@ -31,6 +31,7 @@ type SubstringQuery struct {
 	Pattern       string
 	CaseSensitive bool
 	Negate        bool
+	FileName      bool
 }
 
 func (q *SubstringQuery) String() string {
