@@ -16,6 +16,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/md5"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -24,6 +25,7 @@ import (
 	"path/filepath"
 	"runtime/pprof"
 	"sync"
+	"text/template"
 
 	"github.com/hanwen/codesearch"
 )
@@ -65,7 +67,9 @@ func main() {
 	var shardLimit = flag.Int("shard_limit", 100<<20, "maximum corpus size for a shard")
 	var parallelism = flag.Int("parallelism", 4, "maximum number of parallel indexing processes.")
 
-	index := flag.String("index", ".csindex.%05d", "index file to use")
+	index := flag.String("index",
+		"{{.Home}}/.csindex/{{.Base}}.{{.FP}}.{{.Shard}}",
+		"index file to use. First %x argument is repo ID, second is shard number.")
 
 	flag.Parse()
 
@@ -78,29 +82,69 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	chunks := make(chan []string, 10)
-	agg := fileAggregator{
-		chunks:   chunks,
-		sizeMax:  int64(*sizeMax),
-		shardMax: int64(*shardLimit),
+
+	for _, arg := range flag.Args() {
+		if err := indexArg(arg, *index, *parallelism, *sizeMax, *shardLimit); err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+
+func stableHash(in string) string {
+	h := md5.New()
+	h.Write([]byte(in))
+	return fmt.Sprintf("%x", h.Sum(nil)[:6])
+}
+
+func indexArg(arg string, indexTemplate string, parallelism, sizeMax, shardLimit int) error {
+	tpl, err := template.New("index").Parse(indexTemplate)
+	if err != nil {
+		return err
 	}
 
 	shardNum := 0
+
+	chunks := make(chan []string, 10)
+	agg := fileAggregator{
+		chunks:   chunks,
+		sizeMax:  int64(sizeMax),
+		shardMax: int64(shardLimit),
+	}
+
+
+	abs, err := filepath.Abs(arg)
+	if err != nil {
+		return err
+	}
+	fp := stableHash(filepath.Dir(abs))
+
 	go func() {
-		for _, a := range flag.Args() {
-			if err := filepath.Walk(a, agg.add); err != nil {
-				log.Fatal(err)
-			}
+		if err := filepath.Walk(arg, agg.add); err != nil {
+			log.Fatal(err)
 		}
 		agg.flush()
 	}()
 
 	var wg sync.WaitGroup
 	errors := make(chan error, 10)
-	throttle := make(chan int, *parallelism)
+	throttle := make(chan int, parallelism)
 
 	for names := range chunks {
-		fn := fmt.Sprintf(*index, shardNum)
+		var buf bytes.Buffer
+		if err := tpl.Execute(&buf, struct {
+			Home, FP, Base, Shard string
+		} {
+			os.Getenv("HOME"), fp, filepath.Base(abs),
+			fmt.Sprintf("%05d", shardNum),
+		}); err != nil {
+			return err
+		}
+
+		fn := buf.String()
+
+		if err := os.MkdirAll(filepath.Dir(fn), 0700); err !=  nil {
+			return err
+		}
 		shardNum++
 		wg.Add(1)
 		go func(nm []string) {
@@ -116,11 +160,13 @@ func main() {
 		close(errors)
 	}()
 
+	var lastErr error
 	for err := range errors {
 		if err != nil {
-			log.Fatal(err)
+			lastErr = err
 		}
 	}
+	return lastErr
 }
 
 func buildShard(shardName string, files []string) error {

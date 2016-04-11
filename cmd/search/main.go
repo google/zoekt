@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/hanwen/codesearch"
@@ -28,12 +29,13 @@ const CONTEXT = 20
 
 func displayMatches(matches []codesearch.FileMatch, pat string) {
 	for _, m := range matches {
-		fmt.Printf("%s:%d:%s\n", m.Name, m.Matches[0].LineNum, m.matches[0].Line)
+		fmt.Printf("%s:%d:%s\n", m.Name, m.Matches[0].LineNum, m.Matches[0].Line)
 	}
 }
 
 func main() {
-	index := flag.String("index", ".csindex.*", "index file glob to use")
+	index := flag.String("index",
+		filepath.Join(os.Getenv("HOME"), ".csindex", "*"), "index file glob to use")
 	caseSensitive := flag.Bool("case", false, "case sensitive search by default ")
 
 	flag.Usage = func() {

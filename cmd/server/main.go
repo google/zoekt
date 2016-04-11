@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"os"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -143,7 +145,6 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 	for _, m := range matches {
 		// TODO - visualize all the matches.
 		l := m.Matches[0].LineOff
-		e := l+len(query)
 		res.Matches = append(res.Matches, MatchData{
 			FileName:  m.Name,
 			LineNum:   m.Matches[0].LineNum,
@@ -164,7 +165,7 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 
 func main() {
 	listen := flag.String("listen", ":6070", "address to listen on.")
-	index := flag.String("index", ".csindex.*", "index file glob to use")
+	index := flag.String("index", filepath.Join(os.Getenv("HOME"), ".csindex/*"), "index file glob to use")
 	flag.Parse()
 
 	searcher, err := codesearch.NewShardedSearcher(*index)
