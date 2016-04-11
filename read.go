@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 var _ = log.Println
@@ -175,11 +176,6 @@ func (r *reader) getDocIterator(data *indexData, query *SubstringQuery) (*docIte
 	return input, nil
 }
 
-type Searcher interface {
-	Search(query Query) ([]FileMatch, error)
-	Close() error
-}
-
 type searcher struct {
 	reader    reader
 	indexData *indexData
@@ -207,23 +203,7 @@ func NewSearcher(r ReadSeekCloser) (Searcher, error) {
 	return s, nil
 }
 
-type FileMatch struct {
-	// Ranking; the lower, the better.
-	Rank    int
-	Name    string
-	Matches []Match
-}
-
-type Match struct {
-	Line    string
-	LineNum int
-	LineOff int
-
-	Offset      uint32
-	MatchLength int
-}
-
-func (s *searcher) Search(query Query) ([]FileMatch, error) {
+func (s *searcher) Search(query Query) (*SearchResult, error) {
 	orQ, err := standardize(query)
 	if err != nil {
 		return nil, err
@@ -236,7 +216,6 @@ func (s *searcher) Search(query Query) ([]FileMatch, error) {
 	andQ := orQ.ands[0]
 	return s.andSearch(andQ)
 }
-
 
 type shardedSearcher struct {
 	searchers []Searcher
@@ -283,9 +262,10 @@ func (ss *shardedSearcher) Close() error {
 	return nil
 }
 
-func (ss *shardedSearcher) Search(pat Query) ([]FileMatch, error) {
+func (ss *shardedSearcher) Search(pat Query) (*SearchResult, error) {
+	start := time.Now()
 	type res struct {
-		m   []FileMatch
+		sr   *SearchResult
 		err error
 	}
 	all := make(chan res, len(ss.searchers))
@@ -296,14 +276,16 @@ func (ss *shardedSearcher) Search(pat Query) ([]FileMatch, error) {
 		}(s)
 	}
 
-	var aggregate []FileMatch
+	var aggregate SearchResult
 	for _ = range ss.searchers {
 		r := <-all
 		if r.err != nil {
 			return nil, r.err
 		}
-		aggregate = append(aggregate, r.m...)
+		aggregate.Files = append(aggregate.Files, r.sr.Files...)
+		aggregate.Stats.Add(r.sr.Stats)
 	}
-	sort.Sort((matchSlice)(aggregate))
-	return aggregate, nil
+	sort.Sort((matchSlice)(aggregate.Files))
+	aggregate.Duration = time.Now().Sub(start)
+	return &aggregate, nil
 }

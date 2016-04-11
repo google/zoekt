@@ -28,11 +28,13 @@ type mergedCandidateMatch struct {
 	matches map[*SubstringQuery][]candidateMatch
 }
 
-func mergeCandidates(iters []*docIterator) []mergedCandidateMatch {
+func mergeCandidates(iters []*docIterator, stats *Stats) []mergedCandidateMatch {
 	var cands [][]candidateMatch
 	for _, i := range iters {
 		iterCands := i.next()
 		cands = append(cands, iterCands)
+
+		stats.NgramMatches += len(iterCands)
 	}
 
 	var merged []mergedCandidateMatch
@@ -82,9 +84,11 @@ done:
 	return merged
 }
 
-func (s *searcher) andSearch(andQ *andQuery) ([]FileMatch, error) {
+func (s *searcher) andSearch(andQ *andQuery) (*SearchResult, error) {
+ 	var res SearchResult
 	var caseSensitive bool
 	var iters []*docIterator
+
 	for _, atom := range andQ.atoms {
 		if atom.Negate {
 			return nil, fmt.Errorf("not implemented: negation")
@@ -100,9 +104,8 @@ func (s *searcher) andSearch(andQ *andQuery) ([]FileMatch, error) {
 	}
 
 	// TODO merge mergeCandidates and following loop.
-	cands := mergeCandidates(iters)
+	cands := mergeCandidates(iters, &res.Stats)
 
-	var fileMatches []FileMatch
 	lastFile := uint32(0xFFFFFFFF)
 	var content []byte
 	var caseBits []byte
@@ -135,6 +138,7 @@ nextFileMatch:
 		}
 
 		if lastFile != c.fileID {
+			res.Stats.FilesLoaded++
 			content = s.reader.readContents(s.indexData, c.fileID)
 			newlines = s.reader.readNewlines(s.indexData, c.fileID)
 			lastFile = c.fileID
@@ -175,10 +179,12 @@ nextFileMatch:
 		}
 
 		sortMatches(fMatch.Matches)
-		fileMatches = append(fileMatches, fMatch)
-
+		res.Files = append(res.Files, fMatch)
+		res.Stats.MatchCount += len(fMatch.Matches)
+		res.Stats.FileCount ++
 	}
-	return fileMatches, nil
+
+	return &res, nil
 }
 
 

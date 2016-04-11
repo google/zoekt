@@ -86,8 +86,7 @@ type MatchData struct {
 
 type ResultsPage struct {
 	Query         string
-	MatchCount    int
-	FileCount     int
+	Stats         codesearch.Stats
 	Duration      time.Duration
 	FileMatches       []FileMatchData
 }
@@ -98,9 +97,9 @@ var resultTemplate = template.Must(template.New("page").Parse(`<html>
   </head>
 <body>` + searchBox +
 `  <hr>
-  Found {{.MatchCount}} results in {{.FileCount}} files for
+  Found {{.Stats.MatchCount}} results in {{.Stats.FileCount}} files ({{.Stats.NgramMatches}} ngram matches, {{.Stats.FilesLoaded}} docs loaded): for
   <pre style="background: #ffc;">{{.Query}}</pre>
-  in {{.Duration}}:
+  in {{.Stats.Duration}}
   <p>
   {{range .FileMatches}}
     <b><tt>{{.FileName}}:</tt></b>
@@ -132,28 +131,21 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 		num = 50
 	}
 
-	startT := time.Now()
-
-	files, err := s.searcher.Search(q)
+	result, err := s.searcher.Search(q)
 	if err != nil {
 		return err
 	}
 
-
 	res := ResultsPage{
-		Query:         q.String(),
-		FileCount:    len(files),
-		Duration:      time.Now().Sub(startT),
-	}
-	for _, f := range files {
-		res.MatchCount += len(f.Matches)
+		Stats: result.Stats,
+		Query: q.String(),
 	}
 
-	if len(files) > num {
-		files = files[:num]
+	if len(result.Files) > num {
+		result.Files = result.Files[:num]
 	}
 
-	for _, f := range files {
+	for _, f := range result.Files {
 		fMatch := FileMatchData{
 			FileName:  f.Name,
 		}

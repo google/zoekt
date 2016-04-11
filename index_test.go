@@ -30,12 +30,13 @@ func TestBoundary(t *testing.T) {
 	b.AddFile("f1", []byte("reader"))
 	searcher := searcherForTest(t, b)
 
-	matches, err := searcher.Search(&SubstringQuery{Pattern: "there"})
+	res, err := searcher.Search(&SubstringQuery{Pattern: "there"})
 	if err != nil {
 		t.Errorf("search: %v", err)
 	}
-	if len(matches) > 0 {
-		t.Fatalf("got %v, want no matches", matches)
+
+	if len(res.Files) > 0 {
+		t.Fatalf("got %v, want no matches", res.Files)
 	}
 }
 
@@ -48,10 +49,11 @@ func TestBasic(t *testing.T) {
 	// -------------------- 0123456789012345678901234567890123456789
 
 	searcher := searcherForTest(t, b)
-	fmatches, err := searcher.Search(&SubstringQuery{Pattern: "water"})
+	res, err := searcher.Search(&SubstringQuery{Pattern: "water"})
 	if err != nil {
 		t.Errorf("search: %v", err)
 	}
+	fmatches := res.Files
 	if len(fmatches) != 1 {
 		t.Fatalf("got %v, want 1 matches", fmatches)
 	}
@@ -126,8 +128,8 @@ func TestNewlines(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSearcher: %v", err)
 	}
-	matches, err := searcher.Search(&SubstringQuery{Pattern: "ne2"})
-
+	sres, err := searcher.Search(&SubstringQuery{Pattern: "ne2"})
+	matches := sres.Files
 	want := []FileMatch{{
 		Rank:        0,
 		Name:        "filename",
@@ -256,11 +258,11 @@ func TestFileBasedSearch(t *testing.T) {
 	b.AddFile("f2", c2)
 
 	searcher := searcherForTest(t, b)
-	matches, err := searcher.Search(&SubstringQuery{Pattern: "ananas"})
+	sres, err := searcher.Search(&SubstringQuery{Pattern: "ananas"})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
-
+	matches := sres.Files
 	want := []FileMatch{{
 		Rank:        0,
 		Name:        "f1",
@@ -295,7 +297,7 @@ func TestCaseFold(t *testing.T) {
 	b.AddFile("f1", c1)
 
 	searcher := searcherForTest(t, b)
-	matches, err := searcher.Search(
+	sres, err := searcher.Search(
 		&SubstringQuery{
 			Pattern:       "bananas",
 			CaseSensitive: true,
@@ -303,12 +305,12 @@ func TestCaseFold(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
-
+	matches := sres.Files
 	if len(matches) != 0 {
 		t.Errorf("foldcase: got %v, want 0 matches", matches)
 	}
 
-	matches, err = searcher.Search(
+	sres, err = searcher.Search(
 		&SubstringQuery{
 			Pattern:       "BaNaNAS",
 			CaseSensitive: true,
@@ -316,7 +318,7 @@ func TestCaseFold(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
-
+	matches = sres.Files
 	if len(matches) != 1 {
 		t.Errorf("no foldcase: got %v, want 1 matches", matches)
 	} else if matches[0].Matches[0].Offset != 7 {
@@ -333,7 +335,7 @@ func TestAndSearch(t *testing.T) {
 	b.AddFile("f3", []byte("x banana apple y"))
 	// ---------------------0123456789012345
 	searcher := searcherForTest(t, b)
-	matches, err := searcher.Search(
+	sres, err := searcher.Search(
 		&AndQuery{
 			Children: []Query{
 				&SubstringQuery{
@@ -348,12 +350,22 @@ func TestAndSearch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
-
+	matches := sres.Files
 	if len(matches) != 1 {
 		t.Fatalf("got %v, want 1 match", matches)
 	}
 
 	if matches[0].Matches[0].Offset != 2 || matches[0].Matches[1].Offset != 9 {
 		t.Fatalf("got %v, want offsets 2,9", matches)
+	}
+
+	wantStats := Stats{
+		FilesLoaded: 1,
+		NgramMatches: 4,
+		MatchCount: 2,
+		FileCount: 1,
+	}
+	if !reflect.DeepEqual(sres.Stats, wantStats) {
+		t.Errorf("got stats %#v, want %#v", sres.Stats, wantStats)
 	}
 }
