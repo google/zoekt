@@ -18,6 +18,7 @@ type Match struct {
 
 	Offset      uint32
 	MatchLength int
+	FileName    bool
 }
 
 type Stats struct {

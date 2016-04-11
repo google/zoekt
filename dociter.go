@@ -126,7 +126,7 @@ func (s *docIterator) next() []candidateMatch {
 			s.first = s.first[1:]
 			s.last = s.last[1:]
 
-			if p1+uint32(s.patLen) >= s.ends[s.fileIdx] {
+			if p1+uint32(s.patLen) > s.ends[s.fileIdx] {
 				continue
 			}
 
@@ -144,5 +144,6 @@ func (s *docIterator) next() []candidateMatch {
 				})
 		}
 	}
+
 	return candidates
 }

@@ -175,7 +175,23 @@ func (r *reader) getDocIterator(data *indexData, query *SubstringQuery) (*docIte
 		return nil, fmt.Errorf("pattern %q less than %d bytes", query.Pattern, NGRAM)
 	}
 
+	if query.FileName {
+		return r.getFileNameDocIterator(data, query), nil
+	}
 	return r.getContentDocIterator(data, query)
+}
+
+func (r *reader) getFileNameDocIterator(data *indexData, query *SubstringQuery) *docIterator {
+	str := strings.ToLower(query.Pattern) // TODO - UTF-8
+	di := &docIterator{
+		query:  query,
+		patLen: uint32(len(str)),
+		ends:   data.fileNameIndex[1:],
+		first:  data.fileNameNgrams[stringToNGram(str[:NGRAM])],
+		last:   data.fileNameNgrams[stringToNGram(str[len(str)-NGRAM:])],
+	}
+
+	return di
 }
 
 func (r *reader) getContentDocIterator(data *indexData, query *SubstringQuery) (*docIterator, error) {

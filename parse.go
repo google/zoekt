@@ -65,6 +65,7 @@ func consumeKeyword(in []byte, kw []byte) ([]byte, int, bool, error) {
 	var err error
 	left := in
 	left = left[len(kw):]
+done:
 	for len(left) > 0 {
 		c := left[0]
 		switch {
@@ -78,7 +79,7 @@ func consumeKeyword(in []byte, kw []byte) ([]byte, int, bool, error) {
 			left = left[n:]
 			break
 		case isSpace(c):
-			break
+			break done
 		default:
 			arg = append(arg, c)
 			left = left[1:]

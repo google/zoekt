@@ -24,6 +24,11 @@ func TestParseQuery(t *testing.T) {
 		{"abccase:yes", &SubstringQuery{Pattern: "abccase:yes"}, false},
 		{"file:abc", &SubstringQuery{Pattern: "abc", FileName: true}, false},
 
+		{"file:helpers.go byte", &AndQuery{[]Query{
+			&SubstringQuery{Pattern: "helpers.go", FileName: true},
+			&SubstringQuery{Pattern: "byte"},
+		}}, false},
+
 		// case
 		{"abc case:yes", &SubstringQuery{Pattern: "abc", CaseSensitive: true}, false},
 		{"abc case:auto", &SubstringQuery{Pattern: "abc", CaseSensitive: false}, false},

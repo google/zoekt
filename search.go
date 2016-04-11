@@ -119,6 +119,80 @@ done:
 	return merged
 }
 
+type dataProvider interface {
+	caseBits() []byte
+	contentBits() []byte
+	newlines() []uint32
+}
+
+type contentProvider struct {
+	reader *reader
+	id     *indexData
+	idx    uint32
+	stats  *Stats
+	cb     []byte
+	data   []byte
+	nl     []uint32
+}
+
+func (p *contentProvider) caseMatches(m *candidateMatch) bool {
+	var cb []byte
+	if m.query.FileName {
+		cb = p.id.fileNameCaseBits[p.id.fileNameCaseBitsIndex[p.idx]:p.id.fileNameCaseBitsIndex[p.idx+1]]
+	} else {
+		if p.cb == nil {
+			p.cb = p.reader.readCaseBits(p.id, p.idx)
+		}
+		cb = p.cb
+	}
+	return m.caseMatches(cb)
+}
+
+func (p *contentProvider) matchContent(m *candidateMatch) bool {
+	var content []byte
+	if m.query.FileName {
+		content = p.id.fileNameContent[p.id.fileNameIndex[p.idx]:p.id.fileNameIndex[p.idx+1]]
+	} else {
+		if p.data == nil {
+			p.data = p.reader.readContents(p.id, p.idx)
+			p.stats.FilesLoaded++
+		}
+		content = p.data
+	}
+	return m.matchContent(content)
+}
+
+func (p *contentProvider) fillMatch(m *candidateMatch) Match {
+	if m.query.FileName {
+		return Match{
+			Offset:      m.offset,
+			Line:        string(p.id.fileNameContent[p.id.fileNameIndex[p.idx]:p.id.fileNameIndex[p.idx+1]]),
+			LineOff:     int(m.offset),
+			MatchLength: len(m.substrBytes),
+			FileName:    true,
+		}
+	}
+
+	if p.nl == nil {
+		p.nl = p.reader.readNewlines(p.id, p.idx)
+	}
+	if p.data == nil {
+		p.data = p.reader.readContents(p.id, p.idx)
+		p.stats.FilesLoaded++
+	}
+	if p.cb == nil {
+		p.cb = p.reader.readCaseBits(p.id, p.idx)
+	}
+	num, off, data := m.line(p.nl, p.data, p.cb)
+	return Match{
+		Offset:      m.offset,
+		Line:        string(data),
+		LineNum:     num,
+		LineOff:     off,
+		MatchLength: len(m.substrBytes),
+	}
+}
+
 func (s *searcher) andSearch(andQ *andQuery) (*SearchResult, error) {
 	foundPositive := false
 	for _, atom := range andQ.atoms {
@@ -149,17 +223,19 @@ func (s *searcher) andSearch(andQ *andQuery) (*SearchResult, error) {
 	// TODO merge mergeCandidates and following loop.
 	cands := mergeCandidates(iters, &res.Stats)
 
-	lastFile := uint32(0xFFFFFFFF)
-	var content []byte
-	var caseBits []byte
-	var newlines []uint32
+	cp := contentProvider{
+		idx: uint32(0xFFFFFFFF),
+	}
 
 nextFileMatch:
 	for _, c := range cands {
-		if lastFile != c.fileID {
-			// needed for caseSensitive and for
-			// reconstructing the data.
-			caseBits = s.reader.readCaseBits(s.indexData, c.fileID)
+		if c.fileID != cp.idx {
+			cp = contentProvider{
+				reader: &s.reader,
+				id:     s.indexData,
+				idx:    c.fileID,
+				stats:  &res.Stats,
+			}
 		}
 
 		if caseSensitive {
@@ -167,7 +243,7 @@ nextFileMatch:
 			for q, req := range c.matches {
 				matching := []candidateMatch{}
 				for _, m := range req {
-					if m.caseMatches(caseBits) {
+					if cp.caseMatches(&m) {
 						matching = append(matching, m)
 					}
 				}
@@ -183,7 +259,7 @@ nextFileMatch:
 			for q, req := range c.negateMatches {
 				matching := []candidateMatch{}
 				for _, m := range req {
-					if m.caseMatches(caseBits) {
+					if cp.caseMatches(&m) {
 						matching = append(matching, m)
 					}
 				}
@@ -193,18 +269,11 @@ nextFileMatch:
 			c.negateMatches = trimmed
 		}
 
-		if lastFile != c.fileID {
-			res.Stats.FilesLoaded++
-			content = s.reader.readContents(s.indexData, c.fileID)
-			newlines = s.reader.readNewlines(s.indexData, c.fileID)
-			lastFile = c.fileID
-		}
-
 		trimmed := map[*SubstringQuery][]candidateMatch{}
 		for q, req := range c.matches {
 			matching := []candidateMatch{}
 			for _, m := range req {
-				if m.matchContent(content) {
+				if cp.matchContent(&m) {
 					matching = append(matching, m)
 				}
 			}
@@ -217,7 +286,7 @@ nextFileMatch:
 
 		for _, neg := range c.negateMatches {
 			for _, m := range neg {
-				if m.matchContent(content) {
+				if cp.matchContent(&m) {
 					continue nextFileMatch
 				}
 			}
@@ -228,17 +297,20 @@ nextFileMatch:
 			Rank: int(c.fileID),
 		}
 
+		// If we have content matches, drop the filename match.
+		foundContentMatch := false
 		for _, req := range c.matches {
 			for _, m := range req {
-				num, off, data := m.line(newlines, content, caseBits)
-				fMatch.Matches = append(fMatch.Matches,
-					Match{
-						Offset:      m.offset,
-						Line:        string(data),
-						LineNum:     num,
-						LineOff:     off,
-						MatchLength: len(m.substrBytes),
-					})
+				if !m.query.FileName {
+					foundContentMatch = true
+				}
+			}
+		}
+		for _, req := range c.matches {
+			for _, m := range req {
+				if !m.query.FileName || !foundContentMatch {
+					fMatch.Matches = append(fMatch.Matches, cp.fillMatch(&m))
+				}
 			}
 		}
 

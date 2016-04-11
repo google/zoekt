@@ -375,3 +375,104 @@ func TestAndNegateSearch(t *testing.T) {
 		t.Fatalf("got %v, want offsets 2,9", matches)
 	}
 }
+
+func TestFileSearch(t *testing.T) {
+	b := NewIndexBuilder()
+
+	b.AddFile("banzana", []byte("x orange y"))
+	// --------------------------0123456879
+	b.AddFile("banana", []byte("x apple y"))
+	searcher := searcherForTest(t, b)
+
+	sres, err := searcher.Search(
+		&SubstringQuery{
+			Pattern:  "anan",
+			FileName: true,
+		})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+
+	matches := sres.Files
+	if len(matches) != 1 || len(matches[0].Matches) != 1 {
+		t.Fatalf("got %v, want 1 match", matches)
+	}
+
+	got := matches[0].Matches[0]
+	want := Match{
+		Line:        "banana",
+		Offset:      1,
+		LineOff:     1,
+		MatchLength: 4,
+		FileName:    true,
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v, want %#v", got, want)
+	}
+}
+
+func TestFileRestriction(t *testing.T) {
+	b := NewIndexBuilder()
+
+	b.AddFile("banana1", []byte("x orange y"))
+	// --------------------------0123456879
+	b.AddFile("banana2", []byte("x apple y"))
+	b.AddFile("orange", []byte("x apple y"))
+	searcher := searcherForTest(t, b)
+
+	sres, err := searcher.Search(
+		&AndQuery{[]Query{
+			&SubstringQuery{
+				Pattern:  "banana",
+				FileName: true,
+			},
+			&SubstringQuery{
+				Pattern: "apple",
+			},
+		}})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+
+	matches := sres.Files
+	if len(matches) != 1 || len(matches[0].Matches) != 1 {
+		t.Fatalf("got %v, want 1 match", matches)
+	}
+
+	got := matches[0].Matches[0]
+	want := Match{
+		Line:        "x apple y",
+		Offset:      2,
+		LineOff:     1,
+		MatchLength: 4,
+		FileName:    true,
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v, want %#v", got, want)
+	}
+}
+
+func TestFileNameBoundary(t *testing.T) {
+	b := NewIndexBuilder()
+	b.AddFile("banana2", []byte("x apple y"))
+	b.AddFile("helpers.go", []byte("x apple y"))
+	b.AddFile("foo", []byte("x apple y"))
+	searcher := searcherForTest(t, b)
+
+	sres, err := searcher.Search(
+		&SubstringQuery{
+			Pattern:  "helpers.go",
+			FileName: true,
+		})
+
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+
+	matches := sres.Files
+	if len(matches) != 1 || len(matches[0].Matches) != 1 {
+		t.Fatalf("got %v, want 1 match", matches)
+	}
+}
