@@ -13,16 +13,16 @@ func TestParseQuery(t *testing.T) {
 	}
 
 	for _, c := range []testcase{
-		{"abc", &AndQuery{[]Query{&SubstringQuery{Pattern: "abc"}}}, false},
-		{"\"abc bcd\"", &AndQuery{[]Query{&SubstringQuery{Pattern: "abc bcd"}}}, false},
+		{"abc", &SubstringQuery{Pattern: "abc"}, false},
+		{"\"abc bcd\"", &SubstringQuery{Pattern: "abc bcd"}, false},
 		{"abc bcd", &AndQuery{[]Query{
 			&SubstringQuery{Pattern: "abc"},
 			&SubstringQuery{Pattern: "bcd"},
 		}}, false},
-		{"abc case:yes", &AndQuery{[]Query{&SubstringQuery{Pattern: "abc", CaseSensitive: true}}}, false},
-		{"abc case:auto", &AndQuery{[]Query{&SubstringQuery{Pattern: "abc", CaseSensitive: false}}}, false},
-		{"ABC case:auto", &AndQuery{[]Query{&SubstringQuery{Pattern: "ABC", CaseSensitive: true}}}, false},
-		{"ABC case:\"auto\"", &AndQuery{[]Query{&SubstringQuery{Pattern: "ABC", CaseSensitive: true}}}, false},
+		{"abc case:yes", &SubstringQuery{Pattern: "abc", CaseSensitive: true}, false},
+		{"abc case:auto", &SubstringQuery{Pattern: "abc", CaseSensitive: false}, false},
+		{"ABC case:auto", &SubstringQuery{Pattern: "ABC", CaseSensitive: true}, false},
+		{"ABC case:\"auto\"", &SubstringQuery{Pattern: "ABC", CaseSensitive: true}, false},
 
 		// errors.
 		{"\"abc", nil, true},
