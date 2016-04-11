@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/hanwen/codesearch"
@@ -18,11 +17,39 @@ type httpServer struct {
 	searcher codesearch.Searcher
 }
 
+var didYouMeanTemplate = template.Must(template.New("didyoumean").Parse(`<html>
+  <head>
+    <title>Error</title>
+  </head>
+  <body>
+    <p>{{.Message}}. Did you mean <a href="/search?q={{.Suggestion}}">{{.Suggestion}}</a> ?
+  </body>
+</html>
+`))
+
 func (s *httpServer) serveSearch(w http.ResponseWriter, r *http.Request) {
-	if err := s.serveSearchErr(w, r); err != nil {
+	err := s.serveSearchErr(w, r)
+
+	if suggest, ok := err.(*codesearch.SuggestQueryError); ok {
+		var buf bytes.Buffer
+		if err := didYouMeanTemplate.Execute(&buf, suggest); err != nil {
+			http.Error(w, err.Error(), http.StatusTeapot)
+		}
+
+		w.Write(buf.Bytes())
+		return
+	}
+
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusTeapot)
 	}
 }
+
+const searchBox = `
+  <form action="search">
+    Search some code: <input type="text" name="q"> Max results:  <input style="width: 5em;" type="text" name="num" value="50"> <input type="submit" value="Search">
+  </form>
+`
 
 func (s *httpServer) serveSearchBox(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`<html>
@@ -30,16 +57,7 @@ func (s *httpServer) serveSearchBox(w http.ResponseWriter, r *http.Request) {
 </head>
 <body>
 <div style="margin: 3em; padding 3em; position: center;">
-  <form action="search">
-    Search some code: <input type="text" name="q"> Max results:  <input type="text" name="num" value="50">
-  <select name="case">
-    <option value="auto">auto</option>
-    <option value="no">no</option>
-    <option value="yes">yes</option>
-  </select>
-<br>
-    <input type="submit" value="Search">
-  </form>
+` + searchBox + `
 </div>
 </body>
 </html>
@@ -61,7 +79,6 @@ type MatchData struct {
 
 type ResultsPage struct {
 	Query         string
-	CaseSensitive bool
 	MatchCount    int
 	Duration      time.Duration
 	Matches       []MatchData
@@ -71,9 +88,9 @@ var resultTemplate = template.Must(template.New("page").Parse(`<html>
   <head>
     <title>Search results</title>
   </head>
-<body>
+<body>` + searchBox +
+`  <hr>
   Found {{.MatchCount}} results for
-  {{if .CaseSensitive}}case sensitive{{end}} search of
   <pre style="background: #ffc;">{{.Query}}</pre>
   in {{.Duration}}:
   <p>
@@ -91,6 +108,11 @@ var resultTemplate = template.Must(template.New("page").Parse(`<html>
 func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) error {
 	qvals := r.URL.Query()
 	query := qvals.Get("q")
+	q, err := codesearch.Parse(query)
+	if err != nil {
+		return err
+	}
+
 	numStr := qvals.Get("num")
 	if query == "" {
 		return fmt.Errorf("no query found")
@@ -103,27 +125,13 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 
 	startT := time.Now()
 
-	q := codesearch.SubstringQuery{
-		Pattern: query,
-	}
-
-	if c := qvals.Get("case"); c != "" {
-		switch c {
-		case "auto":
-			q.CaseSensitive = strings.ToLower(query) != query
-		default:
-			q.CaseSensitive = c == "yes"
-		}
-	}
-
-	matches, err := s.searcher.Search(&q)
+	matches, err := s.searcher.Search(q)
 	if err != nil {
 		return err
 	}
 
 	res := ResultsPage{
-		Query:         query,
-		CaseSensitive: q.CaseSensitive,
+		Query:         q.String(),
 		MatchCount:    len(matches),
 		Duration:      time.Now().Sub(startT),
 	}
@@ -135,6 +143,7 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 	for _, m := range matches {
 		// TODO - visualize all the matches.
 		l := m.Matches[0].LineOff
+		e := l+len(query)
 		res.Matches = append(res.Matches, MatchData{
 			FileName:  m.Name,
 			LineNum:   m.Matches[0].LineNum,

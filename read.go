@@ -146,7 +146,7 @@ func (r *reader) readNewlines(d *indexData, i uint32) []uint32 {
 func (r *reader) getDocIterator(data *indexData, query *SubstringQuery) (*docIterator, error) {
 	str := strings.ToLower(query.Pattern) // UTF-8
 	if len(str) < NGRAM {
-		return nil, fmt.Errorf("pattern must be at least %d bytes", NGRAM)
+		return nil, fmt.Errorf("pattern %q less than %d bytes", str, NGRAM)
 	}
 
 	input := &docIterator{
