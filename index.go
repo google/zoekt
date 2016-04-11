@@ -23,26 +23,53 @@ var _ = log.Println
 
 const NGRAM = 3
 
-type fileEntry struct {
-	// lower cased file content.
-	content []byte
+type searchableString struct {
+	// lower cased data.
+	data []byte
 
 	// Bit vector describing where we found uppercase letters
 	caseBits []byte
-	name     string
-	offset   uint32
+
+	// offset of the content
+	offset uint32
 }
 
-func (e *fileEntry) end() uint32 {
-	return e.offset + uint32(len(e.content))
+func (e *searchableString) end() uint32 {
+	return e.offset + uint32(len(e.data))
+}
+
+func newSearchableString(data []byte, startOff uint32, postings map[string][]uint32) *searchableString {
+	dest := searchableString{
+		offset: startOff,
+	}
+	dest.data, dest.caseBits = splitCase(data)
+	for i := range dest.data {
+		if i+NGRAM > len(dest.data) {
+			break
+		}
+		ngram := string(dest.data[i : i+NGRAM])
+		postings[ngram] = append(postings[ngram], startOff+uint32(i))
+	}
+	return &dest
+}
+
+type fileEntry struct {
+	content *searchableString
+	name    *searchableString
+	nameStr string
 }
 
 type IndexBuilder struct {
 	contentEnd uint32
-	files      []fileEntry
+	nameEnd    uint32
+
+	files []fileEntry
 
 	// ngram => posting.
-	postings map[string][]uint32
+	contentPostings map[string][]uint32
+
+	// like postings, but for filenames
+	namePostings map[string][]uint32
 }
 
 func (m *candidateMatch) String() string {
@@ -50,27 +77,19 @@ func (m *candidateMatch) String() string {
 }
 
 func NewIndexBuilder() *IndexBuilder {
-	return &IndexBuilder{postings: make(map[string][]uint32)}
+	return &IndexBuilder{
+		contentPostings: make(map[string][]uint32),
+		namePostings:    make(map[string][]uint32),
+	}
 }
 
 func (b *IndexBuilder) AddFile(name string, content []byte) {
-	off := b.contentEnd
-
-	var diff []byte
-	content, diff = splitCase(content)
-	for i := range content {
-		if i+NGRAM > len(content) {
-			break
-		}
-		ngram := string(content[i : i+NGRAM])
-		b.postings[ngram] = append(b.postings[ngram], off+uint32(i))
-	}
 	b.files = append(b.files,
 		fileEntry{
-			name:     name,
-			content:  content,
-			caseBits: diff,
-			offset:   b.contentEnd,
+			content: newSearchableString(content, b.contentEnd, b.contentPostings),
+			name:    newSearchableString([]byte(name), b.nameEnd, b.namePostings),
+			nameStr: name,
 		})
 	b.contentEnd += uint32(len(content))
+	b.nameEnd += uint32(len(name))
 }

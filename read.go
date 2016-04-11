@@ -54,7 +54,15 @@ type indexData struct {
 	// offsets of file contents. Includes end of last file.
 	boundaries []uint32
 
-	fileEnds  []uint32
+	fileEnds []uint32
+
+	fileNameContent       []byte
+	fileNameCaseBits      []byte
+	fileNameCaseBitsIndex []uint32
+	fileNameIndex         []uint32
+	fileNameNgrams        map[ngram][]uint32
+
+	// TODO - delme
 	fileNames []string
 }
 
@@ -83,17 +91,22 @@ func (r *reader) readIndexData(toc *indexTOC) *indexData {
 		return nil
 	}
 
+	toc.contents.readIndex(r)
 	toc.postings.readIndex(r)
 	toc.caseBits.readIndex(r)
 	toc.newlines.readIndex(r)
-	toc.contents.readIndex(r)
+
+	toc.namePostings.readIndex(r)
+	toc.nameCaseBits.readIndex(r)
+	toc.nameContents.readIndex(r)
 
 	d := indexData{
-		postingsIndex: toc.postings.absoluteIndex(),
-		caseBitsIndex: toc.caseBits.absoluteIndex(),
-		boundaries:    toc.contents.absoluteIndex(),
-		newlinesIndex: toc.newlines.absoluteIndex(),
-		ngrams:        map[ngram]simpleSection{},
+		postingsIndex:  toc.postings.absoluteIndex(),
+		caseBitsIndex:  toc.caseBits.absoluteIndex(),
+		boundaries:     toc.contents.absoluteIndex(),
+		newlinesIndex:  toc.newlines.absoluteIndex(),
+		ngrams:         map[ngram]simpleSection{},
+		fileNameNgrams: map[ngram][]uint32{},
 	}
 
 	textContent := r.readSectionBlob(toc.ngramText)
@@ -106,6 +119,21 @@ func (r *reader) readIndexData(toc *indexTOC) *indexData {
 	}
 
 	d.fileEnds = toc.contents.relativeIndex()[1:]
+
+	d.fileNameContent = r.readSectionBlob(toc.nameContents.data)
+	d.fileNameCaseBits = r.readSectionBlob(toc.nameCaseBits.data)
+	d.fileNameCaseBitsIndex = toc.nameCaseBits.relativeIndex()
+	d.fileNameIndex = toc.nameContents.relativeIndex()
+
+	nameNgramText := r.readSectionBlob(toc.nameNgramText)
+	fileNamePostingsData := r.readSectionBlob(toc.namePostings.data)
+	fileNamePostingsIndex := toc.namePostings.relativeIndex()
+	for i := 0; i < len(nameNgramText); i += NGRAM {
+		j := i / NGRAM
+		off := fileNamePostingsIndex[j]
+		end := fileNamePostingsIndex[j+1]
+		d.fileNameNgrams[bytesToNGram(nameNgramText[i:i+NGRAM])] = fromDeltas(fileNamePostingsData[off:end])
+	}
 
 	toc.names.readIndex(r)
 	fnIndex := toc.names.relativeIndex()
@@ -143,11 +171,15 @@ func (r *reader) readNewlines(d *indexData, i uint32) []uint32 {
 }
 
 func (r *reader) getDocIterator(data *indexData, query *SubstringQuery) (*docIterator, error) {
-	str := strings.ToLower(query.Pattern) // UTF-8
-	if len(str) < NGRAM {
-		return nil, fmt.Errorf("pattern %q less than %d bytes", str, NGRAM)
+	if len(query.Pattern) < NGRAM {
+		return nil, fmt.Errorf("pattern %q less than %d bytes", query.Pattern, NGRAM)
 	}
 
+	return r.getContentDocIterator(data, query)
+}
+
+func (r *reader) getContentDocIterator(data *indexData, query *SubstringQuery) (*docIterator, error) {
+	str := strings.ToLower(query.Pattern) // TODO - UTF-8
 	input := &docIterator{
 		query:  query,
 		patLen: uint32(len(str)),

@@ -40,10 +40,14 @@ func (q *SubstringQuery) String() string {
 		s = "-"
 	}
 
+	t := "sub"
+	if q.FileName {
+		t = "file"
+	}
+
+	s += fmt.Sprintf("%sstr:%q", t, q.Pattern)
 	if q.CaseSensitive {
-		s += fmt.Sprintf("case_substr:%q", q.Pattern)
-	} else {
-		s += fmt.Sprintf("substr:%q", q.Pattern)
+		s = "case_" + s
 	}
 	return s
 }
@@ -134,8 +138,7 @@ func flattenAndOr(children []Query, typ Query) ([]Query, bool) {
 	return flat, changed
 }
 
-// (and (and x y) z) => (and x y z)
-// (and (or a b) Q) => (or (a and Q) (b and Q))
+// (and (and x y) z) => (and x y z) , the same for "or"
 func flatten(q Query) (Query, bool) {
 	switch s := q.(type) {
 	case *AndQuery:

@@ -26,10 +26,17 @@ var _ = log.Println
 type indexTOC struct {
 	contents  compoundSection
 	caseBits  compoundSection
+	postings  compoundSection
 	newlines  compoundSection
 	ngramText simpleSection
-	postings  compoundSection
-	names     compoundSection
+
+	nameContents  compoundSection
+	nameCaseBits  compoundSection
+	nameNgramText simpleSection
+	namePostings  compoundSection
+
+	// TODO - delme
+	names compoundSection
 }
 
 func (t *indexTOC) sections() []section {
@@ -40,6 +47,11 @@ func (t *indexTOC) sections() []section {
 		&t.ngramText,
 		&t.postings,
 		&t.names,
+
+		&t.nameContents,
+		&t.nameCaseBits,
+		&t.nameNgramText,
+		&t.namePostings,
 	}
 }
 
@@ -58,24 +70,24 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 
 	toc.contents.start(w)
 	for _, f := range b.files {
-		toc.contents.addItem(w, f.content)
+		toc.contents.addItem(w, f.content.data)
 	}
 	toc.contents.end(w)
 
 	toc.caseBits.start(w)
 	for _, f := range b.files {
-		toc.caseBits.addItem(w, f.caseBits)
+		toc.caseBits.addItem(w, f.content.caseBits)
 	}
 	toc.caseBits.end(w)
 
 	toc.newlines.start(w)
 	for _, f := range b.files {
-		toc.newlines.addItem(w, toDeltas(newLinesIndices(f.content)))
+		toc.newlines.addItem(w, toDeltas(newLinesIndices(f.content.data)))
 	}
 	toc.newlines.end(w)
 
 	var keys []string
-	for k := range b.postings {
+	for k := range b.contentPostings {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
@@ -88,13 +100,45 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 
 	toc.postings.start(w)
 	for _, k := range keys {
-		toc.postings.addItem(w, toDeltas(b.postings[k]))
+		toc.postings.addItem(w, toDeltas(b.contentPostings[k]))
 	}
 	toc.postings.end(w)
 
+	// names.
+	toc.nameContents.start(w)
+	for _, f := range b.files {
+		toc.nameContents.addItem(w, f.name.data)
+	}
+	toc.nameContents.end(w)
+
+	toc.nameCaseBits.start(w)
+	for _, f := range b.files {
+		toc.nameCaseBits.addItem(w, f.name.caseBits)
+	}
+	toc.nameCaseBits.end(w)
+
+	keys = keys[:0]
+	for k := range b.namePostings {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	toc.nameNgramText.start(w)
+	for _, k := range keys {
+		w.Write([]byte(k))
+	}
+	toc.nameNgramText.end(w)
+
+	toc.namePostings.start(w)
+	for _, k := range keys {
+		toc.namePostings.addItem(w, toDeltas(b.namePostings[k]))
+	}
+	toc.namePostings.end(w)
+
+	// TODO - delme.
 	toc.names.start(w)
 	for _, f := range b.files {
-		toc.names.addItem(w, []byte(f.name))
+		toc.names.addItem(w, []byte(f.nameStr))
 	}
 	toc.names.end(w)
 

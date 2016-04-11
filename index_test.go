@@ -171,49 +171,6 @@ func TestCaseBits(t *testing.T) {
 	}
 }
 
-func TestReadWrite(t *testing.T) {
-	b := NewIndexBuilder()
-	b.AddFile("filename", []byte("abcde"))
-
-	var buf bytes.Buffer
-	b.Write(&buf)
-	f := &memSeeker{buf.Bytes(), 0}
-
-	r := reader{r: f}
-
-	var toc indexTOC
-	r.readTOC(&toc)
-
-	if r.err != nil {
-		t.Errorf("got read error %v", r.err)
-	}
-	if toc.contents.data.sz != 5 {
-		t.Errorf("got contents size %d, want 5", toc.contents.data.sz)
-	}
-
-	data := r.readIndexData(&toc)
-	if want := []string{"filename"}; !reflect.DeepEqual(data.fileNames, want) {
-		t.Errorf("got filenames %s, want %v", data.fileNames, want)
-	}
-
-	if len(data.ngrams) != 3 {
-		t.Fatalf("got ngrams %v, want 3 ngrams", data.ngrams)
-	}
-
-	if want := []uint32{5}; !reflect.DeepEqual(data.fileEnds, want) {
-		t.Fatalf("got fileEnds %v, want %v", data.fileEnds, want)
-	}
-
-	if _, ok := data.ngrams[stringToNGram("bcq")]; ok {
-		t.Errorf("found ngram bcd in %v", data.ngrams)
-	}
-
-	got := fromDeltas(r.readSectionBlob(data.ngrams[stringToNGram("bcd")]))
-	if want := []uint32{1}; !reflect.DeepEqual(got, want) {
-		t.Errorf("got posting data %v, want %v", got, want)
-	}
-}
-
 func TestDelta(t *testing.T) {
 	b := NewIndexBuilder()
 
