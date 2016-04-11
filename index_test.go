@@ -368,3 +368,53 @@ func TestAndSearch(t *testing.T) {
 		t.Errorf("got stats %#v, want %#v", sres.Stats, wantStats)
 	}
 }
+
+func TestOnlyNegations(t *testing.T) {
+	b := NewIndexBuilder()
+
+	b.AddFile("f1", []byte("x banana y"))
+	searcher := searcherForTest(t, b)
+
+	_, err := searcher.Search(&SubstringQuery{
+		Pattern: "bla",
+		Negate:  true})
+	if err == nil {
+		t.Fatalf("should return error on query with negations only.")
+	}
+}
+
+func TestAndNegateSearch(t *testing.T) {
+	b := NewIndexBuilder()
+
+	b.AddFile("f1", []byte("x banana y"))
+	b.AddFile("f4", []byte("x banana apple y"))
+	// ---------------------0123456789012345
+	searcher := searcherForTest(t, b)
+	sres, err := searcher.Search(
+		&AndQuery{
+			Children: []Query{
+				&SubstringQuery{
+					Pattern: "banana",
+				},
+				&SubstringQuery{
+					Pattern: "apple",
+					Negate:  true,
+				},
+			},
+		})
+
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	matches := sres.Files
+
+	if len(matches) != 1 || len(matches[0].Matches) != 1 {
+		t.Fatalf("got %v, want 1 match", matches)
+	}
+	if matches[0].Name != "f1" {
+		t.Fatalf("got match %#v, want FileName: f1", matches[0])
+	}
+	if matches[0].Matches[0].Offset != 2 {
+		t.Fatalf("got %v, want offsets 2,9", matches)
+	}
+}

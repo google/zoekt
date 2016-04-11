@@ -19,11 +19,13 @@ func TestParseQuery(t *testing.T) {
 			&SubstringQuery{Pattern: "abc"},
 			&SubstringQuery{Pattern: "bcd"},
 		}}, false},
+		{"-abc", &SubstringQuery{Pattern: "abc", Negate: true}, false},
+
+		// case
 		{"abc case:yes", &SubstringQuery{Pattern: "abc", CaseSensitive: true}, false},
 		{"abc case:auto", &SubstringQuery{Pattern: "abc", CaseSensitive: false}, false},
 		{"ABC case:auto", &SubstringQuery{Pattern: "ABC", CaseSensitive: true}, false},
 		{"ABC case:\"auto\"", &SubstringQuery{Pattern: "ABC", CaseSensitive: true}, false},
-
 		// errors.
 		{"\"abc", nil, true},
 		{"\"a\\", nil, true},

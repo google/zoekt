@@ -164,6 +164,8 @@ func Parse(qStr string) (Query, error) {
 		add(&SubstringQuery{Pattern: string(current)})
 	}
 
+	qs = pushDownNegations(&AndQuery{qs}).(*AndQuery).Children
+
 	for _, q := range qs {
 		s := q.(*SubstringQuery)
 		if len(s.Pattern) < 3 {

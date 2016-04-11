@@ -24,16 +24,21 @@ var _ = log.Println
 
 // All the matches for a given file.
 type mergedCandidateMatch struct {
-	fileID  uint32
-	matches map[*SubstringQuery][]candidateMatch
+	fileID        uint32
+	matches       map[*SubstringQuery][]candidateMatch
+	negateMatches map[*SubstringQuery][]candidateMatch
 }
 
 func mergeCandidates(iters []*docIterator, stats *Stats) []mergedCandidateMatch {
 	var cands [][]candidateMatch
+	var negateCands [][]candidateMatch
 	for _, i := range iters {
 		iterCands := i.next()
-		cands = append(cands, iterCands)
-
+		if i.query.Negate {
+			negateCands = append(negateCands, iterCands)
+		} else {
+			cands = append(cands, iterCands)
+		}
 		stats.NgramMatches += len(iterCands)
 	}
 
@@ -62,10 +67,22 @@ done:
 			continue
 		}
 
-		newCands = newCands[:0]
+		newCands = nil
+		for _, ms := range negateCands {
+			for len(ms) > 0 && ms[0].file < nextDoc {
+				ms = ms[1:]
+			}
+			if len(ms) > 0 {
+				newCands = append(newCands, ms)
+			}
+		}
+		negateCands = newCands
+
+		newCands = nil
 		mc := mergedCandidateMatch{
-			fileID:  nextDoc,
-			matches: map[*SubstringQuery][]candidateMatch{},
+			fileID:        nextDoc,
+			matches:       map[*SubstringQuery][]candidateMatch{},
+			negateMatches: map[*SubstringQuery][]candidateMatch{},
 		}
 		for _, ms := range cands {
 			var sqMatches []candidateMatch
@@ -77,6 +94,24 @@ done:
 			mc.matches[sqMatches[0].query] = sqMatches
 			newCands = append(newCands, ms[:])
 		}
+		cands = newCands
+
+		newCands = nil
+		for _, ms := range negateCands {
+			var sqMatches []candidateMatch
+			for len(ms) > 0 && ms[0].file == nextDoc {
+				sqMatches = append(sqMatches, ms[0])
+				ms = ms[1:]
+			}
+			if len(sqMatches) > 0 {
+				mc.negateMatches[sqMatches[0].query] = sqMatches
+			}
+
+			if len(ms) > 0 {
+				newCands = append(newCands, ms)
+			}
+		}
+		negateCands = newCands
 
 		merged = append(merged, mc)
 	}
@@ -85,14 +120,22 @@ done:
 }
 
 func (s *searcher) andSearch(andQ *andQuery) (*SearchResult, error) {
+	foundPositive := false
+	for _, atom := range andQ.atoms {
+		if !atom.Negate {
+			foundPositive = true
+			break
+		}
+	}
+	if !foundPositive {
+		return nil, fmt.Errorf("must have a positive query atom in AND query.")
+	}
+
 	var res SearchResult
 	var caseSensitive bool
 	var iters []*docIterator
 
 	for _, atom := range andQ.atoms {
-		if atom.Negate {
-			return nil, fmt.Errorf("not implemented: negation")
-		}
 		caseSensitive = caseSensitive || atom.CaseSensitive
 
 		// TODO - postingsCache
@@ -135,6 +178,19 @@ nextFileMatch:
 			}
 
 			c.matches = trimmed
+
+			trimmed = map[*SubstringQuery][]candidateMatch{}
+			for q, req := range c.negateMatches {
+				matching := []candidateMatch{}
+				for _, m := range req {
+					if m.caseMatches(caseBits) {
+						matching = append(matching, m)
+					}
+				}
+				trimmed[q] = matching
+			}
+
+			c.negateMatches = trimmed
 		}
 
 		if lastFile != c.fileID {
@@ -158,6 +214,14 @@ nextFileMatch:
 			trimmed[q] = matching
 		}
 		c.matches = trimmed
+
+		for _, neg := range c.negateMatches {
+			for _, m := range neg {
+				if m.matchContent(content) {
+					continue nextFileMatch
+				}
+			}
+		}
 
 		fMatch := FileMatch{
 			Name: s.indexData.fileNames[c.fileID],
