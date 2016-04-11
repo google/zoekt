@@ -22,8 +22,8 @@ import (
 var _ = log.Println
 
 func TestQueryString(t *testing.T) {
-	q := &OrQuery{ []Query{
-		&AndQuery{ []Query{
+	q := &OrQuery{[]Query{
+		&AndQuery{[]Query{
 			&SubstringQuery{Pattern: "hoi"},
 			&SubstringQuery{Pattern: "neg", Negate: true},
 			&NotQuery{&SubstringQuery{Pattern: "hai"}},
@@ -38,13 +38,13 @@ func TestQueryString(t *testing.T) {
 
 func TestQueryFlatten(t *testing.T) {
 	var q Query
-	q = &OrQuery{ []Query{
-		&OrQuery{ []Query {
-			&AndQuery{ []Query{
+	q = &OrQuery{[]Query{
+		&OrQuery{[]Query{
+			&AndQuery{[]Query{
 				&SubstringQuery{Pattern: "hoi"},
 				&NotQuery{&SubstringQuery{Pattern: "hai"}},
 			}},
-			&OrQuery{ []Query{
+			&OrQuery{[]Query{
 				&SubstringQuery{Pattern: "zip"},
 				&SubstringQuery{Pattern: "zap"},
 			}},
@@ -61,9 +61,9 @@ func TestQueryFlatten(t *testing.T) {
 
 func TestStandardizeQuery(t *testing.T) {
 	var q Query
-	q = &OrQuery{ []Query{
+	q = &OrQuery{[]Query{
 		&SubstringQuery{Pattern: "A"},
-		&AndQuery{ []Query{
+		&AndQuery{[]Query{
 			&SubstringQuery{Pattern: "B"},
 			&SubstringQuery{Pattern: "C"},
 		}}}}

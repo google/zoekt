@@ -23,23 +23,23 @@ import (
 var _ = log.Println
 
 type docIterator struct {
-	query  *SubstringQuery
+	query *SubstringQuery
 
-	patLen   uint32
-	first []uint32
-	last  []uint32
+	patLen uint32
+	first  []uint32
+	last   []uint32
 
 	fileIdx int
-	ends  []uint32
+	ends    []uint32
 }
 
 type candidateMatch struct {
-	query  *SubstringQuery
+	query *SubstringQuery
 
 	substrBytes []byte
 	lowered     []byte
-	caseMask [][]byte
-	caseBits [][]byte
+	caseMask    [][]byte
+	caseBits    [][]byte
 
 	file   uint32
 	offset uint32
@@ -136,11 +136,11 @@ func (s *docIterator) next() []candidateMatch {
 			}
 			candidates = append(candidates,
 				candidateMatch{
-					query: s.query,
+					query:       s.query,
 					substrBytes: patBytes,
-					lowered: lowerPatBytes,
-					file: uint32(s.fileIdx),
-					offset: p1 - fileStart,
+					lowered:     lowerPatBytes,
+					file:        uint32(s.fileIdx),
+					offset:      p1 - fileStart,
 				})
 		}
 	}

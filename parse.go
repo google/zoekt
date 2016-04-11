@@ -9,7 +9,7 @@ import (
 var _ = log.Printf
 
 type SuggestQueryError struct {
-	Message string
+	Message    string
 	Suggestion string
 }
 
@@ -46,7 +46,6 @@ func parseStringLiteral(in []byte) (lit []byte, n int, err error) {
 	return lit, len(in) - len(left), nil
 }
 
-
 var casePrefix = []byte("case:")
 
 type setCase string
@@ -70,7 +69,7 @@ func consumeKeyword(in []byte, kw []byte) ([]byte, int, bool, error) {
 		switch {
 		case c == '"':
 			var n int
-			arg, n, err  = parseStringLiteral(left)
+			arg, n, err = parseStringLiteral(left)
 			if err != nil {
 				return nil, 0, true, err
 			}
@@ -130,7 +129,7 @@ func Parse(qStr string) (Query, error) {
 		}
 
 		if q, n, ok, err := tryConsumeCase(b); err != nil {
-			return nil,  err
+			return nil, err
 		} else if ok {
 			setCase = q
 			b = b[n:]
@@ -157,7 +156,7 @@ func Parse(qStr string) (Query, error) {
 			continue
 		}
 
-		current  = append(current, c)
+		current = append(current, c)
 		b = b[1:]
 	}
 
@@ -198,7 +197,6 @@ func Parse(qStr string) (Query, error) {
 	if len(qs) == 1 {
 		return qs[0], nil
 	}
-
 
 	return &AndQuery{qs}, nil
 }

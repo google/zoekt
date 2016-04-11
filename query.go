@@ -71,7 +71,6 @@ type AndQuery struct {
 	Children []Query
 }
 
-
 func (q *AndQuery) String() string {
 	var sub []string
 	for _, ch := range q.Children {
@@ -89,7 +88,7 @@ func (q *andQuery) String() string {
 	for _, a := range q.atoms {
 		qs = append(qs, a.String())
 	}
-	return fmt.Sprintf("(AND %s)",  strings.Join(qs, " "))
+	return fmt.Sprintf("(AND %s)", strings.Join(qs, " "))
 }
 
 type orQuery struct {
@@ -101,13 +100,15 @@ func (q *orQuery) String() string {
 	for _, a := range q.ands {
 		qs = append(qs, a.String())
 	}
-	return fmt.Sprintf("(OR %s)",  strings.Join(qs, " "))
+	return fmt.Sprintf("(OR %s)", strings.Join(qs, " "))
 }
 
 func queryChildren(q Query) []Query {
-	switch s :=  q.(type){
-	case *AndQuery: return s.Children
-	case *OrQuery: return s.Children
+	switch s := q.(type) {
+	case *AndQuery:
+		return s.Children
+	case *OrQuery:
+		return s.Children
 	}
 	return nil
 }
@@ -170,7 +171,7 @@ func negate(q Query) Query {
 	}
 }
 
-func mapQuery(qs []Query, f func(Query)Query) []Query {
+func mapQuery(qs []Query, f func(Query) Query) []Query {
 	var neg []Query
 	for _, sub := range qs {
 		neg = append(neg, f(sub))
@@ -204,7 +205,7 @@ func standardizeAnd(q Query) (*andQuery, bool) {
 		}
 		return &r, true
 	case *SubstringQuery:
-		return &andQuery{ atoms: []*SubstringQuery{ s }}, true
+		return &andQuery{atoms: []*SubstringQuery{s}}, true
 	}
 	return nil, false
 }

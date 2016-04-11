@@ -131,15 +131,15 @@ func TestNewlines(t *testing.T) {
 	sres, err := searcher.Search(&SubstringQuery{Pattern: "ne2"})
 	matches := sres.Files
 	want := []FileMatch{{
-		Rank:        0,
-		Name:        "filename",
+		Rank: 0,
+		Name: "filename",
 		Matches: []Match{
 			{
-			Offset:      8,
-			Line:        "line2",
-			LineNum:     2,
-			LineOff:     2,
-			MatchLength: 3,
+				Offset:      8,
+				Line:        "line2",
+				LineNum:     2,
+				LineOff:     2,
+				MatchLength: 3,
 			},
 		}}}
 
@@ -264,24 +264,24 @@ func TestFileBasedSearch(t *testing.T) {
 	}
 	matches := sres.Files
 	want := []FileMatch{{
-		Rank:        0,
-		Name:        "f1",
+		Rank: 0,
+		Name: "f1",
 		Matches: []Match{{
-		Offset:      8,
-		Line:        string(c1),
-		LineNum:     1,
-		LineOff:     8,
-		MatchLength: 6,
+			Offset:      8,
+			Line:        string(c1),
+			LineNum:     1,
+			LineOff:     8,
+			MatchLength: 6,
 		}},
 	}, {
-		Rank:        1,
-		Name:        "f2",
+		Rank: 1,
+		Name: "f2",
 		Matches: []Match{{
-		Line:        string(c2),
-		LineNum:     1,
-		LineOff:     10,
-		Offset:      10,
-		MatchLength: 6,
+			Line:        string(c2),
+			LineNum:     1,
+			LineOff:     10,
+			Offset:      10,
+			MatchLength: 6,
 		}},
 	}}
 	if !reflect.DeepEqual(matches, want) {
@@ -326,7 +326,6 @@ func TestCaseFold(t *testing.T) {
 	}
 }
 
-
 func TestAndSearch(t *testing.T) {
 	b := NewIndexBuilder()
 
@@ -339,10 +338,10 @@ func TestAndSearch(t *testing.T) {
 		&AndQuery{
 			Children: []Query{
 				&SubstringQuery{
-					Pattern:       "banana",
+					Pattern: "banana",
 				},
 				&SubstringQuery{
-					Pattern:       "apple",
+					Pattern: "apple",
 				},
 			},
 		})
@@ -360,10 +359,10 @@ func TestAndSearch(t *testing.T) {
 	}
 
 	wantStats := Stats{
-		FilesLoaded: 1,
+		FilesLoaded:  1,
 		NgramMatches: 4,
-		MatchCount: 2,
-		FileCount: 1,
+		MatchCount:   2,
+		FileCount:    1,
 	}
 	if !reflect.DeepEqual(sres.Stats, wantStats) {
 		t.Errorf("got stats %#v, want %#v", sres.Stats, wantStats)

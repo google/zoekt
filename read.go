@@ -42,7 +42,6 @@ func (r *reader) readTOC(toc *indexTOC) {
 	}
 }
 
-
 // indexData holds the pattern independent data that we have to have
 // in memory to search.
 type indexData struct {
@@ -58,7 +57,6 @@ type indexData struct {
 	fileEnds  []uint32
 	fileNames []string
 }
-
 
 func (r *reader) readSectionBlob(sec simpleSection) []byte {
 	d := make([]byte, sec.sz)
@@ -95,12 +93,12 @@ func (r *reader) readIndexData(toc *indexTOC) *indexData {
 		caseBitsIndex: toc.caseBits.absoluteIndex(),
 		boundaries:    toc.contents.absoluteIndex(),
 		newlinesIndex: toc.newlines.absoluteIndex(),
-		ngrams: map[ngram]simpleSection{},
+		ngrams:        map[ngram]simpleSection{},
 	}
 
 	textContent := r.readSectionBlob(toc.ngramText)
 	for i := 0; i < len(textContent); i += NGRAM {
-		j := i/NGRAM
+		j := i / NGRAM
 		d.ngrams[bytesToNGram(textContent[i:i+NGRAM])] = simpleSection{
 			d.postingsIndex[j],
 			d.postingsIndex[j+1] - d.postingsIndex[j],
@@ -151,9 +149,9 @@ func (r *reader) getDocIterator(data *indexData, query *SubstringQuery) (*docIte
 	}
 
 	input := &docIterator{
-		query: query,
+		query:  query,
 		patLen: uint32(len(str)),
-		ends: data.fileEnds,
+		ends:   data.fileEnds,
 	}
 	first, ok := data.ngrams[stringToNGram(str[:NGRAM])]
 	if !ok {
@@ -265,7 +263,7 @@ func (ss *shardedSearcher) Close() error {
 func (ss *shardedSearcher) Search(pat Query) (*SearchResult, error) {
 	start := time.Now()
 	type res struct {
-		sr   *SearchResult
+		sr  *SearchResult
 		err error
 	}
 	all := make(chan res, len(ss.searchers))

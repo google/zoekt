@@ -64,7 +64,7 @@ done:
 
 		newCands = newCands[:0]
 		mc := mergedCandidateMatch{
-			fileID: nextDoc,
+			fileID:  nextDoc,
 			matches: map[*SubstringQuery][]candidateMatch{},
 		}
 		for _, ms := range cands {
@@ -85,7 +85,7 @@ done:
 }
 
 func (s *searcher) andSearch(andQ *andQuery) (*SearchResult, error) {
- 	var res SearchResult
+	var res SearchResult
 	var caseSensitive bool
 	var iters []*docIterator
 
@@ -169,8 +169,8 @@ nextFileMatch:
 				num, off, data := m.line(newlines, content, caseBits)
 				fMatch.Matches = append(fMatch.Matches,
 					Match{
-						Offset: m.offset,
-						Line: string(data),
+						Offset:      m.offset,
+						Line:        string(data),
 						LineNum:     num,
 						LineOff:     off,
 						MatchLength: len(m.substrBytes),
@@ -181,16 +181,16 @@ nextFileMatch:
 		sortMatches(fMatch.Matches)
 		res.Files = append(res.Files, fMatch)
 		res.Stats.MatchCount += len(fMatch.Matches)
-		res.Stats.FileCount ++
+		res.Stats.FileCount++
 	}
 
 	return &res, nil
 }
 
-
 type matchOffsetSlice []Match
-func (m matchOffsetSlice) Len() int { return len(m) }
-func (m matchOffsetSlice) Swap(i, j int) { m[i],m[j] = m[j],m[i] }
+
+func (m matchOffsetSlice) Len() int           { return len(m) }
+func (m matchOffsetSlice) Swap(i, j int)      { m[i], m[j] = m[j], m[i] }
 func (m matchOffsetSlice) Less(i, j int) bool { return m[i].Offset <= m[j].Offset }
 
 func sortMatches(ms []Match) {

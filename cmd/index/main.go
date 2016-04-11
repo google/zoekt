@@ -82,7 +82,6 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-
 	for _, arg := range flag.Args() {
 		if err := indexArg(arg, *index, *parallelism, *sizeMax, *shardLimit); err != nil {
 			log.Fatal(err)
@@ -111,7 +110,6 @@ func indexArg(arg string, indexTemplate string, parallelism, sizeMax, shardLimit
 		shardMax: int64(shardLimit),
 	}
 
-
 	abs, err := filepath.Abs(arg)
 	if err != nil {
 		return err
@@ -133,7 +131,7 @@ func indexArg(arg string, indexTemplate string, parallelism, sizeMax, shardLimit
 		var buf bytes.Buffer
 		if err := tpl.Execute(&buf, struct {
 			Home, FP, Base, Shard string
-		} {
+		}{
 			os.Getenv("HOME"), fp, filepath.Base(abs),
 			fmt.Sprintf("%05d", shardNum),
 		}); err != nil {
@@ -142,7 +140,7 @@ func indexArg(arg string, indexTemplate string, parallelism, sizeMax, shardLimit
 
 		fn := buf.String()
 
-		if err := os.MkdirAll(filepath.Dir(fn), 0700); err !=  nil {
+		if err := os.MkdirAll(filepath.Dir(fn), 0700); err != nil {
 			return err
 		}
 		shardNum++

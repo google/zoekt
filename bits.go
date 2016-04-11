@@ -105,7 +105,7 @@ func findCaseMasks(pattern []byte) (mask [][]byte, bits [][]byte) {
 type ngram uint32
 
 func bytesToNGram(b []byte) ngram {
-	return ngram(uint32(b[0]) << 16 | uint32(b[1]) << 8 | uint32(b[2]))
+	return ngram(uint32(b[0])<<16 | uint32(b[1])<<8 | uint32(b[2]))
 }
 
 func stringToNGram(s string) ngram {

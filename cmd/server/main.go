@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"html/template"
 	"log"
-	"os"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -72,8 +72,8 @@ type MatchLine struct {
 }
 
 type FileMatchData struct {
-	FileName  string
-	Matches   []MatchData
+	FileName string
+	Matches  []MatchData
 }
 
 type MatchData struct {
@@ -85,10 +85,10 @@ type MatchData struct {
 }
 
 type ResultsPage struct {
-	Query         string
-	Stats         codesearch.Stats
-	Duration      time.Duration
-	FileMatches       []FileMatchData
+	Query       string
+	Stats       codesearch.Stats
+	Duration    time.Duration
+	FileMatches []FileMatchData
 }
 
 var resultTemplate = template.Must(template.New("page").Parse(`<html>
@@ -96,7 +96,7 @@ var resultTemplate = template.Must(template.New("page").Parse(`<html>
     <title>Search results</title>
   </head>
 <body>` + searchBox +
-`  <hr>
+	`  <hr>
   Found {{.Stats.MatchCount}} results in {{.Stats.FileCount}} files ({{.Stats.NgramMatches}} ngram matches, {{.Stats.FilesLoaded}} docs loaded): for
   <pre style="background: #ffc;">{{.Query}}</pre>
   in {{.Stats.Duration}}
@@ -147,20 +147,20 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 
 	for _, f := range result.Files {
 		fMatch := FileMatchData{
-			FileName:  f.Name,
+			FileName: f.Name,
 		}
 		for _, m := range f.Matches {
 			l := m.LineOff
-			e := l+m.MatchLength
+			e := l + m.MatchLength
 			if e > len(m.Line) {
 				e = len(m.Line)
 				log.Printf("%s %#v", f.Name, m)
 			}
 			fMatch.Matches = append(fMatch.Matches, MatchData{
-				FileName: f.Name,
+				FileName:  f.Name,
 				LineNum:   m.LineNum,
 				Pre:       m.Line[:l],
-				MatchText: m.Line[l : e],
+				MatchText: m.Line[l:e],
 				Post:      m.Line[e:],
 			})
 		}

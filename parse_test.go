@@ -7,8 +7,8 @@ import (
 
 func TestParseQuery(t *testing.T) {
 	type testcase struct {
-		in  string
-		out Query
+		in     string
+		out    Query
 		hasErr bool
 	}
 
