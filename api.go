@@ -18,6 +18,7 @@ import (
 	"time"
 )
 
+// FileMatch contains all the matches within a file.
 type FileMatch struct {
 	// Ranking; the lower, the better.
 	Rank    int
@@ -25,16 +26,23 @@ type FileMatch struct {
 	Matches []Match
 }
 
+// Match is a match for a single atomic query within a file.
 type Match struct {
 	Line    string
 	LineNum int
+
+	// Offset within the line.
 	LineOff int
 
+	// Offset from file start
 	Offset      uint32
 	MatchLength int
-	FileName    bool
+
+	// If set, this was a match on the filename.
+	FileName bool
 }
 
+// Stats contains interesting numbers on the search
 type Stats struct {
 	NgramMatches int
 	FilesLoaded  int
@@ -50,6 +58,7 @@ func (s *Stats) Add(o Stats) {
 	s.FileCount += o.FileCount
 }
 
+// SearchResult contains search matches and extra data
 type SearchResult struct {
 	Stats
 	Files []FileMatch

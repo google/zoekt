@@ -23,10 +23,12 @@ import (
 
 var _ = log.Println
 
+// Query is a representation for a possibly hierarchical search query.
 type Query interface {
 	String() string
 }
 
+// SubstringQuery is the most basic query: a query for a substring.
 type SubstringQuery struct {
 	Pattern       string
 	CaseSensitive bool
@@ -52,6 +54,7 @@ func (q *SubstringQuery) String() string {
 	return s
 }
 
+// OrQuery is matched when any of its children is matched.
 type OrQuery struct {
 	Children []Query
 }
@@ -64,6 +67,7 @@ func (q *OrQuery) String() string {
 	return fmt.Sprintf("(or %s)", strings.Join(sub, " "))
 }
 
+// NotQuery inverts the meaning of its child.
 type NotQuery struct {
 	Child Query
 }
@@ -72,6 +76,7 @@ func (q *NotQuery) String() string {
 	return fmt.Sprintf("(not %s)", q.Child)
 }
 
+// AndQuery is matched when all its children are.
 type AndQuery struct {
 	Children []Query
 }

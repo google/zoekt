@@ -42,31 +42,6 @@ func (r *reader) readTOC(toc *indexTOC) {
 	}
 }
 
-// indexData holds the pattern independent data that we have to have
-// in memory to search.
-type indexData struct {
-	ngrams map[ngram]simpleSection
-
-	postingsIndex []uint32
-	newlinesIndex []uint32
-	caseBitsIndex []uint32
-
-	// offsets of file contents. Includes end of last file.
-	boundaries []uint32
-
-	fileEnds []uint32
-
-	fileNameContent       []byte
-	fileNameCaseBits      []byte
-	fileNameCaseBitsIndex []uint32
-	fileNameIndex         []uint32
-	fileNameNgrams        map[ngram][]uint32
-}
-
-func (d *indexData) fileName(i uint32) string {
-	return string(d.fileNameContent[d.fileNameIndex[i]:d.fileNameIndex[i+1]])
-
-}
 func (r *reader) readSectionBlob(sec simpleSection) []byte {
 	d := make([]byte, sec.sz)
 	r.r.Seek(int64(sec.off), 0)
@@ -111,9 +86,9 @@ func (r *reader) readIndexData(toc *indexTOC) *indexData {
 	}
 
 	textContent := r.readSectionBlob(toc.ngramText)
-	for i := 0; i < len(textContent); i += NGRAM {
-		j := i / NGRAM
-		d.ngrams[bytesToNGram(textContent[i:i+NGRAM])] = simpleSection{
+	for i := 0; i < len(textContent); i += ngramSize {
+		j := i / ngramSize
+		d.ngrams[bytesToNGram(textContent[i:i+ngramSize])] = simpleSection{
 			d.postingsIndex[j],
 			d.postingsIndex[j+1] - d.postingsIndex[j],
 		}
@@ -129,11 +104,11 @@ func (r *reader) readIndexData(toc *indexTOC) *indexData {
 	nameNgramText := r.readSectionBlob(toc.nameNgramText)
 	fileNamePostingsData := r.readSectionBlob(toc.namePostings.data)
 	fileNamePostingsIndex := toc.namePostings.relativeIndex()
-	for i := 0; i < len(nameNgramText); i += NGRAM {
-		j := i / NGRAM
+	for i := 0; i < len(nameNgramText); i += ngramSize {
+		j := i / ngramSize
 		off := fileNamePostingsIndex[j]
 		end := fileNamePostingsIndex[j+1]
-		d.fileNameNgrams[bytesToNGram(nameNgramText[i:i+NGRAM])] = fromDeltas(fileNamePostingsData[off:end])
+		d.fileNameNgrams[bytesToNGram(nameNgramText[i:i+ngramSize])] = fromDeltas(fileNamePostingsData[off:end])
 	}
 
 	return &d
@@ -162,97 +137,22 @@ func (r *reader) readNewlines(d *indexData, i uint32) []uint32 {
 	return fromDeltas(blob)
 }
 
-func (r *reader) getDocIterator(data *indexData, query *SubstringQuery) (*docIterator, error) {
-	if len(query.Pattern) < NGRAM {
-		return nil, fmt.Errorf("pattern %q less than %d bytes", query.Pattern, NGRAM)
-	}
-
-	if query.FileName {
-		return r.getFileNameDocIterator(data, query), nil
-	}
-	return r.getContentDocIterator(data, query)
-}
-
-func (r *reader) getFileNameDocIterator(data *indexData, query *SubstringQuery) *docIterator {
-	str := strings.ToLower(query.Pattern) // TODO - UTF-8
-	di := &docIterator{
-		query:  query,
-		patLen: uint32(len(str)),
-		ends:   data.fileNameIndex[1:],
-		first:  data.fileNameNgrams[stringToNGram(str[:NGRAM])],
-		last:   data.fileNameNgrams[stringToNGram(str[len(str)-NGRAM:])],
-	}
-
-	return di
-}
-
-func (r *reader) getContentDocIterator(data *indexData, query *SubstringQuery) (*docIterator, error) {
-	str := strings.ToLower(query.Pattern) // TODO - UTF-8
-	input := &docIterator{
-		query:  query,
-		patLen: uint32(len(str)),
-		ends:   data.fileEnds,
-	}
-	first, ok := data.ngrams[stringToNGram(str[:NGRAM])]
-	if !ok {
-		return input, nil
-	}
-
-	last, ok := data.ngrams[stringToNGram(str[len(str)-NGRAM:])]
-	if !ok {
-		return input, nil
-	}
-
-	input.first = fromDeltas(r.readSectionBlob(first))
-	if r.err != nil {
-		return nil, r.err
-	}
-	input.last = fromDeltas(r.readSectionBlob(last))
-	if r.err != nil {
-		return nil, r.err
-	}
-	return input, nil
-}
-
-type searcher struct {
-	reader    reader
-	indexData *indexData
-}
-
-func (s *searcher) Close() error {
-	return s.reader.r.Close()
-}
-
 type ReadSeekCloser interface {
 	io.ReadSeeker
 	io.Closer
 }
 
 func NewSearcher(r ReadSeekCloser) (Searcher, error) {
-	s := &searcher{
-		reader: reader{r: r},
-	}
+	rd := &reader{r: r}
+
 	var toc indexTOC
-	s.reader.readTOC(&toc)
-	s.indexData = s.reader.readIndexData(&toc)
-	if s.reader.err != nil {
-		return nil, s.reader.err
+	rd.readTOC(&toc)
+	indexData := rd.readIndexData(&toc)
+	indexData.reader = rd
+	if rd.err != nil {
+		return nil, rd.err
 	}
-	return s, nil
-}
-
-func (s *searcher) Search(query Query) (*SearchResult, error) {
-	orQ, err := standardize(query)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(orQ.ands) != 1 {
-		return nil, fmt.Errorf("not implemented: OrQuery")
-	}
-
-	andQ := orQ.ands[0]
-	return s.andSearch(andQ)
+	return indexData, nil
 }
 
 type shardedSearcher struct {

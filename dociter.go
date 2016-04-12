@@ -104,7 +104,7 @@ func (s *docIterator) next() []candidateMatch {
 	patBytes := []byte(s.query.Pattern)
 	lowerPatBytes := toLower(patBytes)
 
-	distance := s.patLen - NGRAM
+	distance := s.patLen - ngramSize
 
 	var candidates []candidateMatch
 	for {

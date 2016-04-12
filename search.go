@@ -193,7 +193,7 @@ func (p *contentProvider) fillMatch(m *candidateMatch) Match {
 	}
 }
 
-func (s *searcher) andSearch(andQ *andQuery) (*SearchResult, error) {
+func (d *indexData) andSearch(andQ *andQuery) (*SearchResult, error) {
 	foundPositive := false
 	for _, atom := range andQ.atoms {
 		if !atom.Negate {
@@ -213,7 +213,7 @@ func (s *searcher) andSearch(andQ *andQuery) (*SearchResult, error) {
 		caseSensitive = caseSensitive || atom.CaseSensitive
 
 		// TODO - postingsCache
-		i, err := s.reader.getDocIterator(s.indexData, atom)
+		i, err := d.getDocIterator(atom)
 		if err != nil {
 			return nil, err
 		}
@@ -231,8 +231,8 @@ nextFileMatch:
 	for _, c := range cands {
 		if c.fileID != cp.idx {
 			cp = contentProvider{
-				reader: &s.reader,
-				id:     s.indexData,
+				reader: d.reader,
+				id:     d,
 				idx:    c.fileID,
 				stats:  &res.Stats,
 			}
@@ -293,7 +293,7 @@ nextFileMatch:
 		}
 
 		fMatch := FileMatch{
-			Name: s.indexData.fileName(c.fileID),
+			Name: d.fileName(c.fileID),
 			Rank: int(c.fileID),
 		}
 

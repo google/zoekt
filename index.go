@@ -19,68 +19,99 @@ import (
 	"log"
 )
 
-var _ = log.Println
-
-const NGRAM = 3
-
-type searchableString struct {
-	// lower cased data.
-	data []byte
-
-	// Bit vector describing where we found uppercase letters
-	caseBits []byte
-
-	// offset of the content
-	offset uint32
-}
-
-func (e *searchableString) end() uint32 {
-	return e.offset + uint32(len(e.data))
-}
-
-func newSearchableString(data []byte, startOff uint32, postings map[string][]uint32) *searchableString {
-	dest := searchableString{
-		offset: startOff,
+func (data *indexData) getDocIterator(query *SubstringQuery) (*docIterator, error) {
+	if len(query.Pattern) < ngramSize {
+		return nil, fmt.Errorf("pattern %q less than %d bytes", query.Pattern, ngramSize)
 	}
-	dest.data, dest.caseBits = splitCase(data)
-	for i := range dest.data {
-		if i+NGRAM > len(dest.data) {
-			break
-		}
-		ngram := string(dest.data[i : i+NGRAM])
-		postings[ngram] = append(postings[ngram], startOff+uint32(i))
+
+	if query.FileName {
+		return data.getFileNameDocIterator(query), nil
 	}
-	return &dest
+	return data.getContentDocIterator(query)
 }
 
-type IndexBuilder struct {
-	contentEnd uint32
-	nameEnd    uint32
-
-	files     []*searchableString
-	fileNames []*searchableString
-
-	// ngram => posting.
-	contentPostings map[string][]uint32
-
-	// like postings, but for filenames
-	namePostings map[string][]uint32
-}
-
-func (m *candidateMatch) String() string {
-	return fmt.Sprintf("%d:%d", m.file, m.offset)
-}
-
-func NewIndexBuilder() *IndexBuilder {
-	return &IndexBuilder{
-		contentPostings: make(map[string][]uint32),
-		namePostings:    make(map[string][]uint32),
+func (data *indexData) getFileNameDocIterator(query *SubstringQuery) *docIterator {
+	str := strings.ToLower(query.Pattern) // TODO - UTF-8
+	di := &docIterator{
+		query:  query,
+		patLen: uint32(len(str)),
+		ends:   data.fileNameIndex[1:],
+		first:  data.fileNameNgrams[stringToNGram(str[:ngramSize])],
+		last:   data.fileNameNgrams[stringToNGram(str[len(str)-ngramSize:])],
 	}
+
+	return di
 }
 
-func (b *IndexBuilder) AddFile(name string, content []byte) {
-	b.files = append(b.files, newSearchableString(content, b.contentEnd, b.contentPostings))
-	b.fileNames = append(b.fileNames, newSearchableString([]byte(name), b.nameEnd, b.namePostings))
-	b.contentEnd += uint32(len(content))
-	b.nameEnd += uint32(len(name))
+func (data *indexData) getContentDocIterator(query *SubstringQuery) (*docIterator, error) {
+	str := strings.ToLower(query.Pattern) // TODO - UTF-8
+	input := &docIterator{
+		query:  query,
+		patLen: uint32(len(str)),
+		ends:   data.fileEnds,
+	}
+	first, ok := data.ngrams[stringToNGram(str[:ngramSize])]
+	if !ok {
+		return input, nil
+	}
+
+	last, ok := data.ngrams[stringToNGram(str[len(str)-ngramSize:])]
+	if !ok {
+		return input, nil
+	}
+
+	input.first = fromDeltas(data.reader.readSectionBlob(first))
+	if data.reader.err != nil {
+		return nil, data.reader.err
+	}
+	input.last = fromDeltas(data.reader.readSectionBlob(last))
+	if data.reader.err != nil {
+		return nil, data.reader.err
+	}
+	return input, nil
+}
+
+// indexData holds the pattern independent data that we have to have
+// in memory to search.
+type indexData struct {
+	reader *reader
+
+	ngrams map[ngram]simpleSection
+
+	postingsIndex []uint32
+	newlinesIndex []uint32
+	caseBitsIndex []uint32
+
+	// offsets of file contents. Includes end of last file.
+	boundaries []uint32
+
+	fileEnds []uint32
+
+	fileNameContent       []byte
+	fileNameCaseBits      []byte
+	fileNameCaseBitsIndex []uint32
+	fileNameIndex         []uint32
+	fileNameNgrams        map[ngram][]uint32
+}
+
+func (d *indexData) fileName(i uint32) string {
+	return string(d.fileNameContent[d.fileNameIndex[i]:d.fileNameIndex[i+1]])
+}
+
+func (s *indexData) Close() error {
+	return s.reader.r.Close()
+}
+
+func (d *indexData) Search(query Query) (*SearchResult, error) {
+	orQ, err := standardize(query)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(orQ.ands) != 1 {
+		return nil, fmt.Errorf("not implemented: OrQuery")
+	}
+
+	andQ := orQ.ands[0]
+	return d.andSearch(andQ)
 }
