@@ -25,9 +25,11 @@ var _ = log.Println
 type docIterator struct {
 	query *SubstringQuery
 
-	patLen uint32
-	first  []uint32
-	last   []uint32
+	leftPad  uint32
+	rightPad uint32
+	distance uint32
+	first    []uint32
+	last     []uint32
 
 	fileIdx int
 	ends    []uint32
@@ -104,8 +106,6 @@ func (s *docIterator) next() []candidateMatch {
 	patBytes := []byte(s.query.Pattern)
 	lowerPatBytes := toLower(patBytes)
 
-	distance := s.patLen - ngramSize
-
 	var candidates []candidateMatch
 	for {
 		if len(s.first) == 0 || len(s.last) == 0 {
@@ -118,29 +118,29 @@ func (s *docIterator) next() []candidateMatch {
 			s.fileIdx++
 		}
 
-		if p1+distance < p2 {
+		if p1+s.distance < p2 {
 			s.first = s.first[1:]
-		} else if p1+distance > p2 {
+		} else if p1+s.distance > p2 {
 			s.last = s.last[1:]
 		} else {
 			s.first = s.first[1:]
 			s.last = s.last[1:]
 
-			if p1+uint32(s.patLen) > s.ends[s.fileIdx] {
+			var fileStart uint32
+			if s.fileIdx > 0 {
+				fileStart = s.ends[s.fileIdx-1]
+			}
+			if p1 < s.leftPad+fileStart || p1+s.distance+ngramSize+s.rightPad > s.ends[s.fileIdx] {
 				continue
 			}
 
-			fileStart := uint32(0)
-			if s.fileIdx > 0 {
-				fileStart += s.ends[s.fileIdx-1]
-			}
 			candidates = append(candidates,
 				candidateMatch{
 					query:       s.query,
 					substrBytes: patBytes,
 					lowered:     lowerPatBytes,
 					file:        uint32(s.fileIdx),
-					offset:      p1 - fileStart,
+					offset:      p1 - fileStart - s.leftPad,
 				})
 		}
 	}

@@ -16,7 +16,7 @@ package codesearch
 
 import (
 	"fmt"
-	"log"
+	"strings"
 )
 
 func (data *indexData) getDocIterator(query *SubstringQuery) (*docIterator, error) {
@@ -33,32 +33,58 @@ func (data *indexData) getDocIterator(query *SubstringQuery) (*docIterator, erro
 func (data *indexData) getFileNameDocIterator(query *SubstringQuery) *docIterator {
 	str := strings.ToLower(query.Pattern) // TODO - UTF-8
 	di := &docIterator{
-		query:  query,
-		patLen: uint32(len(str)),
-		ends:   data.fileNameIndex[1:],
-		first:  data.fileNameNgrams[stringToNGram(str[:ngramSize])],
-		last:   data.fileNameNgrams[stringToNGram(str[len(str)-ngramSize:])],
+		query:    query,
+		distance: uint32(len(str)) - ngramSize,
+		ends:     data.fileNameIndex[1:],
+		first:    data.fileNameNgrams[stringToNGram(str[:ngramSize])],
+		last:     data.fileNameNgrams[stringToNGram(str[len(str)-ngramSize:])],
 	}
 
 	return di
 }
 
+const maxUInt32 = 0xffffffff
+
+func minarg(xs []uint32) uint32 {
+	m := uint32(maxUInt32)
+	j := len(xs)
+	for i, x := range xs {
+		if x < m {
+			m = x
+			j = i
+		}
+	}
+	return uint32(j)
+}
+
 func (data *indexData) getContentDocIterator(query *SubstringQuery) (*docIterator, error) {
 	str := strings.ToLower(query.Pattern) // TODO - UTF-8
 	input := &docIterator{
-		query:  query,
-		patLen: uint32(len(str)),
-		ends:   data.fileEnds,
-	}
-	first, ok := data.ngrams[stringToNGram(str[:ngramSize])]
-	if !ok {
-		return input, nil
+		query: query,
+		ends:  data.fileEnds,
 	}
 
-	last, ok := data.ngrams[stringToNGram(str[len(str)-ngramSize:])]
-	if !ok {
-		return input, nil
+	// Find the 2 least common ngrams from the string.
+	frequencies := make([]uint32, len(str)-ngramSize+1)
+	for i := range frequencies {
+		frequencies[i] = data.ngrams[stringToNGram(str[i:i+ngramSize])].sz
+		if frequencies[i] == 0 {
+			return input, nil
+		}
 	}
+
+	firstI := minarg(frequencies)
+	frequencies[firstI] = 0xfffffff
+	lastI := minarg(frequencies)
+	if firstI > lastI {
+		lastI, firstI = firstI, lastI
+	}
+
+	first := data.ngrams[stringToNGram(str[firstI:firstI+ngramSize])]
+	last := data.ngrams[stringToNGram(str[lastI:lastI+ngramSize])]
+	input.distance = lastI - firstI
+	input.leftPad = firstI
+	input.rightPad = uint32(len(str)-ngramSize) - lastI
 
 	input.first = fromDeltas(data.reader.readSectionBlob(first))
 	if data.reader.err != nil {
