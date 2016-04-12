@@ -34,9 +34,6 @@ type indexTOC struct {
 	nameCaseBits  compoundSection
 	nameNgramText simpleSection
 	namePostings  compoundSection
-
-	// TODO - delme
-	names compoundSection
 }
 
 func (t *indexTOC) sections() []section {
@@ -46,7 +43,6 @@ func (t *indexTOC) sections() []section {
 		&t.newlines,
 		&t.ngramText,
 		&t.postings,
-		&t.names,
 
 		&t.nameContents,
 		&t.nameCaseBits,
@@ -134,13 +130,6 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 		toc.namePostings.addItem(w, toDeltas(b.namePostings[k]))
 	}
 	toc.namePostings.end(w)
-
-	// TODO - delme.
-	toc.names.start(w)
-	for _, f := range b.files {
-		toc.names.addItem(w, []byte(f.nameStr))
-	}
-	toc.names.end(w)
 
 	var tocSection simpleSection
 

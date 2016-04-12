@@ -293,7 +293,7 @@ nextFileMatch:
 		}
 
 		fMatch := FileMatch{
-			Name: s.indexData.fileNames[c.fileID],
+			Name: s.indexData.fileName(c.fileID),
 			Rank: int(c.fileID),
 		}
 

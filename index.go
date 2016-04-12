@@ -56,7 +56,6 @@ func newSearchableString(data []byte, startOff uint32, postings map[string][]uin
 type fileEntry struct {
 	content *searchableString
 	name    *searchableString
-	nameStr string
 }
 
 type IndexBuilder struct {
@@ -88,7 +87,6 @@ func (b *IndexBuilder) AddFile(name string, content []byte) {
 		fileEntry{
 			content: newSearchableString(content, b.contentEnd, b.contentPostings),
 			name:    newSearchableString([]byte(name), b.nameEnd, b.namePostings),
-			nameStr: name,
 		})
 	b.contentEnd += uint32(len(content))
 	b.nameEnd += uint32(len(name))

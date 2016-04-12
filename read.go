@@ -61,11 +61,12 @@ type indexData struct {
 	fileNameCaseBitsIndex []uint32
 	fileNameIndex         []uint32
 	fileNameNgrams        map[ngram][]uint32
-
-	// TODO - delme
-	fileNames []string
 }
 
+func (d *indexData) fileName(i uint32) string {
+	return string(d.fileNameContent[d.fileNameIndex[i]:d.fileNameIndex[i+1]])
+
+}
 func (r *reader) readSectionBlob(sec simpleSection) []byte {
 	d := make([]byte, sec.sz)
 	r.r.Seek(int64(sec.off), 0)
@@ -135,15 +136,6 @@ func (r *reader) readIndexData(toc *indexTOC) *indexData {
 		d.fileNameNgrams[bytesToNGram(nameNgramText[i:i+NGRAM])] = fromDeltas(fileNamePostingsData[off:end])
 	}
 
-	toc.names.readIndex(r)
-	fnIndex := toc.names.relativeIndex()
-	fnBlob := r.readSectionBlob(toc.names.data)
-	for i, n := range fnIndex {
-		if i == 0 {
-			continue
-		}
-		d.fileNames = append(d.fileNames, string(fnBlob[fnIndex[i-1]:n]))
-	}
 	return &d
 }
 
