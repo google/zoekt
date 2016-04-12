@@ -70,10 +70,36 @@ const searchBox = `
 func (s *httpServer) serveSearchBox(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`<html>
 <head>
+<style>
+dt {
+    font-family: monospace;
+}
+</style>
 </head>
 <body>
 <div style="margin: 3em; padding 3em; position: center;">
 ` + searchBox + `
+</div>
+
+Examples:
+<div style="margin-left: 4em;">
+<dl>
+  <dt>file</dt><dd>search for "file"
+</dd>
+  <dt>class file</dt><dd>search for files containing both "class" and "file"
+</dd>
+  <dt>class File</dt><dd>search for files containing both "class" (case insensitive) and "File" (case sensitive)
+</dd>
+  <dt>class File case:yes</dt><dd>search for files containing both "class" and "File", case sensitively
+</dd>
+  <dt>"class file"</dt><dd>search for files with the phrase "class file"
+</dd>
+  <dt>class -file</dt><dd>search for files with the word "class" but not the word "file"
+</dd>
+  <dt>path file:java</dt><dd>search for the word "path" in files whose name contains "java"
+</dd>
+  <dt>path -file:java</dt><dd>search for the word "path" excluding files whose name contains "java"
+</dl>
 </div>
 </body>
 </html>
