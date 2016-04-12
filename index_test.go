@@ -444,9 +444,9 @@ func TestFileRestriction(t *testing.T) {
 	want := Match{
 		Line:        "x apple y",
 		Offset:      2,
-		LineOff:     1,
-		MatchLength: 4,
-		FileName:    true,
+		LineNum:     1,
+		LineOff:     2,
+		MatchLength: 5,
 	}
 
 	if !reflect.DeepEqual(got, want) {
