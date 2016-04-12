@@ -24,28 +24,25 @@ import (
 var _ = log.Println
 
 type indexTOC struct {
-	contents  compoundSection
-	caseBits  compoundSection
-	postings  compoundSection
-	newlines  compoundSection
-	ngramText simpleSection
+	fileContents contentSection
+	fileNames    contentSection
+	caseBits     compoundSection
+	postings     compoundSection
+	newlines     compoundSection
+	ngramText    simpleSection
 
-	nameContents  compoundSection
-	nameCaseBits  compoundSection
 	nameNgramText simpleSection
 	namePostings  compoundSection
 }
 
 func (t *indexTOC) sections() []section {
 	return []section{
-		&t.contents,
-		&t.caseBits,
+		&t.fileContents,
+		&t.fileNames,
 		&t.newlines,
 		&t.ngramText,
 		&t.postings,
 
-		&t.nameContents,
-		&t.nameCaseBits,
 		&t.nameNgramText,
 		&t.namePostings,
 	}
@@ -64,21 +61,11 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 	w := &writer{w: buffered}
 	toc := indexTOC{}
 
-	toc.contents.start(w)
-	for _, f := range b.files {
-		toc.contents.addItem(w, f.content.data)
-	}
-	toc.contents.end(w)
-
-	toc.caseBits.start(w)
-	for _, f := range b.files {
-		toc.caseBits.addItem(w, f.content.caseBits)
-	}
-	toc.caseBits.end(w)
+	toc.fileContents.writeStrings(w, b.files)
 
 	toc.newlines.start(w)
 	for _, f := range b.files {
-		toc.newlines.addItem(w, toDeltas(newLinesIndices(f.content.data)))
+		toc.newlines.addItem(w, toDeltas(newLinesIndices(f.data)))
 	}
 	toc.newlines.end(w)
 
@@ -101,17 +88,7 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 	toc.postings.end(w)
 
 	// names.
-	toc.nameContents.start(w)
-	for _, f := range b.files {
-		toc.nameContents.addItem(w, f.name.data)
-	}
-	toc.nameContents.end(w)
-
-	toc.nameCaseBits.start(w)
-	for _, f := range b.files {
-		toc.nameCaseBits.addItem(w, f.name.caseBits)
-	}
-	toc.nameCaseBits.end(w)
+	toc.fileNames.writeStrings(w, b.fileNames)
 
 	keys = keys[:0]
 	for k := range b.namePostings {

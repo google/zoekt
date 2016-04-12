@@ -53,16 +53,12 @@ func newSearchableString(data []byte, startOff uint32, postings map[string][]uin
 	return &dest
 }
 
-type fileEntry struct {
-	content *searchableString
-	name    *searchableString
-}
-
 type IndexBuilder struct {
 	contentEnd uint32
 	nameEnd    uint32
 
-	files []fileEntry
+	files     []*searchableString
+	fileNames []*searchableString
 
 	// ngram => posting.
 	contentPostings map[string][]uint32
@@ -83,11 +79,8 @@ func NewIndexBuilder() *IndexBuilder {
 }
 
 func (b *IndexBuilder) AddFile(name string, content []byte) {
-	b.files = append(b.files,
-		fileEntry{
-			content: newSearchableString(content, b.contentEnd, b.contentPostings),
-			name:    newSearchableString([]byte(name), b.nameEnd, b.namePostings),
-		})
+	b.files = append(b.files, newSearchableString(content, b.contentEnd, b.contentPostings))
+	b.fileNames = append(b.fileNames, newSearchableString([]byte(name), b.nameEnd, b.namePostings))
 	b.contentEnd += uint32(len(content))
 	b.nameEnd += uint32(len(name))
 }

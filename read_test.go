@@ -39,13 +39,13 @@ func TestReadWrite(t *testing.T) {
 	if r.err != nil {
 		t.Errorf("got read error %v", r.err)
 	}
-	if toc.contents.data.sz != 5 {
-		t.Errorf("got contents size %d, want 5", toc.contents.data.sz)
+	if toc.fileContents.content.data.sz != 5 {
+		t.Errorf("got contents size %d, want 5", toc.fileContents.content.data.sz)
 	}
 
 	data := r.readIndexData(&toc)
-	if want := []string{"filename"}; !reflect.DeepEqual(data.fileNames, want) {
-		t.Errorf("got filenames %s, want %v", data.fileNames, want)
+	if got := data.fileName(0); got != "filename" {
+		t.Errorf("got filename %s, want %v", got, "filename")
 	}
 
 	if len(data.ngrams) != 3 {
@@ -81,8 +81,8 @@ func TestReadWriteNames(t *testing.T) {
 	if r.err != nil {
 		t.Errorf("got read error %v", r.err)
 	}
-	if toc.nameContents.data.sz != 4 {
-		t.Errorf("got contents size %d, want 4", toc.nameContents.data.sz)
+	if toc.fileNames.content.data.sz != 4 {
+		t.Errorf("got contents size %d, want 4", toc.fileNames.content.data.sz)
 	}
 
 	data := r.readIndexData(&toc)

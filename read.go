@@ -92,19 +92,19 @@ func (r *reader) readIndexData(toc *indexTOC) *indexData {
 		return nil
 	}
 
-	toc.contents.readIndex(r)
+	toc.fileContents.content.readIndex(r)
+	toc.fileContents.caseBits.readIndex(r)
 	toc.postings.readIndex(r)
-	toc.caseBits.readIndex(r)
 	toc.newlines.readIndex(r)
 
 	toc.namePostings.readIndex(r)
-	toc.nameCaseBits.readIndex(r)
-	toc.nameContents.readIndex(r)
+	toc.fileNames.content.readIndex(r)
+	toc.fileNames.caseBits.readIndex(r)
 
 	d := indexData{
 		postingsIndex:  toc.postings.absoluteIndex(),
-		caseBitsIndex:  toc.caseBits.absoluteIndex(),
-		boundaries:     toc.contents.absoluteIndex(),
+		caseBitsIndex:  toc.fileContents.caseBits.absoluteIndex(),
+		boundaries:     toc.fileContents.content.absoluteIndex(),
 		newlinesIndex:  toc.newlines.absoluteIndex(),
 		ngrams:         map[ngram]simpleSection{},
 		fileNameNgrams: map[ngram][]uint32{},
@@ -119,12 +119,12 @@ func (r *reader) readIndexData(toc *indexTOC) *indexData {
 		}
 	}
 
-	d.fileEnds = toc.contents.relativeIndex()[1:]
+	d.fileEnds = toc.fileContents.content.relativeIndex()[1:]
 
-	d.fileNameContent = r.readSectionBlob(toc.nameContents.data)
-	d.fileNameCaseBits = r.readSectionBlob(toc.nameCaseBits.data)
-	d.fileNameCaseBitsIndex = toc.nameCaseBits.relativeIndex()
-	d.fileNameIndex = toc.nameContents.relativeIndex()
+	d.fileNameContent = r.readSectionBlob(toc.fileNames.content.data)
+	d.fileNameCaseBits = r.readSectionBlob(toc.fileNames.caseBits.data)
+	d.fileNameCaseBitsIndex = toc.fileNames.caseBits.relativeIndex()
+	d.fileNameIndex = toc.fileNames.content.relativeIndex()
 
 	nameNgramText := r.readSectionBlob(toc.nameNgramText)
 	fileNamePostingsData := r.readSectionBlob(toc.namePostings.data)

@@ -171,6 +171,35 @@ func (s *compoundSection) readBlob(r *reader, i uint32) []byte {
 	return r.readSectionBlob(simpleSection{s.offsets[i], s.offsets[i+1] - s.offsets[i]})
 }
 
+type contentSection struct {
+	content  compoundSection
+	caseBits compoundSection
+}
+
+func (s *contentSection) writeStrings(w *writer, strs []*searchableString) {
+	s.content.start(w)
+	for _, f := range strs {
+		s.content.addItem(w, f.data)
+	}
+	s.content.end(w)
+
+	s.caseBits.start(w)
+	for _, f := range strs {
+		s.caseBits.addItem(w, f.caseBits)
+	}
+	s.caseBits.end(w)
+}
+
+func (s *contentSection) read(r *reader) {
+	s.content.read(r)
+	s.caseBits.read(r)
+}
+
+func (s *contentSection) write(w *writer) {
+	s.content.write(w)
+	s.caseBits.write(w)
+}
+
 func toDeltas(offsets []uint32) []byte {
 	deltas := make([]byte, 0, len(offsets)*2)
 	var last uint32
