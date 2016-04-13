@@ -200,11 +200,8 @@ func Parse(qStr string) (Query, error) {
 		add(&SubstringQuery{Pattern: string(current)})
 	}
 
-	qs = pushDownNegations(&AndQuery{qs}).(*AndQuery).Children
-
 	for _, q := range qs {
-		s := q.(*SubstringQuery)
-		if len(s.Pattern) < 3 {
+		if s, ok := q.(*SubstringQuery); ok && len(s.Pattern) < 3 {
 			return nil, &SuggestQueryError{
 				fmt.Sprintf("pattern %q too short", s.Pattern),
 				fmt.Sprintf("%q", qStr),
@@ -223,8 +220,9 @@ func Parse(qStr string) (Query, error) {
 		}
 	case "auto":
 		for _, q := range qs {
-			s := q.(*SubstringQuery)
-			s.CaseSensitive = (s.Pattern != string(toLower([]byte(s.Pattern))))
+			if s, ok := q.(*SubstringQuery); ok {
+				s.CaseSensitive = (s.Pattern != string(toLower([]byte(s.Pattern))))
+			}
 		}
 	}
 

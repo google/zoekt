@@ -326,20 +326,6 @@ func TestAndSearch(t *testing.T) {
 	}
 }
 
-func TestOnlyNegations(t *testing.T) {
-	b := NewIndexBuilder()
-
-	b.AddFile("f1", []byte("x banana y"))
-	searcher := searcherForTest(t, b)
-
-	_, err := searcher.Search(&SubstringQuery{
-		Pattern: "bla",
-		Negate:  true})
-	if err == nil {
-		t.Fatalf("should return error on query with negations only.")
-	}
-}
-
 func TestAndNegateSearch(t *testing.T) {
 	b := NewIndexBuilder()
 
@@ -353,10 +339,9 @@ func TestAndNegateSearch(t *testing.T) {
 				&SubstringQuery{
 					Pattern: "banana",
 				},
-				&SubstringQuery{
+				&NotQuery{&SubstringQuery{
 					Pattern: "apple",
-					Negate:  true,
-				},
+				}},
 			},
 		})
 

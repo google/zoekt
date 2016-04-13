@@ -33,7 +33,7 @@ func TestParseQuery(t *testing.T) {
 			&SubstringQuery{Pattern: "abc"},
 			&SubstringQuery{Pattern: "bcd"},
 		}}, false},
-		{"-abc", &SubstringQuery{Pattern: "abc", Negate: true}, false},
+		{"-abc", &NotQuery{&SubstringQuery{Pattern: "abc"}}, false},
 
 		{"abccase:yes", &SubstringQuery{Pattern: "abccase:yes"}, false},
 		{"file:abc", &SubstringQuery{Pattern: "abc", FileName: true}, false},

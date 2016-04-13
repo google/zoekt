@@ -15,7 +15,6 @@
 package zoekt
 
 import (
-	"fmt"
 	"log"
 	"sort"
 )
@@ -25,94 +24,51 @@ var _ = log.Println
 // All the matches for a given file.
 type mergedCandidateMatch struct {
 	fileID        uint32
-	matches       map[*SubstringQuery][]candidateMatch
-	negateMatches map[*SubstringQuery][]candidateMatch
+	matches       map[*SubstringQuery][]*candidateMatch
+	negateMatches map[*SubstringQuery][]*candidateMatch
 }
 
 func mergeCandidates(iters []*docIterator, stats *Stats) []mergedCandidateMatch {
-	var cands [][]candidateMatch
-	var negateCands [][]candidateMatch
+	var cands [][]*candidateMatch
 	for _, i := range iters {
 		iterCands := i.next()
-		if i.query.Negate {
-			negateCands = append(negateCands, iterCands)
-		} else {
+		if len(iterCands) > 0 {
 			cands = append(cands, iterCands)
 		}
 		stats.NgramMatches += len(iterCands)
 	}
 
 	var merged []mergedCandidateMatch
-	var nextDoc uint32
 
-done:
-	for {
-		found := true
-		var newCands [][]candidateMatch
+	for len(cands) > 0 {
+		var newCands [][]*candidateMatch
+		var nextDoc uint32
+		nextDoc = maxUInt32
 		for _, ms := range cands {
-			for len(ms) > 0 && ms[0].file < nextDoc {
-				ms = ms[1:]
-			}
-			if len(ms) == 0 {
-				break done
-			}
-			if ms[0].file > nextDoc {
+			if ms[0].file < nextDoc {
 				nextDoc = ms[0].file
-				found = false
-			}
-			newCands = append(newCands, ms)
-		}
-		cands = newCands
-		if !found {
-			continue
-		}
-
-		newCands = nil
-		for _, ms := range negateCands {
-			for len(ms) > 0 && ms[0].file < nextDoc {
-				ms = ms[1:]
-			}
-			if len(ms) > 0 {
-				newCands = append(newCands, ms)
 			}
 		}
-		negateCands = newCands
 
 		newCands = nil
 		mc := mergedCandidateMatch{
-			fileID:        nextDoc,
-			matches:       map[*SubstringQuery][]candidateMatch{},
-			negateMatches: map[*SubstringQuery][]candidateMatch{},
+			fileID:  nextDoc,
+			matches: map[*SubstringQuery][]*candidateMatch{},
 		}
 		for _, ms := range cands {
-			var sqMatches []candidateMatch
-			for len(ms) > 0 && ms[0].file == nextDoc {
-				sqMatches = append(sqMatches, ms[0])
-				ms = ms[1:]
-			}
-
-			mc.matches[sqMatches[0].query] = sqMatches
-			newCands = append(newCands, ms[:])
-		}
-		cands = newCands
-
-		newCands = nil
-		for _, ms := range negateCands {
-			var sqMatches []candidateMatch
+			var sqMatches []*candidateMatch
 			for len(ms) > 0 && ms[0].file == nextDoc {
 				sqMatches = append(sqMatches, ms[0])
 				ms = ms[1:]
 			}
 			if len(sqMatches) > 0 {
-				mc.negateMatches[sqMatches[0].query] = sqMatches
+				mc.matches[sqMatches[0].query] = sqMatches
 			}
-
 			if len(ms) > 0 {
-				newCands = append(newCands, ms)
+				newCands = append(newCands, ms[:])
 			}
 		}
-		negateCands = newCands
-
+		cands = newCands
 		merged = append(merged, mc)
 	}
 
@@ -133,6 +89,8 @@ type contentProvider struct {
 	cb     []byte
 	data   []byte
 	nl     []uint32
+
+	matchesByQuery map[*SubstringQuery][]*candidateMatch
 }
 
 func (p *contentProvider) caseMatches(m *candidateMatch) bool {
@@ -191,136 +149,6 @@ func (p *contentProvider) fillMatch(m *candidateMatch) Match {
 		LineOff:     off,
 		MatchLength: len(m.substrBytes),
 	}
-}
-
-func (d *indexData) andSearch(andQ *andQuery) (*SearchResult, error) {
-	foundPositive := false
-	for _, atom := range andQ.atoms {
-		if !atom.Negate {
-			foundPositive = true
-			break
-		}
-	}
-	if !foundPositive {
-		return nil, fmt.Errorf("must have a positive query atom in AND query.")
-	}
-
-	var res SearchResult
-	var caseSensitive bool
-	var iters []*docIterator
-
-	for _, atom := range andQ.atoms {
-		caseSensitive = caseSensitive || atom.CaseSensitive
-
-		// TODO - postingsCache
-		i, err := d.getDocIterator(atom)
-		if err != nil {
-			return nil, err
-		}
-		iters = append(iters, i)
-	}
-
-	// TODO merge mergeCandidates and following loop.
-	cands := mergeCandidates(iters, &res.Stats)
-
-	cp := contentProvider{
-		idx: uint32(0xFFFFFFFF),
-	}
-
-nextFileMatch:
-	for _, c := range cands {
-		if c.fileID != cp.idx {
-			cp = contentProvider{
-				reader: d.reader,
-				id:     d,
-				idx:    c.fileID,
-				stats:  &res.Stats,
-			}
-		}
-
-		if caseSensitive {
-			trimmed := map[*SubstringQuery][]candidateMatch{}
-			for q, req := range c.matches {
-				matching := []candidateMatch{}
-				for _, m := range req {
-					if cp.caseMatches(&m) {
-						matching = append(matching, m)
-					}
-				}
-				if len(matching) == 0 {
-					continue nextFileMatch
-				}
-				trimmed[q] = matching
-			}
-
-			c.matches = trimmed
-
-			trimmed = map[*SubstringQuery][]candidateMatch{}
-			for q, req := range c.negateMatches {
-				matching := []candidateMatch{}
-				for _, m := range req {
-					if cp.caseMatches(&m) {
-						matching = append(matching, m)
-					}
-				}
-				trimmed[q] = matching
-			}
-
-			c.negateMatches = trimmed
-		}
-
-		trimmed := map[*SubstringQuery][]candidateMatch{}
-		for q, req := range c.matches {
-			matching := []candidateMatch{}
-			for _, m := range req {
-				if cp.matchContent(&m) {
-					matching = append(matching, m)
-				}
-			}
-			if len(matching) == 0 {
-				continue nextFileMatch
-			}
-			trimmed[q] = matching
-		}
-		c.matches = trimmed
-
-		for _, neg := range c.negateMatches {
-			for _, m := range neg {
-				if cp.matchContent(&m) {
-					continue nextFileMatch
-				}
-			}
-		}
-
-		fMatch := FileMatch{
-			Name: d.fileName(c.fileID),
-			Rank: int(c.fileID),
-		}
-
-		// If we have content matches, drop the filename match.
-		foundContentMatch := false
-		for _, req := range c.matches {
-			for _, m := range req {
-				if !m.query.FileName {
-					foundContentMatch = true
-				}
-			}
-		}
-		for _, req := range c.matches {
-			for _, m := range req {
-				if !m.query.FileName || !foundContentMatch {
-					fMatch.Matches = append(fMatch.Matches, cp.fillMatch(&m))
-				}
-			}
-		}
-
-		sortMatches(fMatch.Matches)
-		res.Files = append(res.Files, fMatch)
-		res.Stats.MatchCount += len(fMatch.Matches)
-		res.Stats.FileCount++
-	}
-
-	return &res, nil
 }
 
 type matchOffsetSlice []Match

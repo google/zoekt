@@ -28,6 +28,19 @@ This means that if we look for "the quick brown fox", we can look for just the
 trigrams "the" and "fox", and check that they are found at the right distance
 apart.
 
+Regular expressions can be handled (but aren't yet) by extracting
+normal strings from the regular expressions, and running the full
+regular expression match on candidates that this yields. For example,
+
+  (Path|PathFragment).*=.*/usr/local
+
+would be transformed in
+
+  (AND (OR "Path" "PathFragment") "/usr/local")
+
+and any documents thus found would be searched for the regular
+expression.
+
 Compared to indexing 3-grams on a per-file basis, as described
 [here](https://swtch.com/~rsc/regexp/regexp4.html), there are some advantages:
 
@@ -44,8 +57,9 @@ There are some downsides compared to trigrams:
   (offsets), and 1x (original content). However, since we have to look at just a
   limited number of ngrams, we don't have to keep the index in memory.
 
-
-Compared to suffix-array, there are the following advantages:
+Compared to [suffix
+arrays](https://blog.nelhage.com/2015/02/regular-expression-search-with-suffix-arrays/),
+there are the following advantages:
 
 * The index construction is straightforward, and can easily be made
   incremental.
@@ -53,13 +67,13 @@ Compared to suffix-array, there are the following advantages:
 * It uses a less memory.
 
 * All the matches are returned in document order. This makes it
-  straightforward to process multiple queries in parallel, and do
-  complex boolean queries with AND and OR.
+  straightforward to process compound boolean queries with AND and OR.
 
 Downsides compared to suffix array:
 
 * there is no way to transform regular expressions into index ranges into
   the suffix array.
+
 
 
 ACKNOWLEDGEMENTS

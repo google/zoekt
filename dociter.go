@@ -102,11 +102,11 @@ func (m *candidateMatch) line(newlines []uint32, content []byte, caseBits []byte
 	return idx + 1, int(m.offset) - start, toOriginal(content, caseBits, start, end)
 }
 
-func (s *docIterator) next() []candidateMatch {
+func (s *docIterator) next() []*candidateMatch {
 	patBytes := []byte(s.query.Pattern)
 	lowerPatBytes := toLower(patBytes)
 
-	var candidates []candidateMatch
+	var candidates []*candidateMatch
 	for {
 		if len(s.first) == 0 || len(s.last) == 0 {
 			break
@@ -135,7 +135,7 @@ func (s *docIterator) next() []candidateMatch {
 			}
 
 			candidates = append(candidates,
-				candidateMatch{
+				&candidateMatch{
 					query:       s.query,
 					substrBytes: patBytes,
 					lowered:     lowerPatBytes,

@@ -127,17 +127,3 @@ func (d *indexData) fileName(i uint32) string {
 func (s *indexData) Close() error {
 	return s.reader.r.Close()
 }
-
-func (d *indexData) Search(query Query) (*SearchResult, error) {
-	orQ, err := standardize(query)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(orQ.ands) != 1 {
-		return nil, fmt.Errorf("not implemented: OrQuery")
-	}
-
-	andQ := orQ.ands[0]
-	return d.andSearch(andQ)
-}

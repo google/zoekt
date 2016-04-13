@@ -25,11 +25,10 @@ func TestQueryString(t *testing.T) {
 	q := &OrQuery{[]Query{
 		&AndQuery{[]Query{
 			&SubstringQuery{Pattern: "hoi"},
-			&SubstringQuery{Pattern: "neg", Negate: true},
 			&NotQuery{&SubstringQuery{Pattern: "hai"}},
 		}}}}
 	got := q.String()
-	want := `(or (and substr:"hoi" -substr:"neg" (not substr:"hai")))`
+	want := `(or (and substr:"hoi" (not substr:"hai")))`
 
 	if got != want {
 		t.Errorf("got %s, want %s", got, want)
@@ -53,28 +52,8 @@ func TestQueryFlatten(t *testing.T) {
 	q = simplify(q)
 	got := q.String()
 
-	want := `(or (and substr:"hoi" -substr:"hai") substr:"zip" substr:"zap")`
+	want := `(or (and substr:"hoi" (not substr:"hai")) substr:"zip" substr:"zap")`
 	if got != want {
-		t.Errorf("got %s, want %s", got, want)
-	}
-}
-
-func TestStandardizeQuery(t *testing.T) {
-	var q Query
-	q = &OrQuery{[]Query{
-		&SubstringQuery{Pattern: "A"},
-		&AndQuery{[]Query{
-			&SubstringQuery{Pattern: "B"},
-			&SubstringQuery{Pattern: "C"},
-		}}}}
-
-	want := `(OR (AND substr:"A") (AND substr:"B" substr:"C"))`
-
-	got, err := standardize(q)
-	if err != nil {
-		t.Errorf("standardize: %v", err)
-	}
-	if got.String() != want {
 		t.Errorf("got %s, want %s", got, want)
 	}
 }
