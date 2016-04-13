@@ -22,12 +22,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hanwen/codesearch"
+	"github.com/hanwen/zoekt"
 )
 
 const CONTEXT = 20
 
-func displayMatches(files []codesearch.FileMatch, pat string) {
+func displayMatches(files []zoekt.FileMatch, pat string) {
 	for _, f := range files {
 		for _, m := range f.Matches {
 			fmt.Printf("%s:%d:%s\n", f.Name, m.LineNum, m.Line)
@@ -55,19 +55,19 @@ func main() {
 	}
 	pat := flag.Arg(0)
 
-	searcher, err := codesearch.NewShardedSearcher(*index)
+	searcher, err := zoekt.NewShardedSearcher(*index)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	q := &codesearch.SubstringQuery{
+	q := &zoekt.SubstringQuery{
 		Pattern:       pat,
 		CaseSensitive: *caseSensitive || strings.ToLower(pat) != pat,
 	}
-	ms, err := searcher.Search(q)
+	sres, err := searcher.Search(q)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	displayMatches(ms, pat)
+	displayMatches(sres.Files, pat)
 }

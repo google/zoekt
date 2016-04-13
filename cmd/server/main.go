@@ -26,11 +26,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/hanwen/codesearch"
+	"github.com/hanwen/zoekt"
 )
 
 type httpServer struct {
-	searcher codesearch.Searcher
+	searcher zoekt.Searcher
 }
 
 var didYouMeanTemplate = template.Must(template.New("didyoumean").Parse(`<html>
@@ -46,7 +46,7 @@ var didYouMeanTemplate = template.Must(template.New("didyoumean").Parse(`<html>
 func (s *httpServer) serveSearch(w http.ResponseWriter, r *http.Request) {
 	err := s.serveSearchErr(w, r)
 
-	if suggest, ok := err.(*codesearch.SuggestQueryError); ok {
+	if suggest, ok := err.(*zoekt.SuggestQueryError); ok {
 		var buf bytes.Buffer
 		if err := didYouMeanTemplate.Execute(&buf, suggest); err != nil {
 			http.Error(w, err.Error(), http.StatusTeapot)
@@ -126,7 +126,7 @@ type MatchData struct {
 
 type ResultsPage struct {
 	Query       string
-	Stats       codesearch.Stats
+	Stats       zoekt.Stats
 	Duration    time.Duration
 	FileMatches []FileMatchData
 }
@@ -156,7 +156,7 @@ var resultTemplate = template.Must(template.New("page").Parse(`<html>
 func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) error {
 	qvals := r.URL.Query()
 	query := qvals.Get("q")
-	q, err := codesearch.Parse(query)
+	q, err := zoekt.Parse(query)
 	if err != nil {
 		return err
 	}
@@ -221,7 +221,7 @@ func main() {
 	index := flag.String("index", filepath.Join(os.Getenv("HOME"), ".csindex/*"), "index file glob to use")
 	flag.Parse()
 
-	searcher, err := codesearch.NewShardedSearcher(*index)
+	searcher, err := zoekt.NewShardedSearcher(*index)
 	if err != nil {
 		log.Fatal(err)
 	}

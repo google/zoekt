@@ -27,7 +27,7 @@ import (
 	"sync"
 	"text/template"
 
-	"github.com/hanwen/codesearch"
+	"github.com/hanwen/zoekt"
 )
 
 type fileAggregator struct {
@@ -174,7 +174,7 @@ func buildShard(shardName string, files []string) error {
 		return err
 	}
 
-	b := codesearch.NewIndexBuilder()
+	b := zoekt.NewIndexBuilder()
 	total := 0
 	for _, a := range files {
 		c, err := ioutil.ReadFile(a)
