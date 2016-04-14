@@ -321,7 +321,10 @@ nextFileMatch:
 
 		fileMatch := FileMatch{
 			Name: d.fileName(nextDoc),
-			Rank: int(nextDoc),
+			// Maintain ordering of input files. This
+			// strictly dominates the in-file ordering of
+			// the matches.
+			Score: 10 * float64(nextDoc) / float64(len(d.boundaries)),
 		}
 
 		foundContentMatch := false
@@ -344,12 +347,23 @@ nextFileMatch:
 			fileMatch.Matches = trimmed
 		}
 
-		sortMatches(fileMatch.Matches)
+		maxFileScore := 0.0
+		for i := range fileMatch.Matches {
+			if maxFileScore < fileMatch.Matches[i].Score {
+				maxFileScore = fileMatch.Matches[i].Score
+			}
+
+			// Order by ordering in file.
+			fileMatch.Matches[i].Score += 1.0 - (float64(i) / float64(len(fileMatch.Matches)))
+		}
+		fileMatch.Score += maxFileScore
+
+		sortMatchesByScore(fileMatch.Matches)
 		res.Files = append(res.Files, fileMatch)
 		res.Stats.MatchCount += len(fileMatch.Matches)
 		res.Stats.FileCount++
 	}
-
+	sortFilesByScore(res.Files)
 	return &res, nil
 }
 

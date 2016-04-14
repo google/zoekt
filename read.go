@@ -189,7 +189,7 @@ func NewShardedSearcher(indexGlob string) (Searcher, error) {
 type matchSlice []FileMatch
 
 func (m matchSlice) Len() int           { return len(m) }
-func (m matchSlice) Less(i, j int) bool { return m[i].Rank < m[j].Rank }
+func (m matchSlice) Less(i, j int) bool { return m[i].Score > m[j].Score }
 func (m matchSlice) Swap(i, j int)      { m[i], m[j] = m[j], m[i] }
 
 func (ss *shardedSearcher) Close() error {

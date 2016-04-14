@@ -23,6 +23,15 @@ import (
 	"testing"
 )
 
+func clearScores(r *SearchResult) {
+	for i := range r.Files {
+		r.Files[i].Score = 0.0
+		for j := range r.Files[i].Matches {
+			r.Files[i].Matches[j].Score = 0.0
+		}
+	}
+}
+
 func TestBoundary(t *testing.T) {
 	b := NewIndexBuilder()
 
@@ -129,9 +138,10 @@ func TestNewlines(t *testing.T) {
 		t.Fatalf("NewSearcher: %v", err)
 	}
 	sres, err := searcher.Search(&SubstringQuery{Pattern: "ne2"})
+	clearScores(sres)
+
 	matches := sres.Files
 	want := []FileMatch{{
-		Rank: 0,
 		Name: "filename",
 		Matches: []Match{
 			{
@@ -219,25 +229,25 @@ func TestFileBasedSearch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
+	clearScores(sres)
+
 	matches := sres.Files
 	want := []FileMatch{{
-		Rank: 0,
-		Name: "f1",
-		Matches: []Match{{
-			Offset:      8,
-			Line:        string(c1),
-			LineNum:     1,
-			LineOff:     8,
-			MatchLength: 6,
-		}},
-	}, {
-		Rank: 1,
 		Name: "f2",
 		Matches: []Match{{
 			Line:        string(c2),
 			LineNum:     1,
 			LineOff:     10,
 			Offset:      10,
+			MatchLength: 6,
+		}},
+	}, {
+		Name: "f1",
+		Matches: []Match{{
+			Offset:      8,
+			Line:        string(c1),
+			LineNum:     1,
+			LineOff:     8,
 			MatchLength: 6,
 		}},
 	}}
@@ -408,6 +418,7 @@ func TestFileSearch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
+	clearScores(sres)
 
 	matches := sres.Files
 	if len(matches) != 1 || len(matches[0].Matches) != 1 {
@@ -450,6 +461,7 @@ func TestFileRestriction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
+	clearScores(sres)
 
 	matches := sres.Files
 	if len(matches) != 1 || len(matches[0].Matches) != 1 {
@@ -490,5 +502,33 @@ func TestFileNameBoundary(t *testing.T) {
 	matches := sres.Files
 	if len(matches) != 1 || len(matches[0].Matches) != 1 {
 		t.Fatalf("got %v, want 1 match", matches)
+	}
+}
+
+func TestWordBoundaryRanking(t *testing.T) {
+	b := NewIndexBuilder()
+	b.AddFile("f1", []byte("xbytex xbytex"))
+	b.AddFile("f2", []byte("xbytex bytex byte bla"))
+	// ---------------------012345678901234567890
+	b.AddFile("f3", []byte("xbytex ybytex"))
+
+	searcher := searcherForTest(t, b)
+
+	sres, err := searcher.Search(
+		&SubstringQuery{
+			Pattern: "byte",
+		})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+
+	if len(sres.Files) != 3 || sres.Files[0].Name != "f2" || len(sres.Files[0].Matches) != 3 {
+		t.Fatalf("got %#v, want 3 matches in files f2", sres.Files)
+	}
+	if sres.Files[0].Matches[0].Offset != 13 {
+		t.Fatalf("got first match %#v, want full word match", sres.Files[0].Matches[0])
+	}
+	if sres.Files[0].Matches[1].Offset != 7 {
+		t.Fatalf("got second match %#v, want partial word match", sres.Files[0].Matches[0])
 	}
 }

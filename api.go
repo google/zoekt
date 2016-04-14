@@ -20,8 +20,8 @@ import (
 
 // FileMatch contains all the matches within a file.
 type FileMatch struct {
-	// Ranking; the lower, the better.
-	Rank    int
+	// Ranking; the higher, the better.
+	Score   float64
 	Name    string
 	Matches []Match
 }
@@ -40,6 +40,10 @@ type Match struct {
 
 	// If set, this was a match on the filename.
 	FileName bool
+
+	// The higher the better. Only ranks the quality of the match
+	// within the file, does not take rank of file into account
+	Score float64
 }
 
 // Stats contains interesting numbers on the search

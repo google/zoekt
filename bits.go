@@ -133,3 +133,29 @@ func ngramToBytes(n ngram) []byte {
 func (n ngram) String() string {
 	return string(ngramToBytes(n))
 }
+
+const (
+	_classChar  = 0
+	_classDigit = iota
+	_classPunct = iota
+	_classOther = iota
+	_classSpace = iota
+)
+
+func byteClass(c byte) int {
+	if (c >= 'a' && c <= 'z') || c >= 'A' && c <= 'Z' {
+		return _classChar
+	}
+	if c >= '0' && c <= '9' {
+		return _classDigit
+	}
+
+	switch c {
+	case ' ', '\n':
+		return _classSpace
+	case '.', ',', ';', '"', '\'':
+		return _classPunct
+	default:
+		return _classOther
+	}
+}
