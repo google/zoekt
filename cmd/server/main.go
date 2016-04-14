@@ -137,7 +137,7 @@ var resultTemplate = template.Must(template.New("page").Parse(`<html>
   </head>
 <body>` + searchBox +
 	`  <hr>
-  Found {{.Stats.MatchCount}} results in {{.Stats.FileCount}} files ({{.Stats.NgramMatches}} ngram matches, {{.Stats.FilesLoaded}} docs loaded): for
+  Found {{.Stats.MatchCount}} results in {{.Stats.FileCount}} files ({{.Stats.NgramMatches}} ngram matches, {{.Stats.FilesConsidered}} docs considered,{{.Stats.FilesLoaded}} docs loaded): for
   <pre style="background: #ffc;">{{.Query}}</pre>
   in {{.Stats.Duration}}
   <p>

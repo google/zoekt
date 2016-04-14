@@ -44,11 +44,12 @@ type Match struct {
 
 // Stats contains interesting numbers on the search
 type Stats struct {
-	NgramMatches int
-	FilesLoaded  int
-	FileCount    int
-	MatchCount   int
-	Duration     time.Duration
+	NgramMatches    int
+	FilesConsidered int
+	FilesLoaded     int
+	FileCount       int
+	MatchCount      int
+	Duration        time.Duration
 }
 
 func (s *Stats) Add(o Stats) {
@@ -56,6 +57,7 @@ func (s *Stats) Add(o Stats) {
 	s.FilesLoaded += o.FilesLoaded
 	s.MatchCount += o.MatchCount
 	s.FileCount += o.FileCount
+	s.FilesConsidered += o.FilesConsidered
 }
 
 // SearchResult contains search matches and extra data

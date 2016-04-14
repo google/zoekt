@@ -54,7 +54,7 @@ func TestBasic(t *testing.T) {
 		t.Errorf("search: %v", err)
 	}
 	fmatches := res.Files
-	if len(fmatches) != 1 {
+	if len(fmatches) != 1 || len(fmatches[0].Matches) != 1 {
 		t.Fatalf("got %v, want 1 matches", fmatches)
 	}
 
@@ -316,10 +316,11 @@ func TestAndSearch(t *testing.T) {
 	}
 
 	wantStats := Stats{
-		FilesLoaded:  1,
-		NgramMatches: 4,
-		MatchCount:   2,
-		FileCount:    1,
+		FilesLoaded:     1,
+		NgramMatches:    4,
+		MatchCount:      2,
+		FileCount:       1,
+		FilesConsidered: 3,
 	}
 	if !reflect.DeepEqual(sres.Stats, wantStats) {
 		t.Errorf("got stats %#v, want %#v", sres.Stats, wantStats)
@@ -358,6 +359,36 @@ func TestAndNegateSearch(t *testing.T) {
 	}
 	if matches[0].Matches[0].Offset != 2 {
 		t.Fatalf("got %v, want offsets 2,9", matches)
+	}
+}
+
+func TestNegativeMatchesOnlyShortcut(t *testing.T) {
+	b := NewIndexBuilder()
+
+	b.AddFile("f1", []byte("x banana y"))
+
+	b.AddFile("f2", []byte("x appelmoes y"))
+	b.AddFile("f3", []byte("x appelmoes y"))
+	b.AddFile("f3", []byte("x appelmoes y"))
+
+	searcher := searcherForTest(t, b)
+	sres, err := searcher.Search(
+		&AndQuery{
+			Children: []Query{
+				&SubstringQuery{
+					Pattern: "banana",
+				},
+				&NotQuery{&SubstringQuery{
+					Pattern: "appel",
+				}},
+			},
+		})
+
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if sres.Stats.FilesConsidered != 1 {
+		t.Errorf("got %#v, want FilesConsidered: 1", sres.Stats)
 	}
 }
 

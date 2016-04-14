@@ -10,7 +10,7 @@ var _ = log.Println
 // An expression tree coupled with matches
 type matchTree interface {
 	// returns whether this matches, and if we are sure.
-	matches() (match bool, sure bool)
+	matches(known map[matchTree]bool) (match bool, sure bool)
 	String() string
 }
 
@@ -31,55 +31,75 @@ func (t *notMatchTree) String() string {
 }
 
 func (t *substrMatchTree) String() string {
-	return fmt.Sprintf("substr(%s, %v)", t.query, t.cands)
+	return fmt.Sprintf("substr(%s, %v)", t.query, t.current)
 }
 
-func visit(t matchTree, f func(*substrMatchTree)) {
+func collectPositiveSubstrings(t matchTree, f func(*substrMatchTree)) {
 	switch s := t.(type) {
 	case *andMatchTree:
 		for _, ch := range s.children {
-			visit(ch, f)
+			collectPositiveSubstrings(ch, f)
 		}
 	case *orMatchTree:
 		for _, ch := range s.children {
-			visit(ch, f)
+			collectPositiveSubstrings(ch, f)
 		}
 	case *notMatchTree:
-		visit(s.child, f)
+	case *substrMatchTree:
+		f(s)
+	}
+}
+func visitMatches(t matchTree, known map[matchTree]bool,
+	f func(*substrMatchTree)) {
+	switch s := t.(type) {
+	case *andMatchTree:
+		for _, ch := range s.children {
+			if known[ch] {
+				visitMatches(ch, known, f)
+			}
+		}
+	case *orMatchTree:
+		for _, ch := range s.children {
+			if known[ch] {
+				visitMatches(ch, known, f)
+			}
+		}
+	case *notMatchTree:
+		// don't collect into negative trees.
 	case *substrMatchTree:
 		f(s)
 	}
 }
 
 func (p *contentProvider) evalContentMatches(s *substrMatchTree) {
-	pruned := s.cands[:0]
-	for _, m := range s.cands {
+	pruned := s.current[:0]
+	for _, m := range s.current {
 		if p.matchContent(m) {
 			pruned = append(pruned, m)
 		}
 	}
-	s.cands = pruned
-	s.caseMatch = new(bool)
-	*s.caseMatch = (len(pruned) > 0)
+	s.current = pruned
+	s.contMatch = new(bool)
+	*s.contMatch = (len(pruned) > 0)
 }
 
 func (p *contentProvider) evalCaseMatches(s *substrMatchTree) {
-	pruned := s.cands[:0]
-	for _, m := range s.cands {
+	pruned := s.current[:0]
+	for _, m := range s.current {
 		if p.caseMatches(m) {
 			pruned = append(pruned, m)
 		}
 	}
-	s.cands = pruned
-	s.contMatch = new(bool)
-	*s.contMatch = len(pruned) > 0
+	s.current = pruned
+	s.caseMatch = new(bool)
+	*s.caseMatch = len(pruned) > 0
 }
 
-func (t *andMatchTree) matches() (bool, bool) {
+func (t *andMatchTree) matches(known map[matchTree]bool) (bool, bool) {
 	sure := true
 
 	for _, ch := range t.children {
-		v, ok := ch.matches()
+		v, ok := evalMatchTree(known, ch)
 		if ok && !v {
 			return false, true
 		}
@@ -94,45 +114,53 @@ type orMatchTree struct {
 	children []matchTree
 }
 
-func (t *orMatchTree) matches() (bool, bool) {
-	sure := false
-	res := false
-	var newCh []matchTree
+func (t *orMatchTree) matches(known map[matchTree]bool) (bool, bool) {
+	sure := true
 	for _, ch := range t.children {
-		v, ok := t.matches()
+		v, ok := evalMatchTree(known, ch)
 		if ok {
 			if v {
-				res = res || true
-				sure = true
-			} else {
-				continue
+				return true, true
 			}
+		} else {
+			sure = false
 		}
-
-		newCh = append(newCh, ch)
 	}
-	t.children = newCh
 	return false, sure
+}
+
+func evalMatchTree(known map[matchTree]bool, mt matchTree) (bool, bool) {
+	if v, ok := known[mt]; ok {
+		return v, true
+	}
+
+	v, ok := mt.matches(known)
+	if ok {
+		known[mt] = v
+	}
+
+	return v, ok
 }
 
 type notMatchTree struct {
 	child matchTree
 }
 
-func (t *notMatchTree) matches() (bool, bool) {
-	v, ok := t.child.matches()
+func (t *notMatchTree) matches(known map[matchTree]bool) (bool, bool) {
+	v, ok := evalMatchTree(known, t.child)
 	return !v, ok
 }
 
 type substrMatchTree struct {
 	query     *SubstringQuery
+	current   []*candidateMatch
 	caseMatch *bool
 	contMatch *bool
 	cands     []*candidateMatch
 }
 
-func (t *substrMatchTree) matches() (bool, bool) {
-	if len(t.cands) == 0 {
+func (t *substrMatchTree) matches(known map[matchTree]bool) (bool, bool) {
+	if len(t.current) == 0 {
 		return false, true
 	}
 	sure := true
@@ -151,83 +179,155 @@ func (t *substrMatchTree) matches() (bool, bool) {
 	return val, sure
 }
 
-func newMatchTree(q Query, mc *mergedCandidateMatch) matchTree {
+func (d *indexData) newMatchTree(q Query, sq map[*SubstringQuery]*substrMatchTree) (matchTree, error) {
 	switch s := q.(type) {
 	case *AndQuery:
 		var r []matchTree
 		for _, ch := range s.Children {
-			r = append(r, newMatchTree(ch, mc))
+			ct, err := d.newMatchTree(ch, sq)
+			if err != nil {
+				return nil, err
+			}
+			r = append(r, ct)
 		}
-		return &andMatchTree{r}
+		return &andMatchTree{r}, nil
 	case *OrQuery:
 		var r []matchTree
 		for _, ch := range s.Children {
-			r = append(r, newMatchTree(ch, mc))
+			ct, err := d.newMatchTree(ch, sq)
+			if err != nil {
+				return nil, err
+			}
+			r = append(r, ct)
 		}
-		return &andMatchTree{r}
+		return &andMatchTree{r}, nil
 	case *NotQuery:
+		ct, err := d.newMatchTree(s.Child, sq)
 		return &notMatchTree{
-			child: newMatchTree(s.Child, mc),
-		}
+			child: ct,
+		}, err
 	case *SubstringQuery:
-		return &substrMatchTree{
-			query: s,
-			cands: mc.matches[s],
-		}
-	}
-	return nil
-}
-
-func (d *indexData) Search(q Query) (*SearchResult, error) {
-	atoms := extractSubstringQueries(q)
-	var res SearchResult
-	var iters []*docIterator
-	for _, atom := range atoms {
-		// TODO - postingsCache
-		i, err := d.getDocIterator(atom)
+		iter, err := d.getDocIterator(s)
 		if err != nil {
 			return nil, err
 		}
-		iters = append(iters, i)
+		st := &substrMatchTree{
+			query: s,
+			cands: iter.next(),
+		}
+		sq[s] = st
+		return st, nil
+	}
+	panic("type")
+	return nil, nil
+}
+
+func (d *indexData) Search(q Query) (*SearchResult, error) {
+	var res SearchResult
+
+	atoms := map[*SubstringQuery]*substrMatchTree{}
+	mt, err := d.newMatchTree(q, atoms)
+	if err != nil {
+		return nil, err
 	}
 
-	// TODO merge mergeCandidates and following loop.
-	cands := mergeCandidates(iters, &res.Stats)
+	for _, st := range atoms {
+		res.Stats.NgramMatches += len(st.cands)
+	}
+
+	var positiveAtoms, fileAtoms []*substrMatchTree
+	collectPositiveSubstrings(mt, func(sq *substrMatchTree) {
+		positiveAtoms = append(positiveAtoms, sq)
+	})
+	for _, st := range atoms {
+		if st.query.FileName {
+			fileAtoms = append(fileAtoms, st)
+		}
+	}
 
 nextFileMatch:
-	for _, c := range cands {
-		// TODO - this creates a bunch of garbage that we
-		// could do without.
-		matchTree := newMatchTree(q, &c)
+	for {
+		var nextDoc uint32
+		nextDoc = maxUInt32
+		for _, st := range atoms {
+			st.current = nil
+			st.contMatch = nil
+			st.caseMatch = nil
+		}
+
+		for _, st := range positiveAtoms {
+			if len(st.cands) > 0 && st.cands[0].file < nextDoc {
+				nextDoc = st.cands[0].file
+			}
+		}
+
+		if nextDoc == maxUInt32 {
+			break
+		}
+
+		res.Stats.FilesConsidered++
+		for _, st := range atoms {
+			for len(st.cands) > 0 && st.cands[0].file < nextDoc {
+				st.cands = st.cands[1:]
+			}
+
+			i := 0
+			for ; i < len(st.cands) && st.cands[i].file == nextDoc; i++ {
+			}
+			st.current = st.cands[:i]
+			st.cands = st.cands[i:]
+		}
 
 		cp := contentProvider{
 			reader: d.reader,
 			id:     d,
-			idx:    c.fileID,
+			idx:    nextDoc,
 			stats:  &res.Stats,
 		}
 
-		visit(matchTree, cp.evalCaseMatches)
-		if v, ok := matchTree.matches(); ok && !v {
+		known := make(map[matchTree]bool)
+		if v, ok := evalMatchTree(known, mt); ok && !v {
 			continue nextFileMatch
 		}
 
-		visit(matchTree, cp.evalContentMatches)
-		if v, ok := matchTree.matches(); !ok {
+		// Files are cheap to match. Do them first.
+		if len(fileAtoms) > 0 {
+			for _, st := range fileAtoms {
+				cp.evalCaseMatches(st)
+				cp.evalContentMatches(st)
+			}
+			if v, ok := evalMatchTree(known, mt); ok && !v {
+				continue nextFileMatch
+			}
+		}
+
+		for _, st := range atoms {
+			cp.evalCaseMatches(st)
+		}
+
+		if v, ok := evalMatchTree(known, mt); ok && !v {
+			continue nextFileMatch
+		}
+
+		for _, st := range atoms {
+			// TODO - this may evaluate too much.
+			cp.evalContentMatches(st)
+		}
+		if v, ok := evalMatchTree(known, mt); !ok {
 			panic("did not decide")
 		} else if !v {
 			continue nextFileMatch
 		}
 
-		fMatch := FileMatch{
-			Name: d.fileName(c.fileID),
-			Rank: int(c.fileID),
+		fileMatch := FileMatch{
+			Name: d.fileName(nextDoc),
+			Rank: int(nextDoc),
 		}
 
 		foundContentMatch := false
-		visit(matchTree, func(s *substrMatchTree) {
-			for _, c := range s.cands {
-				fMatch.Matches = append(fMatch.Matches, cp.fillMatch(c))
+		visitMatches(mt, known, func(s *substrMatchTree) {
+			for _, c := range s.current {
+				fileMatch.Matches = append(fileMatch.Matches, cp.fillMatch(c))
 				if !c.query.FileName {
 					foundContentMatch = true
 				}
@@ -235,18 +335,18 @@ nextFileMatch:
 		})
 
 		if foundContentMatch {
-			trimmed := fMatch.Matches[:0]
-			for _, m := range fMatch.Matches {
+			trimmed := fileMatch.Matches[:0]
+			for _, m := range fileMatch.Matches {
 				if !m.FileName {
 					trimmed = append(trimmed, m)
 				}
 			}
-			fMatch.Matches = trimmed
+			fileMatch.Matches = trimmed
 		}
 
-		sortMatches(fMatch.Matches)
-		res.Files = append(res.Files, fMatch)
-		res.Stats.MatchCount += len(fMatch.Matches)
+		sortMatches(fileMatch.Matches)
+		res.Files = append(res.Files, fileMatch)
+		res.Stats.MatchCount += len(fileMatch.Matches)
 		res.Stats.FileCount++
 	}
 
