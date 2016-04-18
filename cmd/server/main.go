@@ -199,9 +199,9 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 			fMatch.Matches = append(fMatch.Matches, MatchData{
 				FileName:  f.Name,
 				LineNum:   m.LineNum,
-				Pre:       m.Line[:l],
-				MatchText: m.Line[l:e],
-				Post:      m.Line[e:],
+				Pre:       string(m.Line[:l]),
+				MatchText: string(m.Line[l:e]),
+				Post:      string(m.Line[e:]),
 			})
 		}
 		res.FileMatches = append(res.FileMatches, fMatch)

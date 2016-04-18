@@ -20,6 +20,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime/pprof"
 	"strings"
 
 	"github.com/hanwen/zoekt"
@@ -39,6 +40,7 @@ func main() {
 	index := flag.String("index",
 		filepath.Join(os.Getenv("HOME"), ".csindex", "*"), "index file glob to use")
 	caseSensitive := flag.Bool("case", false, "case sensitive search by default ")
+	cpuProfile := flag.String("cpu_profile", "", "write cpu profile to file")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage:\n\n  %s [option] PATTERN\n"+
@@ -65,6 +67,23 @@ func main() {
 		CaseSensitive: *caseSensitive || strings.ToLower(pat) != pat,
 	}
 	sres, err := searcher.Search(q)
+
+	if *cpuProfile != "" {
+		// If profiling, do it another time so we measure with
+		// warm caches.
+		f, err := os.Create(*cpuProfile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer f.Close()
+		log.Println("Displaying matches...")
+		pprof.StartCPUProfile(f)
+		for i := 0; i < 10; i++ {
+			sres, err = searcher.Search(q)
+		}
+		pprof.StopCPUProfile()
+	}
+
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -33,7 +33,6 @@ func TestBitFunctions(t *testing.T) {
 	if want := "abcdef"; want != string(lowered) {
 		t.Errorf("got lowercase %q, want %q", lowered, want)
 	}
-
 	roundtrip := toOriginal(lowered, bits, 1, 4)
 	if want := orig[1:4]; !reflect.DeepEqual(roundtrip, want) {
 		t.Errorf("got roundtrip %q, want %q", roundtrip, want)
@@ -63,5 +62,24 @@ func TestNgram(t *testing.T) {
 	n := stringToNGram(in)
 	if n.String() != "abc" {
 		t.Errorf("got %q, want %q", n, "abc")
+	}
+}
+
+func BenchmarkToOriginal(b *testing.B) {
+	b.StopTimer()
+	line := `  if ((size == kSignedByte || size == kUnsignedByte) && !IsByteRegister(rl_src.reg)) {`
+	pre := "xX\n"
+	post := "\nbla"
+
+	content := []byte(pre + line + post)
+	lwr, cb := splitCase(content)
+
+	result := make([][]byte, 0, b.N)
+
+	b.SetBytes(int64(len(line)))
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		result = append(result, toOriginal(lwr, cb, len(pre), len(line)+len(pre)))
 	}
 }

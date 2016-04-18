@@ -124,7 +124,7 @@ func (p *contentProvider) fillMatch(m *candidateMatch) Match {
 	if m.query.FileName {
 		return Match{
 			Offset:      m.offset,
-			Line:        string(p.id.fileNameContent[p.id.fileNameIndex[p.idx]:p.id.fileNameIndex[p.idx+1]]),
+			Line:        p.id.fileNameContent[p.id.fileNameIndex[p.idx]:p.id.fileNameIndex[p.idx+1]],
 			LineOff:     int(m.offset),
 			MatchLength: len(m.substrBytes),
 			FileName:    true,
@@ -145,7 +145,7 @@ func (p *contentProvider) fillMatch(m *candidateMatch) Match {
 
 	finalMatch := Match{
 		Offset:      m.offset,
-		Line:        string(data),
+		Line:        data,
 		LineNum:     num,
 		LineOff:     off,
 		MatchLength: len(m.substrBytes),

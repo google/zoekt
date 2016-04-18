@@ -146,7 +146,7 @@ func TestNewlines(t *testing.T) {
 		Matches: []Match{
 			{
 				Offset:      8,
-				Line:        "line2",
+				Line:        []byte("line2"),
 				LineNum:     2,
 				LineOff:     2,
 				MatchLength: 3,
@@ -235,7 +235,7 @@ func TestFileBasedSearch(t *testing.T) {
 	want := []FileMatch{{
 		Name: "f2",
 		Matches: []Match{{
-			Line:        string(c2),
+			Line:        c2,
 			LineNum:     1,
 			LineOff:     10,
 			Offset:      10,
@@ -245,7 +245,7 @@ func TestFileBasedSearch(t *testing.T) {
 		Name: "f1",
 		Matches: []Match{{
 			Offset:      8,
-			Line:        string(c1),
+			Line:        c1,
 			LineNum:     1,
 			LineOff:     8,
 			MatchLength: 6,
@@ -427,7 +427,7 @@ func TestFileSearch(t *testing.T) {
 
 	got := matches[0].Matches[0]
 	want := Match{
-		Line:        "banana",
+		Line:        []byte("banana"),
 		Offset:      1,
 		LineOff:     1,
 		MatchLength: 4,
@@ -470,7 +470,7 @@ func TestFileRestriction(t *testing.T) {
 
 	got := matches[0].Matches[0]
 	want := Match{
-		Line:        "x apple y",
+		Line:        []byte("x apple y"),
 		Offset:      2,
 		LineNum:     1,
 		LineOff:     2,

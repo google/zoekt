@@ -62,7 +62,7 @@ func (a *fileAggregator) add(path string, info os.FileInfo, err error) error {
 }
 
 func main() {
-	var cpuProfile = flag.String("cpuprofile", "", "write cpu profile to file")
+	var cpuProfile = flag.String("cpu_profile", "", "write cpu profile to file")
 	var sizeMax = flag.Int("file_limit", 128*1024, "maximum file size")
 	var shardLimit = flag.Int("shard_limit", 100<<20, "maximum corpus size for a shard")
 	var parallelism = flag.Int("parallelism", 4, "maximum number of parallel indexing processes.")
