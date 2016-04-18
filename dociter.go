@@ -59,7 +59,7 @@ func (m *candidateMatch) caseMatches(fileCaseBits []byte) bool {
 	start := m.offset - startExtend
 	end := m.offset + uint32(patLen) + endExtend
 
-	fileBits := append([]byte{}, fileCaseBits[start/8:end/8]...)
+	fileBits := fileCaseBits[start/8 : end/8]
 	mask := m.caseMask[startExtend]
 	bits := m.caseBits[startExtend]
 
