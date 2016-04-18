@@ -21,7 +21,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/pprof"
-	"strings"
 
 	"github.com/hanwen/zoekt"
 )
@@ -39,12 +38,13 @@ func displayMatches(files []zoekt.FileMatch, pat string) {
 func main() {
 	index := flag.String("index",
 		filepath.Join(os.Getenv("HOME"), ".csindex", "*"), "index file glob to use")
-	caseSensitive := flag.Bool("case", false, "case sensitive search by default ")
 	cpuProfile := flag.String("cpu_profile", "", "write cpu profile to file")
+	verbose := flag.Bool("v", false, "print some background data")
 
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage:\n\n  %s [option] PATTERN\n"+
-			"\nIf PATTERN has uppercase characters, the search is case sensitive.\n\n", os.Args[0])
+		name := os.Args[0]
+		fmt.Fprintf(os.Stderr, "Usage:\n\n  %s [option] QUERY\n"+
+			`eg %s 'byte file:java -file:test'`, name, name)
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\n")
 	}
@@ -62,12 +62,15 @@ func main() {
 		log.Fatal(err)
 	}
 
-	q := &zoekt.SubstringQuery{
-		Pattern:       pat,
-		CaseSensitive: *caseSensitive || strings.ToLower(pat) != pat,
+	query, err := zoekt.Parse(pat)
+	if err != nil {
+		log.Fatal(err)
 	}
-	sres, err := searcher.Search(q)
+	if *verbose {
+		log.Println("query:", query)
+	}
 
+	sres, err := searcher.Search(query)
 	if *cpuProfile != "" {
 		// If profiling, do it another time so we measure with
 		// warm caches.
@@ -79,7 +82,7 @@ func main() {
 		log.Println("Displaying matches...")
 		pprof.StartCPUProfile(f)
 		for i := 0; i < 10; i++ {
-			sres, err = searcher.Search(q)
+			sres, err = searcher.Search(query)
 		}
 		pprof.StopCPUProfile()
 	}
@@ -89,4 +92,7 @@ func main() {
 	}
 
 	displayMatches(sres.Files, pat)
+	if *verbose {
+		log.Printf("stats: %#v", sres.Stats)
+	}
 }
