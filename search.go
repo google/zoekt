@@ -21,66 +21,6 @@ import (
 
 var _ = log.Println
 
-// All the matches for a given file.
-type mergedCandidateMatch struct {
-	fileID        uint32
-	matches       map[*SubstringQuery][]*candidateMatch
-	negateMatches map[*SubstringQuery][]*candidateMatch
-}
-
-func mergeCandidates(iters []*docIterator, stats *Stats) []mergedCandidateMatch {
-	var cands [][]*candidateMatch
-	for _, i := range iters {
-		iterCands := i.next()
-		if len(iterCands) > 0 {
-			cands = append(cands, iterCands)
-		}
-		stats.NgramMatches += len(iterCands)
-	}
-
-	var merged []mergedCandidateMatch
-
-	for len(cands) > 0 {
-		var newCands [][]*candidateMatch
-		var nextDoc uint32
-		nextDoc = maxUInt32
-		for _, ms := range cands {
-			if ms[0].file < nextDoc {
-				nextDoc = ms[0].file
-			}
-		}
-
-		newCands = nil
-		mc := mergedCandidateMatch{
-			fileID:  nextDoc,
-			matches: map[*SubstringQuery][]*candidateMatch{},
-		}
-		for _, ms := range cands {
-			var sqMatches []*candidateMatch
-			for len(ms) > 0 && ms[0].file == nextDoc {
-				sqMatches = append(sqMatches, ms[0])
-				ms = ms[1:]
-			}
-			if len(sqMatches) > 0 {
-				mc.matches[sqMatches[0].query] = sqMatches
-			}
-			if len(ms) > 0 {
-				newCands = append(newCands, ms[:])
-			}
-		}
-		cands = newCands
-		merged = append(merged, mc)
-	}
-
-	return merged
-}
-
-type dataProvider interface {
-	caseBits() []byte
-	contentBits() []byte
-	newlines() []uint32
-}
-
 type contentProvider struct {
 	reader *reader
 	id     *indexData
@@ -89,8 +29,6 @@ type contentProvider struct {
 	cb     []byte
 	data   []byte
 	nl     []uint32
-
-	matchesByQuery map[*SubstringQuery][]*candidateMatch
 }
 
 func (p *contentProvider) caseMatches(m *candidateMatch) bool {

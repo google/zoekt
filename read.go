@@ -21,7 +21,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"sort"
 	"time"
 )
 
@@ -158,6 +157,8 @@ type shardedSearcher struct {
 	searchers []Searcher
 }
 
+// NewShardedSearcher returns a searcher instance that loads all
+// shards corresponding to a glob into memory.
 func NewShardedSearcher(indexGlob string) (Searcher, error) {
 	fs, err := filepath.Glob(indexGlob)
 	if err != nil {
@@ -185,12 +186,6 @@ func NewShardedSearcher(indexGlob string) (Searcher, error) {
 
 	return &ss, nil
 }
-
-type matchSlice []FileMatch
-
-func (m matchSlice) Len() int           { return len(m) }
-func (m matchSlice) Less(i, j int) bool { return m[i].Score > m[j].Score }
-func (m matchSlice) Swap(i, j int)      { m[i], m[j] = m[j], m[i] }
 
 func (ss *shardedSearcher) Close() error {
 	for _, s := range ss.searchers {
@@ -222,7 +217,7 @@ func (ss *shardedSearcher) Search(pat Query) (*SearchResult, error) {
 		aggregate.Files = append(aggregate.Files, r.sr.Files...)
 		aggregate.Stats.Add(r.sr.Stats)
 	}
-	sort.Sort((matchSlice)(aggregate.Files))
+	sortFilesByScore(aggregate.Files)
 	aggregate.Duration = time.Now().Sub(start)
 	return &aggregate, nil
 }

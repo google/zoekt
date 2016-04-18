@@ -18,6 +18,22 @@ type andMatchTree struct {
 	children []matchTree
 }
 
+type orMatchTree struct {
+	children []matchTree
+}
+
+type notMatchTree struct {
+	child matchTree
+}
+
+type substrMatchTree struct {
+	query     *SubstringQuery
+	current   []*candidateMatch
+	caseMatch *bool
+	contMatch *bool
+	cands     []*candidateMatch
+}
+
 func (t *andMatchTree) String() string {
 	return fmt.Sprintf("and%v", t.children)
 }
@@ -110,10 +126,6 @@ func (t *andMatchTree) matches(known map[matchTree]bool) (bool, bool) {
 	return true, sure
 }
 
-type orMatchTree struct {
-	children []matchTree
-}
-
 func (t *orMatchTree) matches(known map[matchTree]bool) (bool, bool) {
 	sure := true
 	for _, ch := range t.children {
@@ -142,21 +154,9 @@ func evalMatchTree(known map[matchTree]bool, mt matchTree) (bool, bool) {
 	return v, ok
 }
 
-type notMatchTree struct {
-	child matchTree
-}
-
 func (t *notMatchTree) matches(known map[matchTree]bool) (bool, bool) {
 	v, ok := evalMatchTree(known, t.child)
 	return !v, ok
-}
-
-type substrMatchTree struct {
-	query     *SubstringQuery
-	current   []*candidateMatch
-	caseMatch *bool
-	contMatch *bool
-	cands     []*candidateMatch
 }
 
 func (t *substrMatchTree) matches(known map[matchTree]bool) (bool, bool) {

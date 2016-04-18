@@ -16,8 +16,34 @@ package zoekt
 
 import (
 	"fmt"
+	"log"
 	"strings"
 )
+
+var _ = log.Println
+
+// indexData holds the pattern independent data that we have to have
+// in memory to search.
+type indexData struct {
+	reader *reader
+
+	ngrams map[ngram]simpleSection
+
+	postingsIndex []uint32
+	newlinesIndex []uint32
+	caseBitsIndex []uint32
+
+	// offsets of file contents. Includes end of last file.
+	boundaries []uint32
+
+	fileEnds []uint32
+
+	fileNameContent       []byte
+	fileNameCaseBits      []byte
+	fileNameCaseBitsIndex []uint32
+	fileNameIndex         []uint32
+	fileNameNgrams        map[ngram][]uint32
+}
 
 func (data *indexData) getDocIterator(query *SubstringQuery) (*docIterator, error) {
 	if len(query.Pattern) < ngramSize {
@@ -49,7 +75,7 @@ func minarg(xs []uint32) uint32 {
 	m := uint32(maxUInt32)
 	j := len(xs)
 	for i, x := range xs {
-		if x < m {
+		if x <= m {
 			m = x
 			j = i
 		}
@@ -74,7 +100,7 @@ func (data *indexData) getContentDocIterator(query *SubstringQuery) (*docIterato
 	}
 
 	firstI := minarg(frequencies)
-	frequencies[firstI] = 0xfffffff
+	frequencies[firstI] = maxUInt32
 	lastI := minarg(frequencies)
 	if firstI > lastI {
 		lastI, firstI = firstI, lastI
@@ -95,29 +121,6 @@ func (data *indexData) getContentDocIterator(query *SubstringQuery) (*docIterato
 		return nil, data.reader.err
 	}
 	return input, nil
-}
-
-// indexData holds the pattern independent data that we have to have
-// in memory to search.
-type indexData struct {
-	reader *reader
-
-	ngrams map[ngram]simpleSection
-
-	postingsIndex []uint32
-	newlinesIndex []uint32
-	caseBitsIndex []uint32
-
-	// offsets of file contents. Includes end of last file.
-	boundaries []uint32
-
-	fileEnds []uint32
-
-	fileNameContent       []byte
-	fileNameCaseBits      []byte
-	fileNameCaseBitsIndex []uint32
-	fileNameIndex         []uint32
-	fileNameNgrams        map[ngram][]uint32
 }
 
 func (d *indexData) fileName(i uint32) string {
