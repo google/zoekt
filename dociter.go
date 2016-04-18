@@ -47,18 +47,10 @@ type candidateMatch struct {
 	offset uint32
 }
 
-func (m *candidateMatch) populateCaseBits() {
-	if !m.query.CaseSensitive || m.caseMask != nil {
-		return
-	}
-	m.caseMask, m.caseBits = findCaseMasks(m.substrBytes)
-}
-
 func (m *candidateMatch) caseMatches(fileCaseBits []byte) bool {
 	if !m.query.CaseSensitive {
 		return true
 	}
-	m.populateCaseBits()
 	patLen := len(m.substrBytes)
 	startExtend := m.offset % 8
 	patEnd := m.offset + uint32(patLen)
@@ -106,6 +98,7 @@ func (s *docIterator) next() []*candidateMatch {
 	patBytes := []byte(s.query.Pattern)
 	lowerPatBytes := toLower(patBytes)
 
+	caseMasks, caseBits := findCaseMasks(patBytes)
 	var candidates []*candidateMatch
 	for {
 		if len(s.first) == 0 || len(s.last) == 0 {
@@ -136,6 +129,8 @@ func (s *docIterator) next() []*candidateMatch {
 
 			candidates = append(candidates,
 				&candidateMatch{
+					caseMask:    caseMasks,
+					caseBits:    caseBits,
 					query:       s.query,
 					substrBytes: patBytes,
 					lowered:     lowerPatBytes,
