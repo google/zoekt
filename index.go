@@ -43,6 +43,10 @@ type indexData struct {
 	fileNameCaseBitsIndex []uint32
 	fileNameIndex         []uint32
 	fileNameNgrams        map[ngram][]uint32
+
+	fileBranchMasks []uint32
+	branchNames     map[int]string
+	branchIDs       map[string]int
 }
 
 func (data *indexData) getDocIterator(query *SubstringQuery) (*docIterator, error) {

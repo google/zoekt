@@ -21,9 +21,10 @@ import (
 // FileMatch contains all the matches within a file.
 type FileMatch struct {
 	// Ranking; the higher, the better.
-	Score   float64
-	Name    string
-	Matches []Match
+	Score    float64
+	Name     string
+	Branches []string
+	Matches  []Match
 }
 
 // Match is a match for a single atomic query within a file.

@@ -62,6 +62,7 @@ func parseStringLiteral(in []byte) (lit []byte, n int, err error) {
 
 var casePrefix = []byte("case:")
 var filePrefix = []byte("file:")
+var branchPrefix = []byte("branch:")
 
 type setCase string
 
@@ -125,6 +126,11 @@ func tryConsumeFile(in []byte) (string, int, bool, error) {
 	return string(arg), n, ok, err
 }
 
+func tryConsumeBranch(in []byte) (string, int, bool, error) {
+	arg, n, ok, err := consumeKeyword(in, branchPrefix)
+	return string(arg), n, ok, err
+}
+
 func Parse(qStr string) (Query, error) {
 	b := []byte(qStr)
 
@@ -164,6 +170,16 @@ func Parse(qStr string) (Query, error) {
 				add(&SubstringQuery{
 					Pattern:  fn,
 					FileName: true,
+				})
+				b = b[n:]
+				continue
+			}
+
+			if fn, n, ok, err := tryConsumeBranch(b); err != nil {
+				return nil, err
+			} else if ok {
+				add(&BranchQuery{
+					Name: fn,
 				})
 				b = b[n:]
 				continue

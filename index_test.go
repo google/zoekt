@@ -532,3 +532,57 @@ func TestWordBoundaryRanking(t *testing.T) {
 		t.Fatalf("got second match %#v, want partial word match", sres.Files[0].Matches[0])
 	}
 }
+
+func TestBranchMask(t *testing.T) {
+	b := NewIndexBuilder()
+	b.AddFileBranches("f1", []byte("needle"), []string{"master"})
+	b.AddFileBranches("f2", []byte("needle"), []string{"stable", "master"})
+
+	searcher := searcherForTest(t, b)
+
+	sres, err := searcher.Search(
+		&AndQuery{[]Query{
+			&SubstringQuery{
+				Pattern: "needle",
+			},
+			&BranchQuery{
+				Name: "stable",
+			},
+		}})
+
+	if err != nil {
+		t.Fatalf("Search", err)
+	}
+
+	if len(sres.Files) != 1 || sres.Files[0].Name != "f2" {
+		t.Fatalf("got %v, want 1 result from f2", sres.Files)
+	}
+
+	if len(sres.Files[0].Branches) != 1 || sres.Files[0].Branches[0] != "stable" {
+		t.Fatalf("got %v, want 1 branch 'stable'", sres.Files[0].Branches)
+	}
+}
+
+func TestBranchReport(t *testing.T) {
+	b := NewIndexBuilder()
+
+	branches := []string{"stable", "master"}
+	b.AddFileBranches("f2", []byte("needle"), branches)
+	searcher := searcherForTest(t, b)
+	sres, err := searcher.Search(
+		&SubstringQuery{
+			Pattern: "needle",
+		})
+	if err != nil {
+		t.Fatalf("Search", err)
+	}
+
+	if len(sres.Files) != 1 {
+		t.Fatalf("got %v, want 1 result from f2", sres.Files)
+	}
+
+	f := sres.Files[0]
+	if !reflect.DeepEqual(f.Branches, branches) {
+		t.Fatalf("got branches %q, want %q", f.Branches, branches)
+	}
+}

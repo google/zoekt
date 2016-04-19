@@ -37,6 +37,7 @@ func TestParseQuery(t *testing.T) {
 
 		{"abccase:yes", &SubstringQuery{Pattern: "abccase:yes"}, false},
 		{"file:abc", &SubstringQuery{Pattern: "abc", FileName: true}, false},
+		{"branch:pqr", &BranchQuery{Name: "pqr"}, false},
 
 		{"file:helpers.go byte", &AndQuery{[]Query{
 			&SubstringQuery{Pattern: "helpers.go", FileName: true},

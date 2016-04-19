@@ -176,6 +176,11 @@ type contentSection struct {
 	caseBits compoundSection
 }
 
+func (s *contentSection) readIndex(r *reader) {
+	s.content.readIndex(r)
+	s.caseBits.readIndex(r)
+}
+
 func (s *contentSection) writeStrings(w *writer, strs []*searchableString) {
 	s.content.start(w)
 	for _, f := range strs {

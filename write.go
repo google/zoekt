@@ -31,6 +31,9 @@ type indexTOC struct {
 	newlines     compoundSection
 	ngramText    simpleSection
 
+	branchMasks simpleSection
+	branchNames compoundSection
+
 	nameNgramText simpleSection
 	namePostings  compoundSection
 }
@@ -42,9 +45,10 @@ func (t *indexTOC) sections() []section {
 		&t.newlines,
 		&t.ngramText,
 		&t.postings,
-
 		&t.nameNgramText,
 		&t.namePostings,
+		&t.branchMasks,
+		&t.branchNames,
 	}
 }
 
@@ -68,6 +72,12 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 		toc.newlines.addItem(w, toDeltas(newLinesIndices(f.data)))
 	}
 	toc.newlines.end(w)
+
+	toc.branchMasks.start(w)
+	for _, m := range b.branchMasks {
+		w.U32(m)
+	}
+	toc.branchMasks.end(w)
 
 	var keys []string
 	for k := range b.contentPostings {
@@ -107,6 +117,20 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 		toc.namePostings.addItem(w, toDeltas(b.namePostings[k]))
 	}
 	toc.namePostings.end(w)
+
+	var intKeys []int
+	inv := map[int]string{}
+	for k, v := range b.branches {
+		inv[v] = k
+		intKeys = append(intKeys, v)
+	}
+	sort.Ints(intKeys)
+
+	toc.branchNames.start(w)
+	for _, k := range intKeys {
+		toc.branchNames.addItem(w, []byte(inv[k]))
+	}
+	toc.branchNames.end(w)
 
 	var tocSection simpleSection
 

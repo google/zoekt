@@ -58,14 +58,18 @@ type IndexBuilder struct {
 	contentEnd uint32
 	nameEnd    uint32
 
-	files     []*searchableString
-	fileNames []*searchableString
+	files       []*searchableString
+	fileNames   []*searchableString
+	branchMasks []uint32
 
 	// ngram => posting.
 	contentPostings map[string][]uint32
 
 	// like postings, but for filenames
 	namePostings map[string][]uint32
+
+	// Branch name => ID
+	branches map[string]int
 }
 
 func (m *candidateMatch) String() string {
@@ -77,14 +81,43 @@ func NewIndexBuilder() *IndexBuilder {
 	return &IndexBuilder{
 		contentPostings: make(map[string][]uint32),
 		namePostings:    make(map[string][]uint32),
+		branches:        make(map[string]int),
 	}
 }
 
 // AddFile adds a file. This is the basic ordering for search results,
-// so if possible the most important files should be added first.
+// so if possible the most important files should be added last.
 func (b *IndexBuilder) AddFile(name string, content []byte) {
+	b.AddFileBranches(name, content, nil)
+}
+
+func (b *IndexBuilder) addBranch(br string) int {
+	id, ok := b.branches[br]
+	if !ok {
+		id = len(b.branches) + 1
+		b.branches[br] = id
+	}
+
+	return id
+}
+
+// AddBranch registers a branch name.  The first is assumed to be the
+// default.
+func (b *IndexBuilder) AddBranch(branch string) {
+	b.addBranch(branch)
+}
+
+// Add a file which only occurs in certain branches.
+func (b *IndexBuilder) AddFileBranches(name string, content []byte, branches []string) {
 	b.files = append(b.files, newSearchableString(content, b.contentEnd, b.contentPostings))
 	b.fileNames = append(b.fileNames, newSearchableString([]byte(name), b.nameEnd, b.namePostings))
 	b.contentEnd += uint32(len(content))
 	b.nameEnd += uint32(len(name))
+
+	var mask uint32
+	for _, br := range branches {
+		mask |= uint32(b.addBranch(br))
+	}
+
+	b.branchMasks = append(b.branchMasks, mask)
 }

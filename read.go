@@ -60,19 +60,20 @@ func (r *reader) readSectionU32(sec simpleSection) []uint32 {
 	return arr
 }
 
+type indexReader interface {
+	readIndex(*reader)
+}
+
 func (r *reader) readIndexData(toc *indexTOC) *indexData {
 	if r.err != nil {
 		return nil
 	}
 
-	toc.fileContents.content.readIndex(r)
-	toc.fileContents.caseBits.readIndex(r)
-	toc.postings.readIndex(r)
-	toc.newlines.readIndex(r)
-
-	toc.namePostings.readIndex(r)
-	toc.fileNames.content.readIndex(r)
-	toc.fileNames.caseBits.readIndex(r)
+	for _, sec := range toc.sections() {
+		if ir, ok := sec.(indexReader); ok {
+			ir.readIndex(r)
+		}
+	}
 
 	d := indexData{
 		postingsIndex:  toc.postings.absoluteIndex(),
@@ -81,6 +82,8 @@ func (r *reader) readIndexData(toc *indexTOC) *indexData {
 		newlinesIndex:  toc.newlines.absoluteIndex(),
 		ngrams:         map[ngram]simpleSection{},
 		fileNameNgrams: map[ngram][]uint32{},
+		branchNames:    map[int]string{},
+		branchIDs:      map[string]int{},
 	}
 
 	textContent := r.readSectionBlob(toc.ngramText)
@@ -93,7 +96,7 @@ func (r *reader) readIndexData(toc *indexTOC) *indexData {
 	}
 
 	d.fileEnds = toc.fileContents.content.relativeIndex()[1:]
-
+	d.fileBranchMasks = r.readSectionU32(toc.branchMasks)
 	d.fileNameContent = r.readSectionBlob(toc.fileNames.content.data)
 	d.fileNameCaseBits = r.readSectionBlob(toc.fileNames.caseBits.data)
 	d.fileNameCaseBitsIndex = toc.fileNames.caseBits.relativeIndex()
@@ -109,6 +112,17 @@ func (r *reader) readIndexData(toc *indexTOC) *indexData {
 		d.fileNameNgrams[bytesToNGram(nameNgramText[i:i+ngramSize])] = fromDeltas(fileNamePostingsData[off:end])
 	}
 
+	branchNameContent := r.readSectionBlob(toc.branchNames.data)
+	if branchNameIndex := toc.branchNames.relativeIndex(); len(branchNameIndex) > 0 {
+		var last uint32
+		for i, end := range branchNameIndex[1:] {
+			n := string(branchNameContent[last:end])
+			id := i + 1
+			d.branchIDs[n] = id
+			d.branchNames[id] = n
+			last = end
+		}
+	}
 	return &d
 }
 

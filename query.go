@@ -85,6 +85,15 @@ func (q *AndQuery) String() string {
 	return fmt.Sprintf("(and %s)", strings.Join(sub, " "))
 }
 
+// BranchQuery limits search to a specific branch.
+type BranchQuery struct {
+	Name string
+}
+
+func (q *BranchQuery) String() string {
+	return fmt.Sprintf("branch:%q", q.Name)
+}
+
 func queryChildren(q Query) []Query {
 	switch s := q.(type) {
 	case *AndQuery:

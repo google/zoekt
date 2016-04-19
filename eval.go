@@ -10,7 +10,7 @@ var _ = log.Println
 // An expression tree coupled with matches
 type matchTree interface {
 	// returns whether this matches, and if we are sure.
-	matches(known map[matchTree]bool) (match bool, sure bool)
+	matches(known map[matchTree]bool, docID uint32) (match bool, sure bool)
 	String() string
 }
 
@@ -34,6 +34,11 @@ type substrMatchTree struct {
 	cands     []*candidateMatch
 }
 
+type branchQueryMatchTree struct {
+	fileMasks []uint32
+	mask      uint32
+}
+
 func (t *andMatchTree) String() string {
 	return fmt.Sprintf("and%v", t.children)
 }
@@ -48,6 +53,10 @@ func (t *notMatchTree) String() string {
 
 func (t *substrMatchTree) String() string {
 	return fmt.Sprintf("substr(%s, %v)", t.query, t.current)
+}
+
+func (t *branchQueryMatchTree) String() string {
+	return fmt.Sprintf("branch(%x)", t.mask)
 }
 
 func collectPositiveSubstrings(t matchTree, f func(*substrMatchTree)) {
@@ -65,8 +74,8 @@ func collectPositiveSubstrings(t matchTree, f func(*substrMatchTree)) {
 		f(s)
 	}
 }
-func visitMatches(t matchTree, known map[matchTree]bool,
-	f func(*substrMatchTree)) {
+
+func visitMatches(t matchTree, known map[matchTree]bool, f func(matchTree)) {
 	switch s := t.(type) {
 	case *andMatchTree:
 		for _, ch := range s.children {
@@ -82,9 +91,18 @@ func visitMatches(t matchTree, known map[matchTree]bool,
 		}
 	case *notMatchTree:
 		// don't collect into negative trees.
-	case *substrMatchTree:
+	default:
 		f(s)
 	}
+}
+
+func visitSubtreeMatches(t matchTree, known map[matchTree]bool, f func(*substrMatchTree)) {
+	visitMatches(t, known, func(mt matchTree) {
+		st, ok := mt.(*substrMatchTree)
+		if ok {
+			f(st)
+		}
+	})
 }
 
 func (p *contentProvider) evalContentMatches(s *substrMatchTree) {
@@ -111,11 +129,11 @@ func (p *contentProvider) evalCaseMatches(s *substrMatchTree) {
 	*s.caseMatch = len(pruned) > 0
 }
 
-func (t *andMatchTree) matches(known map[matchTree]bool) (bool, bool) {
+func (t *andMatchTree) matches(known map[matchTree]bool, docID uint32) (bool, bool) {
 	sure := true
 
 	for _, ch := range t.children {
-		v, ok := evalMatchTree(known, ch)
+		v, ok := evalMatchTree(known, ch, docID)
 		if ok && !v {
 			return false, true
 		}
@@ -126,10 +144,10 @@ func (t *andMatchTree) matches(known map[matchTree]bool) (bool, bool) {
 	return true, sure
 }
 
-func (t *orMatchTree) matches(known map[matchTree]bool) (bool, bool) {
+func (t *orMatchTree) matches(known map[matchTree]bool, docID uint32) (bool, bool) {
 	sure := true
 	for _, ch := range t.children {
-		v, ok := evalMatchTree(known, ch)
+		v, ok := evalMatchTree(known, ch, docID)
 		if ok {
 			if v {
 				return true, true
@@ -141,12 +159,16 @@ func (t *orMatchTree) matches(known map[matchTree]bool) (bool, bool) {
 	return false, sure
 }
 
-func evalMatchTree(known map[matchTree]bool, mt matchTree) (bool, bool) {
+func (t *branchQueryMatchTree) matches(known map[matchTree]bool, docID uint32) (bool, bool) {
+	return t.fileMasks[docID]&t.mask != 0, true
+}
+
+func evalMatchTree(known map[matchTree]bool, mt matchTree, docID uint32) (bool, bool) {
 	if v, ok := known[mt]; ok {
 		return v, true
 	}
 
-	v, ok := mt.matches(known)
+	v, ok := mt.matches(known, docID)
 	if ok {
 		known[mt] = v
 	}
@@ -154,12 +176,12 @@ func evalMatchTree(known map[matchTree]bool, mt matchTree) (bool, bool) {
 	return v, ok
 }
 
-func (t *notMatchTree) matches(known map[matchTree]bool) (bool, bool) {
-	v, ok := evalMatchTree(known, t.child)
+func (t *notMatchTree) matches(known map[matchTree]bool, docID uint32) (bool, bool) {
+	v, ok := evalMatchTree(known, t.child, docID)
 	return !v, ok
 }
 
-func (t *substrMatchTree) matches(known map[matchTree]bool) (bool, bool) {
+func (t *substrMatchTree) matches(known map[matchTree]bool, docID uint32) (bool, bool) {
 	if len(t.current) == 0 {
 		return false, true
 	}
@@ -217,6 +239,12 @@ func (d *indexData) newMatchTree(q Query, sq map[*SubstringQuery]*substrMatchTre
 		}
 		sq[s] = st
 		return st, nil
+
+	case *BranchQuery:
+		return &branchQueryMatchTree{
+			mask:      uint32(d.branchIDs[s.Name]),
+			fileMasks: d.fileBranchMasks,
+		}, nil
 	}
 	panic("type")
 	return nil, nil
@@ -249,12 +277,6 @@ nextFileMatch:
 	for {
 		var nextDoc uint32
 		nextDoc = maxUInt32
-		for _, st := range atoms {
-			st.current = nil
-			st.contMatch = nil
-			st.caseMatch = nil
-		}
-
 		for _, st := range positiveAtoms {
 			if len(st.cands) > 0 && st.cands[0].file < nextDoc {
 				nextDoc = st.cands[0].file
@@ -276,6 +298,8 @@ nextFileMatch:
 			}
 			st.current = st.cands[:i]
 			st.cands = st.cands[i:]
+			st.contMatch = nil
+			st.caseMatch = nil
 		}
 
 		cp := contentProvider{
@@ -286,7 +310,7 @@ nextFileMatch:
 		}
 
 		known := make(map[matchTree]bool)
-		if v, ok := evalMatchTree(known, mt); ok && !v {
+		if v, ok := evalMatchTree(known, mt, nextDoc); ok && !v {
 			continue nextFileMatch
 		}
 
@@ -296,7 +320,7 @@ nextFileMatch:
 				cp.evalCaseMatches(st)
 				cp.evalContentMatches(st)
 			}
-			if v, ok := evalMatchTree(known, mt); ok && !v {
+			if v, ok := evalMatchTree(known, mt, nextDoc); ok && !v {
 				continue nextFileMatch
 			}
 		}
@@ -305,7 +329,7 @@ nextFileMatch:
 			cp.evalCaseMatches(st)
 		}
 
-		if v, ok := evalMatchTree(known, mt); ok && !v {
+		if v, ok := evalMatchTree(known, mt, nextDoc); ok && !v {
 			continue nextFileMatch
 		}
 
@@ -313,7 +337,8 @@ nextFileMatch:
 			// TODO - this may evaluate too much.
 			cp.evalContentMatches(st)
 		}
-		if v, ok := evalMatchTree(known, mt); !ok {
+
+		if v, ok := evalMatchTree(known, mt, nextDoc); !ok {
 			panic("did not decide")
 		} else if !v {
 			continue nextFileMatch
@@ -328,7 +353,7 @@ nextFileMatch:
 		}
 
 		foundContentMatch := false
-		visitMatches(mt, known, func(s *substrMatchTree) {
+		visitSubtreeMatches(mt, known, func(s *substrMatchTree) {
 			for _, c := range s.current {
 				fileMatch.Matches = append(fileMatch.Matches, cp.fillMatch(c))
 				if !c.query.FileName {
@@ -357,6 +382,28 @@ nextFileMatch:
 			fileMatch.Matches[i].Score += 1.0 - (float64(i) / float64(len(fileMatch.Matches)))
 		}
 		fileMatch.Score += maxFileScore
+
+		foundBranchQuery := false
+		visitMatches(mt, known, func(mt matchTree) {
+			bq, ok := mt.(*branchQueryMatchTree)
+			if ok {
+				foundBranchQuery = true
+				fileMatch.Branches = append(fileMatch.Branches,
+					d.branchNames[int(bq.mask)])
+			}
+		})
+
+		if !foundBranchQuery {
+			mask := d.fileBranchMasks[nextDoc]
+			id := uint32(1)
+			for mask != 0 {
+				if mask&0x1 != 0 {
+					fileMatch.Branches = append(fileMatch.Branches, d.branchNames[int(id)])
+				}
+				id <<= 1
+				mask >>= 1
+			}
+		}
 
 		sortMatchesByScore(fileMatch.Matches)
 		res.Files = append(res.Files, fileMatch)
