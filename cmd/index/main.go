@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/pprof"
+	"strings"
 	"sync"
 	"text/template"
 
@@ -67,11 +68,19 @@ func main() {
 	var shardLimit = flag.Int("shard_limit", 100<<20, "maximum corpus size for a shard")
 	var parallelism = flag.Int("parallelism", 4, "maximum number of parallel indexing processes.")
 
-	index := flag.String("index",
+	branchesStr := flag.String("branches", "", "git branches to index. If set, arguments should be bare git repositories.")
+	branchPrefix := flag.String("branch_prefix", "refs/heads/", "git refs to index")
+
+	indexTemplate := flag.String("index",
 		"{{.Home}}/.csindex/{{.Base}}.{{.FP}}.{{.Shard}}",
-		"index file to use. First %x argument is repo ID, second is shard number.")
+		"template for index file to use.")
 
 	flag.Parse()
+
+	tpl, err := template.New("index").Parse(*indexTemplate)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	if *cpuProfile != "" {
 		f, err := os.Create(*cpuProfile)
@@ -82,8 +91,23 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
+	var branches []string
+	if *branchesStr != "" {
+		branches = strings.Split(*branchesStr, ",")
+		for i := range branches {
+			branches[i] = *branchPrefix + branches[i]
+		}
+	}
+
 	for _, arg := range flag.Args() {
-		if err := indexArg(arg, *index, *parallelism, *sizeMax, *shardLimit); err != nil {
+		if len(branches) > 0 {
+			if err := indexGitRepo(tpl, arg, branches); err != nil {
+				log.Fatal("indexGitRepo", err)
+			}
+			continue
+		}
+
+		if err := indexArg(arg, tpl, *parallelism, *sizeMax, *shardLimit); err != nil {
 			log.Fatal(err)
 		}
 	}
@@ -95,12 +119,7 @@ func stableHash(in string) string {
 	return fmt.Sprintf("%x", h.Sum(nil)[:6])
 }
 
-func indexArg(arg string, indexTemplate string, parallelism, sizeMax, shardLimit int) error {
-	tpl, err := template.New("index").Parse(indexTemplate)
-	if err != nil {
-		return err
-	}
-
+func indexArg(arg string, tpl *template.Template, parallelism, sizeMax, shardLimit int) error {
 	shardNum := 0
 
 	chunks := make(chan []string, 10)
@@ -109,12 +128,6 @@ func indexArg(arg string, indexTemplate string, parallelism, sizeMax, shardLimit
 		sizeMax:  int64(sizeMax),
 		shardMax: int64(shardLimit),
 	}
-
-	abs, err := filepath.Abs(arg)
-	if err != nil {
-		return err
-	}
-	fp := stableHash(filepath.Dir(abs))
 
 	go func() {
 		if err := filepath.Walk(arg, agg.add); err != nil {
@@ -128,19 +141,8 @@ func indexArg(arg string, indexTemplate string, parallelism, sizeMax, shardLimit
 	throttle := make(chan int, parallelism)
 
 	for names := range chunks {
-		var buf bytes.Buffer
-		if err := tpl.Execute(&buf, struct {
-			Home, FP, Base, Shard string
-		}{
-			os.Getenv("HOME"), fp, filepath.Base(abs),
-			fmt.Sprintf("%05d", shardNum),
-		}); err != nil {
-			return err
-		}
-
-		fn := buf.String()
-
-		if err := os.MkdirAll(filepath.Dir(fn), 0700); err != nil {
+		fn, err := shardName(tpl, arg, shardNum)
+		if err != nil {
 			return err
 		}
 		shardNum++
@@ -168,35 +170,60 @@ func indexArg(arg string, indexTemplate string, parallelism, sizeMax, shardLimit
 }
 
 func buildShard(shardName string, files []string) error {
-	f, err := os.OpenFile(
-		shardName, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0600)
-	if err != nil {
-		return err
-	}
-
 	b := zoekt.NewIndexBuilder()
-	total := 0
 	for _, a := range files {
 		c, err := ioutil.ReadFile(a)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+
 		if bytes.IndexByte(c, 0) != -1 {
 			// skip binary
 			continue
-		}
-		total += len(c)
-		if err != nil {
-			log.Println(err)
 		} else {
 			b.AddFile(a, c)
 		}
 	}
+	return writeShard(shardName, b)
+}
 
+func writeShard(fn string, b *zoekt.IndexBuilder) error {
+	if err := os.MkdirAll(filepath.Dir(fn), 0700); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(
+		fn, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0600)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
 	if err := b.Write(f); err != nil {
-		log.Println("Write", err)
+		return err
 	}
 	if err := f.Close(); err != nil {
-		log.Println("Write", err)
+		return err
 	}
-	log.Printf("%s: indexed %d bytes\n", shardName, total)
-
+	log.Printf("wrote %s: %d bytes", fn, b.ContentSize())
 	return nil
+}
+
+func shardName(tpl *template.Template, repo string, shardNum int) (string, error) {
+	abs, err := filepath.Abs(repo)
+	if err != nil {
+		return "", err
+	}
+	fp := stableHash(filepath.Dir(abs))
+
+	var buf bytes.Buffer
+	if err := tpl.Execute(&buf, struct {
+		Home, FP, Base, Shard string
+	}{
+		os.Getenv("HOME"), fp, filepath.Base(abs),
+		fmt.Sprintf("%05d", shardNum),
+	}); err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
 }
