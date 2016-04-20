@@ -586,3 +586,31 @@ func TestBranchReport(t *testing.T) {
 		t.Fatalf("got branches %q, want %q", f.Branches, branches)
 	}
 }
+
+func TestCoversContent(t *testing.T) {
+	b := NewIndexBuilder()
+
+	branches := []string{"stable", "master"}
+	b.AddFileBranches("f1", []byte("needle the bla"), branches)
+
+	searcher := searcherForTest(t, b)
+	sres, err := searcher.Search(
+		&AndQuery{
+			Children: []Query{
+				&SubstringQuery{
+					Pattern: "needle",
+				},
+				&NotQuery{&SubstringQuery{
+					Pattern: "the",
+				}},
+			},
+		})
+
+	if err != nil || len(sres.Files) > 0 {
+		t.Fatalf("got %v, %v, want success without results", sres.Files, err)
+	}
+
+	if sres.Stats.FilesLoaded > 0 {
+		t.Errorf("got %#v, want no FilesLoaded", sres.Stats)
+	}
+}

@@ -120,9 +120,18 @@ func (data *indexData) getContentDocIterator(query *SubstringQuery) (*docIterato
 	if data.reader.err != nil {
 		return nil, data.reader.err
 	}
-	input.last = fromDeltas(data.reader.readSectionBlob(last))
-	if data.reader.err != nil {
-		return nil, data.reader.err
+
+	if firstI != lastI {
+		input.last = fromDeltas(data.reader.readSectionBlob(last))
+		if data.reader.err != nil {
+			return nil, data.reader.err
+		}
+	} else {
+		input.last = input.first
+	}
+
+	if lastI-firstI <= ngramSize && input.leftPad == 0 && input.rightPad == 0 {
+		input.coversContent = true
 	}
 	return input, nil
 }

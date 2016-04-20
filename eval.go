@@ -27,11 +27,12 @@ type notMatchTree struct {
 }
 
 type substrMatchTree struct {
-	query     *SubstringQuery
-	current   []*candidateMatch
-	caseMatch *bool
-	contMatch *bool
-	cands     []*candidateMatch
+	query         *SubstringQuery
+	current       []*candidateMatch
+	caseEvaluated bool
+	contEvaluated bool
+	cands         []*candidateMatch
+	coversContent bool
 }
 
 type branchQueryMatchTree struct {
@@ -106,27 +107,29 @@ func visitSubtreeMatches(t matchTree, known map[matchTree]bool, f func(*substrMa
 }
 
 func (p *contentProvider) evalContentMatches(s *substrMatchTree) {
-	pruned := s.current[:0]
-	for _, m := range s.current {
-		if p.matchContent(m) {
-			pruned = append(pruned, m)
+	if !s.coversContent {
+		pruned := s.current[:0]
+		for _, m := range s.current {
+			if p.matchContent(m) {
+				pruned = append(pruned, m)
+			}
 		}
+		s.current = pruned
 	}
-	s.current = pruned
-	s.contMatch = new(bool)
-	*s.contMatch = (len(pruned) > 0)
+	s.contEvaluated = true
 }
 
 func (p *contentProvider) evalCaseMatches(s *substrMatchTree) {
-	pruned := s.current[:0]
-	for _, m := range s.current {
-		if p.caseMatches(m) {
-			pruned = append(pruned, m)
+	if s.query.CaseSensitive {
+		pruned := s.current[:0]
+		for _, m := range s.current {
+			if p.caseMatches(m) {
+				pruned = append(pruned, m)
+			}
 		}
+		s.current = pruned
 	}
-	s.current = pruned
-	s.caseMatch = new(bool)
-	*s.caseMatch = len(pruned) > 0
+	s.caseEvaluated = true
 }
 
 func (t *andMatchTree) matches(known map[matchTree]bool, docID uint32) (bool, bool) {
@@ -185,20 +188,9 @@ func (t *substrMatchTree) matches(known map[matchTree]bool, docID uint32) (bool,
 	if len(t.current) == 0 {
 		return false, true
 	}
-	sure := true
-	val := true
-	if t.caseMatch != nil {
-		val = *t.caseMatch && val
-	} else {
-		sure = false
-	}
-	if t.contMatch != nil {
-		val = *t.contMatch && val
-	} else {
-		sure = false
-	}
 
-	return val, sure
+	sure := (!t.query.CaseSensitive || t.caseEvaluated) && (t.coversContent || t.contEvaluated)
+	return true, sure
 }
 
 func (d *indexData) newMatchTree(q Query, sq map[*SubstringQuery]*substrMatchTree) (matchTree, error) {
@@ -234,8 +226,9 @@ func (d *indexData) newMatchTree(q Query, sq map[*SubstringQuery]*substrMatchTre
 			return nil, err
 		}
 		st := &substrMatchTree{
-			query: s,
-			cands: iter.next(),
+			query:         s,
+			coversContent: iter.coversContent,
+			cands:         iter.next(),
 		}
 		sq[s] = st
 		return st, nil
@@ -298,8 +291,8 @@ nextFileMatch:
 			}
 			st.current = st.cands[:i]
 			st.cands = st.cands[i:]
-			st.contMatch = nil
-			st.caseMatch = nil
+			st.contEvaluated = false
+			st.caseEvaluated = false
 		}
 
 		cp := contentProvider{

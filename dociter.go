@@ -34,15 +34,20 @@ type docIterator struct {
 
 	fileIdx int
 	ends    []uint32
+
+	// The ngram matches cover the pattern, so no need to check
+	// contents.
+	coversContent bool
 }
 
 type candidateMatch struct {
 	query *SubstringQuery
 
-	substrBytes []byte
-	lowered     []byte
-	caseMask    [][]byte
-	caseBits    [][]byte
+	substrBytes   []byte
+	substrLowered []byte
+
+	caseMask [][]byte
+	caseBits [][]byte
 
 	file   uint32
 	offset uint32
@@ -78,7 +83,7 @@ func (m *candidateMatch) caseMatches(fileCaseBits []byte) bool {
 }
 
 func (m *candidateMatch) matchContent(content []byte) bool {
-	return bytes.Compare(content[m.offset:m.offset+uint32(len(m.lowered))], m.lowered) == 0
+	return bytes.Compare(content[m.offset:m.offset+uint32(len(m.substrLowered))], m.substrLowered) == 0
 }
 
 func (m *candidateMatch) line(newlines []uint32, content []byte, caseBits []byte) (lineNum, lineOff int, lineContent []byte) {
@@ -134,13 +139,13 @@ func (s *docIterator) next() []*candidateMatch {
 
 			candidates = append(candidates,
 				&candidateMatch{
-					caseMask:    caseMasks,
-					caseBits:    caseBits,
-					query:       s.query,
-					substrBytes: patBytes,
-					lowered:     lowerPatBytes,
-					file:        uint32(s.fileIdx),
-					offset:      p1 - fileStart - s.leftPad,
+					caseMask:      caseMasks,
+					caseBits:      caseBits,
+					query:         s.query,
+					substrBytes:   patBytes,
+					substrLowered: lowerPatBytes,
+					file:          uint32(s.fileIdx),
+					offset:        p1 - fileStart - s.leftPad,
 				})
 		}
 	}
