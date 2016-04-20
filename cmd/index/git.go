@@ -18,9 +18,8 @@ import (
 	"log"
 	"path/filepath"
 	"sort"
-	"text/template"
 
-	"github.com/hanwen/zoekt"
+	"github.com/hanwen/zoekt/build"
 	"github.com/speedata/gogit"
 )
 
@@ -45,72 +44,16 @@ func treeToFiles(tree *gogit.Tree) (map[string]gogit.Oid, error) {
 	return res, err
 }
 
-type indexEntry struct {
-	name     string
-	cont     []byte
-	branches []string
-}
-
-func buildGitShards(repoDir string, tpl *template.Template, source <-chan *indexEntry) error {
-	repoName := repoDir
+func indexGitRepo(opts build.Options, repoDir string, branches []string) error {
+	opts.RepoName = repoDir
 	if filepath.Base(repoDir) == ".git" {
-		repoName = filepath.Dir(repoDir)
+		opts.RepoName = filepath.Dir(repoDir)
 	}
 
-	b := zoekt.NewIndexBuilder()
-
-	shardLimit := 80 << 20
-	shardNum := 0
-	var writeErr error
-	for e := range source {
-		b.AddFileBranches(e.name, e.cont, e.branches)
-
-		if b.ContentSize() > uint32(shardLimit) {
-			nm, err := shardName(tpl, repoName, shardNum)
-			if err != nil {
-				writeErr = err
-				break
-			}
-			shardNum++
-
-			if err := writeShard(nm, b); err != nil {
-				writeErr = err
-				break
-			}
-			b = zoekt.NewIndexBuilder()
-		}
-	}
-
-	// drain.
-	for _ = range source {
-	}
-
-	if b.ContentSize() > 0 && writeErr == nil {
-		nm, err := shardName(tpl, repoName, shardNum)
-		if err != nil {
-			writeErr = err
-		} else if err := writeShard(nm, b); err != nil {
-			writeErr = err
-		}
-	}
-	return writeErr
-}
-
-func indexGitRepo(tpl *template.Template, repoDir string, branches []string) error {
-	comm := make(chan *indexEntry, 10)
-	errs := make(chan error, 10)
-	go func() {
-		errs <- buildGitShards(repoDir, tpl, comm)
-	}()
-
-	if err := readGitRepo(repoDir, branches, comm); err != nil {
+	builder, err := build.NewBuilder(opts)
+	if err != nil {
 		return err
 	}
-	return <-errs
-}
-
-func readGitRepo(repoDir string, branches []string, sink chan<- *indexEntry) error {
-	defer close(sink)
 
 	repo, err := gogit.OpenRepository(repoDir)
 	if err != nil {
@@ -174,7 +117,7 @@ func readGitRepo(repoDir string, branches []string, sink chan<- *indexEntry) err
 				return err
 			}
 
-			sink <- &indexEntry{n, blob.Contents(), branches}
+			builder.AddFileBranches(n, blob.Contents(), branches)
 		}
 	}
 
