@@ -81,7 +81,7 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 
 	var keys []string
 	for k := range b.contentPostings {
-		keys = append(keys, k)
+		keys = append(keys, k.String())
 	}
 	sort.Strings(keys)
 
@@ -93,7 +93,7 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 
 	toc.postings.start(w)
 	for _, k := range keys {
-		toc.postings.addItem(w, toDeltas(b.contentPostings[k]))
+		toc.postings.addItem(w, toDeltas(b.contentPostings[stringToNGram(k)]))
 	}
 	toc.postings.end(w)
 
@@ -102,7 +102,7 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 
 	keys = keys[:0]
 	for k := range b.namePostings {
-		keys = append(keys, k)
+		keys = append(keys, k.String())
 	}
 	sort.Strings(keys)
 
@@ -114,7 +114,7 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 
 	toc.namePostings.start(w)
 	for _, k := range keys {
-		toc.namePostings.addItem(w, toDeltas(b.namePostings[k]))
+		toc.namePostings.addItem(w, toDeltas(b.namePostings[stringToNGram(k)]))
 	}
 	toc.namePostings.end(w)
 

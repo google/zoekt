@@ -37,7 +37,7 @@ func (e *searchableString) end() uint32 {
 	return e.offset + uint32(len(e.data))
 }
 
-func newSearchableString(data []byte, startOff uint32, postings map[string][]uint32) *searchableString {
+func newSearchableString(data []byte, startOff uint32, postings map[ngram][]uint32) *searchableString {
 	dest := searchableString{
 		offset: startOff,
 	}
@@ -46,7 +46,7 @@ func newSearchableString(data []byte, startOff uint32, postings map[string][]uin
 		if i+ngramSize > len(dest.data) {
 			break
 		}
-		ngram := string(dest.data[i : i+ngramSize])
+		ngram := bytesToNGram(dest.data[i : i+ngramSize])
 		postings[ngram] = append(postings[ngram], startOff+uint32(i))
 	}
 	return &dest
@@ -62,10 +62,10 @@ type IndexBuilder struct {
 	branchMasks []uint32
 
 	// ngram => posting.
-	contentPostings map[string][]uint32
+	contentPostings map[ngram][]uint32
 
 	// like postings, but for filenames
-	namePostings map[string][]uint32
+	namePostings map[ngram][]uint32
 
 	// Branch name => ID
 	branches map[string]int
@@ -81,8 +81,8 @@ func (b *IndexBuilder) ContentSize() uint32 {
 // NewIndexBuilder creates a fresh IndexBuilder.
 func NewIndexBuilder() *IndexBuilder {
 	return &IndexBuilder{
-		contentPostings: make(map[string][]uint32),
-		namePostings:    make(map[string][]uint32),
+		contentPostings: make(map[ngram][]uint32),
+		namePostings:    make(map[ngram][]uint32),
 		branches:        make(map[string]int),
 	}
 }
