@@ -160,10 +160,10 @@ func NewSearcher(r ReadSeekCloser) (Searcher, error) {
 	var toc indexTOC
 	rd.readTOC(&toc)
 	indexData := rd.readIndexData(&toc)
-	indexData.reader = rd
 	if rd.err != nil {
 		return nil, rd.err
 	}
+	indexData.reader = rd
 	return indexData, nil
 }
 
@@ -193,7 +193,7 @@ func NewShardedSearcher(indexGlob string) (Searcher, error) {
 
 		s, err := NewSearcher(f)
 		if err != nil {
-			return nil, fmt.Errorf("NewSearcher(%s): %v", f, err)
+			return nil, fmt.Errorf("NewSearcher(%s): %v", fn, err)
 		}
 		ss.searchers = append(ss.searchers, s)
 	}
