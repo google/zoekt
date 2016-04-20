@@ -15,7 +15,6 @@
 package zoekt
 
 import (
-	"fmt"
 	"log"
 )
 
@@ -72,8 +71,11 @@ type IndexBuilder struct {
 	branches map[string]int
 }
 
-func (m *candidateMatch) String() string {
-	return fmt.Sprintf("%d:%d", m.file, m.offset)
+// ContentSize returns the number of content bytes so far ingested.
+func (b *IndexBuilder) ContentSize() uint32 {
+	// Add the name too so we don't skip building index if we have
+	// lots of empty files.
+	return b.contentEnd + b.nameEnd
 }
 
 // NewIndexBuilder creates a fresh IndexBuilder.

@@ -16,6 +16,7 @@ package zoekt
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"sort"
 )
@@ -45,6 +46,10 @@ type candidateMatch struct {
 
 	file   uint32
 	offset uint32
+}
+
+func (m *candidateMatch) String() string {
+	return fmt.Sprintf("%d:%d", m.file, m.offset)
 }
 
 func (m *candidateMatch) caseMatches(fileCaseBits []byte) bool {
