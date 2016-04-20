@@ -201,10 +201,15 @@ func writeShard(fn string, b *zoekt.IndexBuilder) error {
 	if err := b.Write(f); err != nil {
 		return err
 	}
+	fi, err := f.Stat()
+	if err != nil {
+		return err
+	}
 	if err := f.Close(); err != nil {
 		return err
 	}
-	log.Printf("wrote %s: %d bytes", fn, b.ContentSize())
+	log.Printf("wrote %s: %d index bytes (overhead %3.1f)", fn, fi.Size(),
+		float64(fi.Size())/float64(b.ContentSize()+1))
 	return nil
 }
 
