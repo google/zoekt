@@ -29,8 +29,11 @@ type FileMatch struct {
 
 // Match is a match for a single atomic query within a file.
 type Match struct {
-	Line    []byte
-	LineNum int
+	// The line in which a match was found.
+	Line      []byte
+	LineStart int
+	LineEnd   int
+	LineNum   int
 
 	// Offset within the line.
 	LineOff int

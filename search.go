@@ -22,72 +22,75 @@ import (
 var _ = log.Println
 
 type contentProvider struct {
-	reader *reader
-	id     *indexData
-	idx    uint32
-	stats  *Stats
-	cb     []byte
-	data   []byte
-	nl     []uint32
+	reader   *reader
+	id       *indexData
+	idx      uint32
+	stats    *Stats
+	_cb      []byte
+	_data    []byte
+	_nl      []uint32
+	fileSize uint32
+}
+
+func (p *contentProvider) newlines() []uint32 {
+	if p._nl == nil {
+		p._nl = p.reader.readNewlines(p.id, p.idx)
+	}
+	return p._nl
+}
+
+func (p *contentProvider) data(fileName bool) []byte {
+	if fileName {
+		return p.id.fileNameContent[p.id.fileNameIndex[p.idx]:p.id.fileNameIndex[p.idx+1]]
+	}
+
+	if p._data == nil {
+		p._data = p.reader.readContents(p.id, p.idx)
+		p.stats.FilesLoaded++
+	}
+	return p._data
+}
+
+func (p *contentProvider) caseBits(fileName bool) []byte {
+	if fileName {
+		return p.id.fileNameCaseBits[p.id.fileNameCaseBitsIndex[p.idx]:p.id.fileNameCaseBitsIndex[p.idx+1]]
+	}
+
+	if p._cb == nil {
+		p._cb = p.reader.readCaseBits(p.id, p.idx)
+	}
+	return p._cb
 }
 
 func (p *contentProvider) caseMatches(m *candidateMatch) bool {
-	var cb []byte
-	if m.query.FileName {
-		cb = p.id.fileNameCaseBits[p.id.fileNameCaseBitsIndex[p.idx]:p.id.fileNameCaseBitsIndex[p.idx+1]]
-	} else {
-		if p.cb == nil {
-			p.cb = p.reader.readCaseBits(p.id, p.idx)
-		}
-		cb = p.cb
-	}
-	return m.caseMatches(cb)
+	return m.caseMatches(p.caseBits(m.query.FileName))
 }
 
 func (p *contentProvider) matchContent(m *candidateMatch) bool {
-	var content []byte
-	if m.query.FileName {
-		content = p.id.fileNameContent[p.id.fileNameIndex[p.idx]:p.id.fileNameIndex[p.idx+1]]
-	} else {
-		if p.data == nil {
-			p.data = p.reader.readContents(p.id, p.idx)
-			p.stats.FilesLoaded++
-		}
-		content = p.data
-	}
-	return m.matchContent(content)
+	return m.matchContent(p.data(m.query.FileName))
 }
 
 func (p *contentProvider) fillMatch(m *candidateMatch) Match {
 	if m.query.FileName {
 		return Match{
 			Offset:      m.offset,
-			Line:        p.id.fileNameContent[p.id.fileNameIndex[p.idx]:p.id.fileNameIndex[p.idx+1]],
+			Line:        p.data(true),
 			LineOff:     int(m.offset),
 			MatchLength: len(m.substrBytes),
 			FileName:    true,
 		}
 	}
 
-	if p.nl == nil {
-		p.nl = p.reader.readNewlines(p.id, p.idx)
-	}
-	if p.data == nil {
-		p.data = p.reader.readContents(p.id, p.idx)
-		p.stats.FilesLoaded++
-	}
-	if p.cb == nil {
-		p.cb = p.reader.readCaseBits(p.id, p.idx)
-	}
-	num, off, data := m.line(p.nl, p.data, p.cb)
-
+	num, start, end := m.line(p.newlines(), p.fileSize)
 	finalMatch := Match{
 		Offset:      m.offset,
-		Line:        data,
+		LineStart:   start,
+		LineEnd:     end,
 		LineNum:     num,
-		LineOff:     off,
+		LineOff:     int(m.offset) - start,
 		MatchLength: len(m.substrBytes),
 	}
+	finalMatch.Line = toOriginal(p.data(false), p.caseBits(false), start, end)
 	finalMatch.Score = matchScore(&finalMatch)
 
 	return finalMatch

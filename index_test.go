@@ -116,28 +116,11 @@ func TestNewlines(t *testing.T) {
 	b.AddFile("filename", []byte("line1\nline2\nbla"))
 	//----------------------------012345 678901 23456
 
-	var buf bytes.Buffer
-	b.Write(&buf)
-	f := &memSeeker{buf.Bytes(), 0}
-
-	r := reader{r: f}
-
-	var toc indexTOC
-	r.readTOC(&toc)
-	data := r.readIndexData(&toc)
-	nls := r.readNewlines(data, 0)
-
-	if want := []uint32{5, 11}; !reflect.DeepEqual(nls, want) {
-		t.Errorf("got newlines %v, want %v", nls, want)
-	}
-
-	f = &memSeeker{buf.Bytes(), 0}
-
-	searcher, err := NewSearcher(f)
-	if err != nil {
-		t.Fatalf("NewSearcher: %v", err)
-	}
+	searcher := searcherForTest(t, b)
 	sres, err := searcher.Search(&SubstringQuery{Pattern: "ne2"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	clearScores(sres)
 
 	matches := sres.Files
@@ -147,6 +130,8 @@ func TestNewlines(t *testing.T) {
 			{
 				Offset:      8,
 				Line:        []byte("line2"),
+				LineStart:   6,
+				LineEnd:     11,
 				LineNum:     2,
 				LineOff:     2,
 				MatchLength: 3,
@@ -232,27 +217,11 @@ func TestFileBasedSearch(t *testing.T) {
 	clearScores(sres)
 
 	matches := sres.Files
-	want := []FileMatch{{
-		Name: "f2",
-		Matches: []Match{{
-			Line:        c2,
-			LineNum:     1,
-			LineOff:     10,
-			Offset:      10,
-			MatchLength: 6,
-		}},
-	}, {
-		Name: "f1",
-		Matches: []Match{{
-			Offset:      8,
-			Line:        c1,
-			LineNum:     1,
-			LineOff:     8,
-			MatchLength: 6,
-		}},
-	}}
-	if !reflect.DeepEqual(matches, want) {
-		t.Errorf("got matches %#v, want %#v", matches, want)
+	if len(matches) != 2 || matches[0].Name != "f2" || matches[1].Name != "f1" {
+		t.Fatalf("got %v, want matches {f1,f2}", matches)
+	}
+	if matches[0].Matches[0].Offset != 10 || matches[1].Matches[0].Offset != 8 {
+		t.Fatalf("got %#v, want offsets 10,8", matches)
 	}
 }
 
@@ -468,17 +437,11 @@ func TestFileRestriction(t *testing.T) {
 		t.Fatalf("got %v, want 1 match", matches)
 	}
 
-	got := matches[0].Matches[0]
-	want := Match{
-		Line:        []byte("x apple y"),
-		Offset:      2,
-		LineNum:     1,
-		LineOff:     2,
-		MatchLength: 5,
-	}
-
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %#v, want %#v", got, want)
+	match := matches[0].Matches[0]
+	got := string(match.Line)
+	want := "x apple y"
+	if got != want {
+		t.Errorf("got match %#v, want line %q", match, want)
 	}
 }
 

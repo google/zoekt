@@ -114,3 +114,24 @@ func TestReadWriteNames(t *testing.T) {
 		t.Errorf("got trigram bcd at bits %v, want sz 2", data.fileNameNgrams)
 	}
 }
+
+func TestReadWriteNewlines(t *testing.T) {
+	b := NewIndexBuilder()
+	b.AddFile("filename", []byte("line1\nline2\nbla"))
+	//----------------------------012345 678901 23456
+
+	var buf bytes.Buffer
+	b.Write(&buf)
+	f := &memSeeker{buf.Bytes(), 0}
+
+	r := reader{r: f}
+
+	var toc indexTOC
+	r.readTOC(&toc)
+	data := r.readIndexData(&toc)
+	nls := r.readNewlines(data, 0)
+
+	if want := []uint32{5, 11}; !reflect.DeepEqual(nls, want) {
+		t.Errorf("got newlines %v, want %v", nls, want)
+	}
+}

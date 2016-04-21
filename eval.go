@@ -295,11 +295,16 @@ nextFileMatch:
 			st.caseEvaluated = false
 		}
 
+		var fileStart uint32
+		if nextDoc > 0 {
+			fileStart = d.fileEnds[nextDoc-1]
+		}
 		cp := contentProvider{
-			reader: d.reader,
-			id:     d,
-			idx:    nextDoc,
-			stats:  &res.Stats,
+			reader:   d.reader,
+			id:       d,
+			idx:      nextDoc,
+			stats:    &res.Stats,
+			fileSize: d.fileEnds[nextDoc] - fileStart,
 		}
 
 		known := make(map[matchTree]bool)

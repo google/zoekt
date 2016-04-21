@@ -86,12 +86,12 @@ func (m *candidateMatch) matchContent(content []byte) bool {
 	return bytes.Compare(content[m.offset:m.offset+uint32(len(m.substrLowered))], m.substrLowered) == 0
 }
 
-func (m *candidateMatch) line(newlines []uint32, content []byte, caseBits []byte) (lineNum, lineOff int, lineContent []byte) {
+func (m *candidateMatch) line(newlines []uint32, fileSize uint32) (lineNum, lineStart, lineEnd int) {
 	idx := sort.Search(len(newlines), func(n int) bool {
 		return newlines[n] >= m.offset
 	})
 
-	end := len(content)
+	end := int(fileSize)
 	if idx < len(newlines) {
 		end = int(newlines[idx])
 	}
@@ -101,7 +101,7 @@ func (m *candidateMatch) line(newlines []uint32, content []byte, caseBits []byte
 		start = int(newlines[idx-1] + 1)
 	}
 
-	return idx + 1, int(m.offset) - start, toOriginal(content, caseBits, start, end)
+	return idx + 1, start, end
 }
 
 func (s *docIterator) next() []*candidateMatch {
