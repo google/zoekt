@@ -47,6 +47,7 @@ func (p *contentProvider) data(fileName bool) []byte {
 	if p._data == nil {
 		p._data = p.reader.readContents(p.id, p.idx)
 		p.stats.FilesLoaded++
+		p.stats.BytesLoaded += int64(len(p._data))
 	}
 	return p._data
 }

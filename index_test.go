@@ -296,6 +296,7 @@ func TestAndSearch(t *testing.T) {
 
 	wantStats := Stats{
 		FilesLoaded:     1,
+		BytesLoaded:     22,
 		NgramMatches:    4,
 		MatchCount:      2,
 		FileCount:       1,

@@ -15,6 +15,7 @@
 package zoekt
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -55,9 +56,27 @@ type Stats struct {
 	NgramMatches    int
 	FilesConsidered int
 	FilesLoaded     int
+	BytesLoaded     int64
 	FileCount       int
 	MatchCount      int
 	Duration        time.Duration
+}
+
+func (s Stats) HumanBytesLoaded() string {
+	suffix := ""
+	b := s.BytesLoaded
+	if s.BytesLoaded > (1 << 30) {
+		suffix = "G"
+		b = s.BytesLoaded / (1 << 30)
+	} else if s.BytesLoaded > (1 << 20) {
+		suffix = "M"
+		b = s.BytesLoaded / (1 << 20)
+	} else if s.BytesLoaded > (1 << 10) {
+		suffix = "K"
+		b = s.BytesLoaded / (1 << 10)
+	}
+
+	return fmt.Sprintf("%d%s", b, suffix)
 }
 
 func (s *Stats) Add(o Stats) {
@@ -66,6 +85,7 @@ func (s *Stats) Add(o Stats) {
 	s.MatchCount += o.MatchCount
 	s.FileCount += o.FileCount
 	s.FilesConsidered += o.FilesConsidered
+	s.BytesLoaded += o.BytesLoaded
 }
 
 // SearchResult contains search matches and extra data
