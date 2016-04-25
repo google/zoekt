@@ -4,6 +4,24 @@ import (
 	"regexp/syntax"
 )
 
+func lowerRegexp(r *syntax.Regexp) *syntax.Regexp {
+	newRE := *r
+	switch r.Op {
+	case syntax.OpLiteral, syntax.OpCharClass:
+		for i, r := range newRE.Rune {
+			if r >= 'A' && r <= 'Z' {
+				newRE.Rune[i] = r + 'a' - 'A'
+			}
+		}
+	default:
+		for i, s := range newRE.Sub {
+			newRE.Sub[i] = lowerRegexp(s)
+		}
+	}
+
+	return &newRE
+}
+
 // regexpToQuery tries to distill a substring search query that
 // matches a superset of the regexp.
 func regexpToQuery(r *syntax.Regexp) Query {

@@ -73,3 +73,13 @@ func TestRegexpParse(t *testing.T) {
 		}
 	}
 }
+
+func TestLowerRegexp(t *testing.T) {
+	in := "[a-zA-Z]fooBAR"
+	re := mustParseRE(in)
+	got := lowerRegexp(re)
+	want := "[a-za-z]foobar"
+	if got.String() != want {
+		t.Errorf("got %s, want %s", got, want)
+	}
+}
