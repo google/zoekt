@@ -16,8 +16,18 @@ package zoekt
 
 import (
 	"reflect"
+	"regexp/syntax"
 	"testing"
 )
+
+func mustParseRE(s string) *syntax.Regexp {
+	r, err := syntax.Parse(s, 0)
+	if err != nil {
+		panic(err)
+	}
+
+	return r
+}
 
 func TestParseQuery(t *testing.T) {
 	type testcase struct {
@@ -44,6 +54,8 @@ func TestParseQuery(t *testing.T) {
 			&SubstringQuery{Pattern: "helpers.go", FileName: true},
 			&SubstringQuery{Pattern: "byte"},
 		}}, false},
+
+		{"regex:abc[p-q]", &RegexpQuery{mustParseRE("abc[p-q]")}, false},
 
 		// case
 		{"abc case:yes", &SubstringQuery{Pattern: "abc", CaseSensitive: true}, false},

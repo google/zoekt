@@ -458,6 +458,7 @@ func TestFileNameBoundary(t *testing.T) {
 			Pattern:  "helpers.go",
 			FileName: true,
 		})
+	clearScores(sres)
 
 	if err != nil {
 		t.Fatalf("Search: %v", err)
@@ -576,5 +577,65 @@ func TestCoversContent(t *testing.T) {
 
 	if sres.Stats.FilesLoaded > 0 {
 		t.Errorf("got %#v, want no FilesLoaded", sres.Stats)
+	}
+}
+
+func TestRegexp(t *testing.T) {
+	b := NewIndexBuilder()
+
+	content := []byte("needle the bla")
+	// ----------------01234567890123
+	b.AddFile("f1", content)
+
+	searcher := searcherForTest(t, b)
+	sres, err := searcher.Search(
+		&RegexpQuery{
+			mustParseRE("dle.*bla"),
+		})
+
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	clearScores(sres)
+	if len(sres.Files) != 1 || len(sres.Files[0].Matches) != 1 {
+		t.Fatalf("got %v, want 1 match in 1 file", sres.Files)
+	}
+
+	got := sres.Files[0].Matches[0]
+	want := Match{
+		LineOff:     3,
+		Offset:      3,
+		MatchLength: 11,
+		Line:        content,
+		FileName:    false,
+		LineNum:     1,
+		LineStart:   0,
+		LineEnd:     14,
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v, want %#v", got, want)
+	}
+}
+
+func TestRegexpOrder(t *testing.T) {
+	b := NewIndexBuilder()
+
+	content := []byte("bla the needle")
+	// ----------------01234567890123
+	b.AddFile("f1", content)
+
+	searcher := searcherForTest(t, b)
+	sres, err := searcher.Search(
+		&RegexpQuery{
+			mustParseRE("dle.*bla"),
+		})
+
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	clearScores(sres)
+	if len(sres.Files) != 0 {
+		t.Fatalf("got %v, want 0 matches", sres.Files)
 	}
 }

@@ -3,6 +3,7 @@ package zoekt
 import (
 	"fmt"
 	"log"
+	"regexp"
 )
 
 var _ = log.Println
@@ -10,7 +11,11 @@ var _ = log.Println
 // An expression tree coupled with matches
 type matchTree interface {
 	// returns whether this matches, and if we are sure.
-	matches(known map[matchTree]bool, docID uint32) (match bool, sure bool)
+	matches(known map[matchTree]bool) (match bool, sure bool)
+
+	// clears any per-document state of the matchTree, and prepares for
+	// evaluating the given doc
+	prepare(nextDoc uint32)
 	String() string
 }
 
@@ -26,26 +31,88 @@ type notMatchTree struct {
 	child matchTree
 }
 
+type regexpMatchTree struct {
+	query  *RegexpQuery
+	regexp *regexp.Regexp
+	child  matchTree
+
+	// mutable
+	reEvaluated bool
+	found       []*candidateMatch
+}
+
 type substrMatchTree struct {
-	query         *SubstringQuery
+	query *SubstringQuery
+
+	cands         []*candidateMatch
+	coversContent bool
+
+	// mutable
 	current       []*candidateMatch
 	caseEvaluated bool
 	contEvaluated bool
-	cands         []*candidateMatch
-	coversContent bool
 }
 
 type branchQueryMatchTree struct {
 	fileMasks []uint32
 	mask      uint32
+
+	// mutable
+	docID uint32
 }
 
+// prepare
+func (t *andMatchTree) prepare(doc uint32) {
+	for _, c := range t.children {
+		c.prepare(doc)
+	}
+}
+
+func (t *regexpMatchTree) prepare(doc uint32) {
+	t.found = t.found[:0]
+	t.reEvaluated = false
+	t.child.prepare(doc)
+}
+
+func (t *orMatchTree) prepare(doc uint32) {
+	for _, c := range t.children {
+		c.prepare(doc)
+	}
+}
+
+func (t *notMatchTree) prepare(doc uint32) {
+	t.child.prepare(doc)
+}
+
+func (t *substrMatchTree) prepare(nextDoc uint32) {
+	for len(t.cands) > 0 && t.cands[0].file < nextDoc {
+		t.cands = t.cands[1:]
+	}
+
+	i := 0
+	for ; i < len(t.cands) && t.cands[i].file == nextDoc; i++ {
+	}
+	t.current = t.cands[:i]
+	t.cands = t.cands[i:]
+	t.contEvaluated = false
+	t.caseEvaluated = false
+}
+
+func (t *branchQueryMatchTree) prepare(doc uint32) {
+	t.docID = doc
+}
+
+// String.
 func (t *andMatchTree) String() string {
 	return fmt.Sprintf("and%v", t.children)
 }
 
+func (t *regexpMatchTree) String() string {
+	return fmt.Sprintf("re(%s,%s)", t.regexp, t.child)
+}
+
 func (t *orMatchTree) String() string {
-	return fmt.Sprintf("and%v", t.children)
+	return fmt.Sprintf("or%v", t.children)
 }
 
 func (t *notMatchTree) String() string {
@@ -70,8 +137,25 @@ func collectPositiveSubstrings(t matchTree, f func(*substrMatchTree)) {
 		for _, ch := range s.children {
 			collectPositiveSubstrings(ch, f)
 		}
+	case *regexpMatchTree:
+		collectPositiveSubstrings(s.child, f)
 	case *notMatchTree:
 	case *substrMatchTree:
+		f(s)
+	}
+}
+
+func collectRegexps(t matchTree, f func(*regexpMatchTree)) {
+	switch s := t.(type) {
+	case *andMatchTree:
+		for _, ch := range s.children {
+			collectRegexps(ch, f)
+		}
+	case *orMatchTree:
+		for _, ch := range s.children {
+			collectRegexps(ch, f)
+		}
+	case *regexpMatchTree:
 		f(s)
 	}
 }
@@ -106,6 +190,15 @@ func visitSubtreeMatches(t matchTree, known map[matchTree]bool, f func(*substrMa
 	})
 }
 
+func visitRegexMatches(t matchTree, known map[matchTree]bool, f func(*regexpMatchTree)) {
+	visitMatches(t, known, func(mt matchTree) {
+		st, ok := mt.(*regexpMatchTree)
+		if ok {
+			f(st)
+		}
+	})
+}
+
 func (p *contentProvider) evalContentMatches(s *substrMatchTree) {
 	if !s.coversContent {
 		pruned := s.current[:0]
@@ -117,6 +210,17 @@ func (p *contentProvider) evalContentMatches(s *substrMatchTree) {
 		s.current = pruned
 	}
 	s.contEvaluated = true
+}
+
+func (p *contentProvider) evalRegexpMatches(s *regexpMatchTree) {
+	idxs := s.regexp.FindAllIndex(p.data(false), -1)
+	for _, idx := range idxs {
+		s.found = append(s.found, &candidateMatch{
+			offset:  uint32(idx[0]),
+			matchSz: uint32(idx[1] - idx[0]),
+		})
+	}
+	s.reEvaluated = true
 }
 
 func (p *contentProvider) evalCaseMatches(s *substrMatchTree) {
@@ -132,11 +236,11 @@ func (p *contentProvider) evalCaseMatches(s *substrMatchTree) {
 	s.caseEvaluated = true
 }
 
-func (t *andMatchTree) matches(known map[matchTree]bool, docID uint32) (bool, bool) {
+func (t *andMatchTree) matches(known map[matchTree]bool) (bool, bool) {
 	sure := true
 
 	for _, ch := range t.children {
-		v, ok := evalMatchTree(known, ch, docID)
+		v, ok := evalMatchTree(known, ch)
 		if ok && !v {
 			return false, true
 		}
@@ -147,10 +251,10 @@ func (t *andMatchTree) matches(known map[matchTree]bool, docID uint32) (bool, bo
 	return true, sure
 }
 
-func (t *orMatchTree) matches(known map[matchTree]bool, docID uint32) (bool, bool) {
+func (t *orMatchTree) matches(known map[matchTree]bool) (bool, bool) {
 	sure := true
 	for _, ch := range t.children {
-		v, ok := evalMatchTree(known, ch, docID)
+		v, ok := evalMatchTree(known, ch)
 		if ok {
 			if v {
 				return true, true
@@ -162,16 +266,29 @@ func (t *orMatchTree) matches(known map[matchTree]bool, docID uint32) (bool, boo
 	return false, sure
 }
 
-func (t *branchQueryMatchTree) matches(known map[matchTree]bool, docID uint32) (bool, bool) {
-	return t.fileMasks[docID]&t.mask != 0, true
+func (t *branchQueryMatchTree) matches(known map[matchTree]bool) (bool, bool) {
+	return t.fileMasks[t.docID]&t.mask != 0, true
 }
 
-func evalMatchTree(known map[matchTree]bool, mt matchTree, docID uint32) (bool, bool) {
+func (t *regexpMatchTree) matches(known map[matchTree]bool) (bool, bool) {
+	v, ok := evalMatchTree(known, t.child)
+	if ok && !v {
+		return false, true
+	}
+
+	if !t.reEvaluated {
+		return false, false
+	}
+
+	return len(t.found) > 0, true
+}
+
+func evalMatchTree(known map[matchTree]bool, mt matchTree) (bool, bool) {
 	if v, ok := known[mt]; ok {
 		return v, true
 	}
 
-	v, ok := mt.matches(known, docID)
+	v, ok := mt.matches(known)
 	if ok {
 		known[mt] = v
 	}
@@ -179,12 +296,12 @@ func evalMatchTree(known map[matchTree]bool, mt matchTree, docID uint32) (bool, 
 	return v, ok
 }
 
-func (t *notMatchTree) matches(known map[matchTree]bool, docID uint32) (bool, bool) {
-	v, ok := evalMatchTree(known, t.child, docID)
+func (t *notMatchTree) matches(known map[matchTree]bool) (bool, bool) {
+	v, ok := evalMatchTree(known, t.child)
 	return !v, ok
 }
 
-func (t *substrMatchTree) matches(known map[matchTree]bool, docID uint32) (bool, bool) {
+func (t *substrMatchTree) matches(known map[matchTree]bool) (bool, bool) {
 	if len(t.current) == 0 {
 		return false, true
 	}
@@ -195,6 +312,17 @@ func (t *substrMatchTree) matches(known map[matchTree]bool, docID uint32) (bool,
 
 func (d *indexData) newMatchTree(q Query, sq map[*SubstringQuery]*substrMatchTree) (matchTree, error) {
 	switch s := q.(type) {
+	case *RegexpQuery:
+		subQ := regexpToQuery(s.Regexp)
+		subMT, err := d.newMatchTree(subQ, sq)
+		if err != nil {
+			return nil, err
+		}
+
+		return &regexpMatchTree{
+			regexp: regexp.MustCompile(s.Regexp.String()),
+			child:  subMT,
+		}, nil
 	case *AndQuery:
 		var r []matchTree
 		for _, ch := range s.Children {
@@ -260,6 +388,12 @@ func (d *indexData) Search(q Query) (*SearchResult, error) {
 	collectPositiveSubstrings(mt, func(sq *substrMatchTree) {
 		positiveAtoms = append(positiveAtoms, sq)
 	})
+
+	var regexpAtoms []*regexpMatchTree
+	collectRegexps(mt, func(re *regexpMatchTree) {
+		regexpAtoms = append(regexpAtoms, re)
+	})
+
 	for _, st := range atoms {
 		if st.query.FileName {
 			fileAtoms = append(fileAtoms, st)
@@ -281,19 +415,7 @@ nextFileMatch:
 		}
 
 		res.Stats.FilesConsidered++
-		for _, st := range atoms {
-			for len(st.cands) > 0 && st.cands[0].file < nextDoc {
-				st.cands = st.cands[1:]
-			}
-
-			i := 0
-			for ; i < len(st.cands) && st.cands[i].file == nextDoc; i++ {
-			}
-			st.current = st.cands[:i]
-			st.cands = st.cands[i:]
-			st.contEvaluated = false
-			st.caseEvaluated = false
-		}
+		mt.prepare(nextDoc)
 
 		var fileStart uint32
 		if nextDoc > 0 {
@@ -308,7 +430,7 @@ nextFileMatch:
 		}
 
 		known := make(map[matchTree]bool)
-		if v, ok := evalMatchTree(known, mt, nextDoc); ok && !v {
+		if v, ok := evalMatchTree(known, mt); ok && !v {
 			continue nextFileMatch
 		}
 
@@ -318,7 +440,7 @@ nextFileMatch:
 				cp.evalCaseMatches(st)
 				cp.evalContentMatches(st)
 			}
-			if v, ok := evalMatchTree(known, mt, nextDoc); ok && !v {
+			if v, ok := evalMatchTree(known, mt); ok && !v {
 				continue nextFileMatch
 			}
 		}
@@ -327,7 +449,7 @@ nextFileMatch:
 			cp.evalCaseMatches(st)
 		}
 
-		if v, ok := evalMatchTree(known, mt, nextDoc); ok && !v {
+		if v, ok := evalMatchTree(known, mt); ok && !v {
 			continue nextFileMatch
 		}
 
@@ -336,7 +458,17 @@ nextFileMatch:
 			cp.evalContentMatches(st)
 		}
 
-		if v, ok := evalMatchTree(known, mt, nextDoc); !ok {
+		if len(regexpAtoms) > 0 {
+			if v, ok := evalMatchTree(known, mt); ok && !v {
+				continue nextFileMatch
+			}
+
+			for _, re := range regexpAtoms {
+				cp.evalRegexpMatches(re)
+			}
+		}
+
+		if v, ok := evalMatchTree(known, mt); !ok {
 			panic("did not decide")
 		} else if !v {
 			continue nextFileMatch
@@ -354,9 +486,16 @@ nextFileMatch:
 		visitSubtreeMatches(mt, known, func(s *substrMatchTree) {
 			for _, c := range s.current {
 				fileMatch.Matches = append(fileMatch.Matches, cp.fillMatch(c))
-				if !c.query.FileName {
+				if !c.fileName {
 					foundContentMatch = true
 				}
+			}
+		})
+
+		visitRegexMatches(mt, known, func(re *regexpMatchTree) {
+			for _, c := range re.found {
+				foundContentMatch = true
+				fileMatch.Matches = append(fileMatch.Matches, cp.fillMatch(c))
 			}
 		})
 

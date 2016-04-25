@@ -64,20 +64,20 @@ func (p *contentProvider) caseBits(fileName bool) []byte {
 }
 
 func (p *contentProvider) caseMatches(m *candidateMatch) bool {
-	return m.caseMatches(p.caseBits(m.query.FileName))
+	return m.caseMatches(p.caseBits(m.fileName))
 }
 
 func (p *contentProvider) matchContent(m *candidateMatch) bool {
-	return m.matchContent(p.data(m.query.FileName))
+	return m.matchContent(p.data(m.fileName))
 }
 
 func (p *contentProvider) fillMatch(m *candidateMatch) Match {
-	if m.query.FileName {
+	if m.fileName {
 		return Match{
 			Offset:      m.offset,
 			Line:        p.data(true),
 			LineOff:     int(m.offset),
-			MatchLength: len(m.substrBytes),
+			MatchLength: int(m.matchSz),
 			FileName:    true,
 		}
 	}
@@ -89,7 +89,7 @@ func (p *contentProvider) fillMatch(m *candidateMatch) Match {
 		LineEnd:     end,
 		LineNum:     num,
 		LineOff:     int(m.offset) - start,
-		MatchLength: len(m.substrBytes),
+		MatchLength: int(m.matchSz),
 	}
 	finalMatch.Line = toOriginal(p.data(false), p.caseBits(false), start, end)
 	finalMatch.Score = matchScore(&finalMatch)

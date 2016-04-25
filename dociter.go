@@ -41,7 +41,8 @@ type docIterator struct {
 }
 
 type candidateMatch struct {
-	query *SubstringQuery
+	caseSensitive bool
+	fileName      bool
 
 	substrBytes   []byte
 	substrLowered []byte
@@ -49,8 +50,9 @@ type candidateMatch struct {
 	caseMask [][]byte
 	caseBits [][]byte
 
-	file   uint32
-	offset uint32
+	file    uint32
+	offset  uint32
+	matchSz uint32
 }
 
 func (m *candidateMatch) String() string {
@@ -58,7 +60,7 @@ func (m *candidateMatch) String() string {
 }
 
 func (m *candidateMatch) caseMatches(fileCaseBits []byte) bool {
-	if !m.query.CaseSensitive {
+	if !m.caseSensitive {
 		return true
 	}
 	patLen := len(m.substrBytes)
@@ -83,7 +85,7 @@ func (m *candidateMatch) caseMatches(fileCaseBits []byte) bool {
 }
 
 func (m *candidateMatch) matchContent(content []byte) bool {
-	return bytes.Compare(content[m.offset:m.offset+uint32(len(m.substrLowered))], m.substrLowered) == 0
+	return bytes.Compare(content[m.offset:m.offset+uint32(m.matchSz)], m.substrLowered) == 0
 }
 
 func (m *candidateMatch) line(newlines []uint32, fileSize uint32) (lineNum, lineStart, lineEnd int) {
@@ -141,9 +143,11 @@ func (s *docIterator) next() []*candidateMatch {
 				&candidateMatch{
 					caseMask:      caseMasks,
 					caseBits:      caseBits,
-					query:         s.query,
+					caseSensitive: s.query.CaseSensitive,
+					fileName:      s.query.FileName,
 					substrBytes:   patBytes,
 					substrLowered: lowerPatBytes,
+					matchSz:       uint32(len(lowerPatBytes)),
 					file:          uint32(s.fileIdx),
 					offset:        p1 - fileStart - s.leftPad,
 				})

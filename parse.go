@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"fmt"
 	"log"
+	"regexp/syntax"
 )
 
 var _ = log.Printf
@@ -63,6 +64,7 @@ func parseStringLiteral(in []byte) (lit []byte, n int, err error) {
 var casePrefix = []byte("case:")
 var filePrefix = []byte("file:")
 var branchPrefix = []byte("branch:")
+var regexPrefix = []byte("regex:")
 
 type setCase string
 
@@ -131,6 +133,11 @@ func tryConsumeBranch(in []byte) (string, int, bool, error) {
 	return string(arg), n, ok, err
 }
 
+func tryConsumeRegexp(in []byte) (string, int, bool, error) {
+	arg, n, ok, err := consumeKeyword(in, regexPrefix)
+	return string(arg), n, ok, err
+}
+
 func Parse(qStr string) (Query, error) {
 	b := []byte(qStr)
 
@@ -180,6 +187,21 @@ func Parse(qStr string) (Query, error) {
 			} else if ok {
 				add(&BranchQuery{
 					Name: fn,
+				})
+				b = b[n:]
+				continue
+			}
+
+			if arg, n, ok, err := tryConsumeRegexp(b); err != nil {
+				return nil, err
+			} else if ok {
+				r, err := syntax.Parse(arg, 0)
+				if err != nil {
+					return nil, err
+				}
+
+				add(&RegexpQuery{
+					Regexp: r,
 				})
 				b = b[n:]
 				continue

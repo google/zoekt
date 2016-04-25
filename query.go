@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"log"
 	"reflect"
+	"regexp/syntax"
 	"strings"
 )
 
@@ -26,6 +27,15 @@ var _ = log.Println
 // Query is a representation for a possibly hierarchical search query.
 type Query interface {
 	String() string
+}
+
+// RegexpQuery is a query looking for regular expressions matches.
+type RegexpQuery struct {
+	Regexp *syntax.Regexp
+}
+
+func (q *RegexpQuery) String() string {
+	return fmt.Sprintf("regex:%q", q.Regexp.String())
 }
 
 // SubstringQuery is the most basic query: a query for a substring.
