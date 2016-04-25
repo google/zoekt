@@ -150,13 +150,13 @@ func Parse(qStr string) (Query, error) {
 	for len(b) > 0 {
 		c := b[0]
 
-		if c == '-' && !negate {
-			negate = true
-			b = b[1:]
-			continue
-		}
-
 		if !inWord {
+			if c == '-' && !negate {
+				negate = true
+				b = b[1:]
+				continue
+			}
+
 			if q, n, ok, err := tryConsumeCase(b); err != nil {
 				return nil, err
 			} else if ok {

@@ -27,6 +27,7 @@ func TestParseQuery(t *testing.T) {
 	}
 
 	for _, c := range []testcase{
+		{"sub-pixel", &SubstringQuery{Pattern: "sub-pixel"}, false},
 		{"abc", &SubstringQuery{Pattern: "abc"}, false},
 		{"\"abc bcd\"", &SubstringQuery{Pattern: "abc bcd"}, false},
 		{"abc bcd", &AndQuery{[]Query{
