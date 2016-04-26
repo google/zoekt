@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package zoekt
+package query
 
 import (
 	"log"
@@ -23,10 +23,10 @@ import (
 var _ = log.Println
 
 func TestQueryString(t *testing.T) {
-	q := &OrQuery{[]Query{
-		&AndQuery{[]Query{
-			&SubstringQuery{Pattern: "hoi"},
-			&NotQuery{&SubstringQuery{Pattern: "hai"}},
+	q := &Or{[]Query{
+		&And{[]Query{
+			&Substring{Pattern: "hoi"},
+			&Not{&Substring{Pattern: "hai"}},
 		}}}}
 	got := q.String()
 	want := `(or (and substr:"hoi" (not substr:"hai")))`
@@ -44,30 +44,30 @@ func TestSimplify(t *testing.T) {
 
 	cases := []testcase{
 		{
-			in: &OrQuery{[]Query{
-				&OrQuery{[]Query{
-					&AndQuery{[]Query{
-						&SubstringQuery{Pattern: "hoi"},
-						&NotQuery{&SubstringQuery{Pattern: "hai"}},
+			in: &Or{[]Query{
+				&Or{[]Query{
+					&And{[]Query{
+						&Substring{Pattern: "hoi"},
+						&Not{&Substring{Pattern: "hai"}},
 					}},
-					&OrQuery{[]Query{
-						&SubstringQuery{Pattern: "zip"},
-						&SubstringQuery{Pattern: "zap"},
+					&Or{[]Query{
+						&Substring{Pattern: "zip"},
+						&Substring{Pattern: "zap"},
 					}},
 				}}}},
-			want: &OrQuery{[]Query{
-				&AndQuery{[]Query{
-					&SubstringQuery{Pattern: "hoi"},
-					&NotQuery{&SubstringQuery{Pattern: "hai"}},
+			want: &Or{[]Query{
+				&And{[]Query{
+					&Substring{Pattern: "hoi"},
+					&Not{&Substring{Pattern: "hai"}},
 				}},
-				&SubstringQuery{Pattern: "zip"},
-				&SubstringQuery{Pattern: "zap"}},
+				&Substring{Pattern: "zip"},
+				&Substring{Pattern: "zap"}},
 			}},
-		{in: &AndQuery{}, want: &TrueQuery{}},
-		{in: &OrQuery{}, want: &FalseQuery{}},
-		{in: &AndQuery{[]Query{&TrueQuery{}, &FalseQuery{}}}, want: &FalseQuery{}},
-		{in: &OrQuery{[]Query{&FalseQuery{}, &TrueQuery{}}}, want: &TrueQuery{}},
-		{in: &NotQuery{&TrueQuery{}}, want: &FalseQuery{}},
+		{in: &And{}, want: &Const{true}},
+		{in: &Or{}, want: &Const{false}},
+		{in: &And{[]Query{&Const{true}, &Const{false}}}, want: &Const{false}},
+		{in: &Or{[]Query{&Const{false}, &Const{true}}}, want: &Const{true}},
+		{in: &Not{&Const{true}}, want: &Const{false}},
 	}
 
 	for _, c := range cases {

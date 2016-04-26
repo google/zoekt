@@ -23,6 +23,7 @@ import (
 	"runtime/pprof"
 
 	"github.com/google/zoekt"
+	"github.com/google/zoekt/query"
 )
 
 const CONTEXT = 20
@@ -62,7 +63,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	query, err := zoekt.Parse(pat)
+	query, err := query.Parse(pat)
 	if err != nil {
 		log.Fatal(err)
 	}

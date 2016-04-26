@@ -19,12 +19,14 @@ import (
 	"fmt"
 	"log"
 	"sort"
+
+	"github.com/google/zoekt/query"
 )
 
 var _ = log.Println
 
 type docIterator struct {
-	query *SubstringQuery
+	query *query.Substring
 
 	leftPad  uint32
 	rightPad uint32

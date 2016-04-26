@@ -17,6 +17,8 @@ package zoekt
 import (
 	"fmt"
 	"time"
+
+	"github.com/google/zoekt/query"
 )
 
 // FileMatch contains all the matches within a file.
@@ -96,6 +98,6 @@ type SearchResult struct {
 }
 
 type Searcher interface {
-	Search(query Query) (*SearchResult, error)
+	Search(q query.Query) (*SearchResult, error)
 	Close() error
 }

@@ -20,7 +20,10 @@ import (
 	"io"
 	"log"
 	"reflect"
+	"regexp/syntax"
 	"testing"
+
+	"github.com/google/zoekt/query"
 )
 
 func clearScores(r *SearchResult) {
@@ -39,7 +42,7 @@ func TestBoundary(t *testing.T) {
 	b.AddFile("f1", []byte("reader"))
 	searcher := searcherForTest(t, b)
 
-	res, err := searcher.Search(&SubstringQuery{Pattern: "there"})
+	res, err := searcher.Search(&query.Substring{Pattern: "there"})
 	if err != nil {
 		t.Errorf("search: %v", err)
 	}
@@ -58,7 +61,7 @@ func TestBasic(t *testing.T) {
 	// -------------------- 0123456789012345678901234567890123456789
 
 	searcher := searcherForTest(t, b)
-	res, err := searcher.Search(&SubstringQuery{Pattern: "water"})
+	res, err := searcher.Search(&query.Substring{Pattern: "water"})
 	if err != nil {
 		t.Errorf("search: %v", err)
 	}
@@ -117,7 +120,7 @@ func TestNewlines(t *testing.T) {
 	//----------------------------012345 678901 23456
 
 	searcher := searcherForTest(t, b)
-	sres, err := searcher.Search(&SubstringQuery{Pattern: "ne2"})
+	sres, err := searcher.Search(&query.Substring{Pattern: "ne2"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -210,7 +213,7 @@ func TestFileBasedSearch(t *testing.T) {
 	b.AddFile("f2", c2)
 
 	searcher := searcherForTest(t, b)
-	sres, err := searcher.Search(&SubstringQuery{Pattern: "ananas"})
+	sres, err := searcher.Search(&query.Substring{Pattern: "ananas"})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -234,7 +237,7 @@ func TestCaseFold(t *testing.T) {
 
 	searcher := searcherForTest(t, b)
 	sres, err := searcher.Search(
-		&SubstringQuery{
+		&query.Substring{
 			Pattern:       "bananas",
 			CaseSensitive: true,
 		})
@@ -247,7 +250,7 @@ func TestCaseFold(t *testing.T) {
 	}
 
 	sres, err = searcher.Search(
-		&SubstringQuery{
+		&query.Substring{
 			Pattern:       "BaNaNAS",
 			CaseSensitive: true,
 		})
@@ -271,12 +274,12 @@ func TestAndSearch(t *testing.T) {
 	// ---------------------0123456789012345
 	searcher := searcherForTest(t, b)
 	sres, err := searcher.Search(
-		&AndQuery{
-			Children: []Query{
-				&SubstringQuery{
+		&query.And{
+			Children: []query.Query{
+				&query.Substring{
 					Pattern: "banana",
 				},
-				&SubstringQuery{
+				&query.Substring{
 					Pattern: "apple",
 				},
 			},
@@ -315,12 +318,12 @@ func TestAndNegateSearch(t *testing.T) {
 	// ---------------------0123456789012345
 	searcher := searcherForTest(t, b)
 	sres, err := searcher.Search(
-		&AndQuery{
-			Children: []Query{
-				&SubstringQuery{
+		&query.And{
+			Children: []query.Query{
+				&query.Substring{
 					Pattern: "banana",
 				},
-				&NotQuery{&SubstringQuery{
+				&query.Not{&query.Substring{
 					Pattern: "apple",
 				}},
 			},
@@ -353,12 +356,12 @@ func TestNegativeMatchesOnlyShortcut(t *testing.T) {
 
 	searcher := searcherForTest(t, b)
 	sres, err := searcher.Search(
-		&AndQuery{
-			Children: []Query{
-				&SubstringQuery{
+		&query.And{
+			Children: []query.Query{
+				&query.Substring{
 					Pattern: "banana",
 				},
-				&NotQuery{&SubstringQuery{
+				&query.Not{&query.Substring{
 					Pattern: "appel",
 				}},
 			},
@@ -381,7 +384,7 @@ func TestFileSearch(t *testing.T) {
 	searcher := searcherForTest(t, b)
 
 	sres, err := searcher.Search(
-		&SubstringQuery{
+		&query.Substring{
 			Pattern:  "anan",
 			FileName: true,
 		})
@@ -419,12 +422,12 @@ func TestFileRestriction(t *testing.T) {
 	searcher := searcherForTest(t, b)
 
 	sres, err := searcher.Search(
-		&AndQuery{[]Query{
-			&SubstringQuery{
+		&query.And{[]query.Query{
+			&query.Substring{
 				Pattern:  "banana",
 				FileName: true,
 			},
-			&SubstringQuery{
+			&query.Substring{
 				Pattern: "apple",
 			},
 		}})
@@ -454,7 +457,7 @@ func TestFileNameBoundary(t *testing.T) {
 	searcher := searcherForTest(t, b)
 
 	sres, err := searcher.Search(
-		&SubstringQuery{
+		&query.Substring{
 			Pattern:  "helpers.go",
 			FileName: true,
 		})
@@ -480,7 +483,7 @@ func TestWordBoundaryRanking(t *testing.T) {
 	searcher := searcherForTest(t, b)
 
 	sres, err := searcher.Search(
-		&SubstringQuery{
+		&query.Substring{
 			Pattern: "byte",
 		})
 	if err != nil {
@@ -506,11 +509,11 @@ func TestBranchMask(t *testing.T) {
 	searcher := searcherForTest(t, b)
 
 	sres, err := searcher.Search(
-		&AndQuery{[]Query{
-			&SubstringQuery{
+		&query.And{[]query.Query{
+			&query.Substring{
 				Pattern: "needle",
 			},
-			&BranchQuery{
+			&query.Branch{
 				Name: "stable",
 			},
 		}})
@@ -535,7 +538,7 @@ func TestBranchReport(t *testing.T) {
 	b.AddFileBranches("f2", []byte("needle"), branches)
 	searcher := searcherForTest(t, b)
 	sres, err := searcher.Search(
-		&SubstringQuery{
+		&query.Substring{
 			Pattern: "needle",
 		})
 	if err != nil {
@@ -560,12 +563,12 @@ func TestCoversContent(t *testing.T) {
 
 	searcher := searcherForTest(t, b)
 	sres, err := searcher.Search(
-		&AndQuery{
-			Children: []Query{
-				&SubstringQuery{
+		&query.And{
+			Children: []query.Query{
+				&query.Substring{
 					Pattern: "needle",
 				},
-				&NotQuery{&SubstringQuery{
+				&query.Not{&query.Substring{
 					Pattern: "the",
 				}},
 			},
@@ -580,6 +583,15 @@ func TestCoversContent(t *testing.T) {
 	}
 }
 
+func mustParseRE(s string) *syntax.Regexp {
+	r, err := syntax.Parse(s, 0)
+	if err != nil {
+		panic(err)
+	}
+
+	return r
+}
+
 func TestRegexp(t *testing.T) {
 	b := NewIndexBuilder()
 
@@ -589,7 +601,7 @@ func TestRegexp(t *testing.T) {
 
 	searcher := searcherForTest(t, b)
 	sres, err := searcher.Search(
-		&RegexpQuery{
+		&query.Regexp{
 			mustParseRE("dle.*bla"),
 		})
 
@@ -627,7 +639,7 @@ func TestRegexpOrder(t *testing.T) {
 
 	searcher := searcherForTest(t, b)
 	sres, err := searcher.Search(
-		&RegexpQuery{
+		&query.Regexp{
 			mustParseRE("dle.*bla"),
 		})
 
@@ -650,9 +662,9 @@ func TestRepoName(t *testing.T) {
 
 	searcher := searcherForTest(t, b)
 	sres, err := searcher.Search(
-		&AndQuery{[]Query{
-			&SubstringQuery{Pattern: "needle"},
-			&RepoQuery{Name: "foo"},
+		&query.And{[]query.Query{
+			&query.Substring{Pattern: "needle"},
+			&query.Repo{Name: "foo"},
 		}})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
@@ -666,9 +678,9 @@ func TestRepoName(t *testing.T) {
 	}
 
 	sres, err = searcher.Search(
-		&AndQuery{[]Query{
-			&SubstringQuery{Pattern: "needle"},
-			&RepoQuery{Name: "bla"},
+		&query.And{[]query.Query{
+			&query.Substring{Pattern: "needle"},
+			&query.Repo{Name: "bla"},
 		}})
 	if err != nil {
 		t.Fatalf("Search: %v", err)

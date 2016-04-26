@@ -16,6 +16,7 @@ package zoekt
 
 import (
 	"fmt"
+	"github.com/google/zoekt/query"
 	"log"
 	"strings"
 )
@@ -51,7 +52,7 @@ type indexData struct {
 	repoName string
 }
 
-func (data *indexData) getDocIterator(query *SubstringQuery) (*docIterator, error) {
+func (data *indexData) getDocIterator(query *query.Substring) (*docIterator, error) {
 	if len(query.Pattern) < ngramSize {
 		return nil, fmt.Errorf("pattern %q less than %d bytes", query.Pattern, ngramSize)
 	}
@@ -62,7 +63,7 @@ func (data *indexData) getDocIterator(query *SubstringQuery) (*docIterator, erro
 	return data.getContentDocIterator(query)
 }
 
-func (data *indexData) getFileNameDocIterator(query *SubstringQuery) *docIterator {
+func (data *indexData) getFileNameDocIterator(query *query.Substring) *docIterator {
 	str := strings.ToLower(query.Pattern) // TODO - UTF-8
 	di := &docIterator{
 		query:    query,
@@ -89,7 +90,7 @@ func minarg(xs []uint32) uint32 {
 	return uint32(j)
 }
 
-func (data *indexData) getContentDocIterator(query *SubstringQuery) (*docIterator, error) {
+func (data *indexData) getContentDocIterator(query *query.Substring) (*docIterator, error) {
 	str := strings.ToLower(query.Pattern) // TODO - UTF-8
 	input := &docIterator{
 		query: query,

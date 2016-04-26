@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package zoekt
+package query
 
 import (
 	"bytes"
@@ -22,6 +22,8 @@ import (
 )
 
 var _ = log.Printf
+
+const ngramSize = 3
 
 type SuggestQueryError struct {
 	Message    string
@@ -151,7 +153,7 @@ func Parse(qStr string) (Query, error) {
 	var current []byte
 	add := func(q Query) {
 		if negate {
-			q = &NotQuery{q}
+			q = &Not{q}
 		}
 		qs = append(qs, q)
 		negate = false
@@ -179,7 +181,7 @@ func Parse(qStr string) (Query, error) {
 			if fn, n, ok, err := tryConsumeFile(b); err != nil {
 				return nil, err
 			} else if ok {
-				add(&SubstringQuery{
+				add(&Substring{
 					Pattern:  fn,
 					FileName: true,
 				})
@@ -190,7 +192,7 @@ func Parse(qStr string) (Query, error) {
 			if fn, n, ok, err := tryConsumeRepo(b); err != nil {
 				return nil, err
 			} else if ok {
-				add(&RepoQuery{Name: fn})
+				add(&Repo{Name: fn})
 				b = b[n:]
 				continue
 			}
@@ -198,7 +200,7 @@ func Parse(qStr string) (Query, error) {
 			if fn, n, ok, err := tryConsumeBranch(b); err != nil {
 				return nil, err
 			} else if ok {
-				add(&BranchQuery{
+				add(&Branch{
 					Name: fn,
 				})
 				b = b[n:]
@@ -213,12 +215,12 @@ func Parse(qStr string) (Query, error) {
 					return nil, err
 				}
 
-				substrQ := regexpToQuery(r)
-				if v, ok := isConst(substrQ); ok && v {
+				substrQ := RegexpToQuery(r)
+				if v, ok := substrQ.(*Const); ok && v.Value {
 					return nil, fmt.Errorf("regexp %s is too general. Need at least %d consecutive characters", arg, ngramSize)
 				}
 
-				add(&RegexpQuery{
+				add(&Regexp{
 					Regexp: r,
 				})
 				b = b[n:]
@@ -240,7 +242,7 @@ func Parse(qStr string) (Query, error) {
 		if isSpace(c) {
 			inWord = false
 			if len(current) > 0 {
-				add(&SubstringQuery{Pattern: string(current)})
+				add(&Substring{Pattern: string(current)})
 				current = current[:0]
 			}
 			b = b[1:]
@@ -253,11 +255,11 @@ func Parse(qStr string) (Query, error) {
 	}
 
 	if len(current) > 0 {
-		add(&SubstringQuery{Pattern: string(current)})
+		add(&Substring{Pattern: string(current)})
 	}
 
 	for _, q := range qs {
-		if sq, ok := q.(*SubstringQuery); ok {
+		if sq, ok := q.(*Substring); ok {
 			if len(sq.Pattern) < 3 {
 				return nil, &SuggestQueryError{
 					fmt.Sprintf("pattern %q too short", sq.Pattern),
@@ -283,5 +285,5 @@ func Parse(qStr string) (Query, error) {
 		return qs[0], nil
 	}
 
-	return &AndQuery{qs}, nil
+	return &And{qs}, nil
 }

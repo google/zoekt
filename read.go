@@ -22,6 +22,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/google/zoekt/query"
 )
 
 var _ = log.Println
@@ -208,7 +210,7 @@ func (ss *shardedSearcher) Close() error {
 	return nil
 }
 
-func (ss *shardedSearcher) Search(pat Query) (*SearchResult, error) {
+func (ss *shardedSearcher) Search(pat query.Query) (*SearchResult, error) {
 	start := time.Now()
 	type res struct {
 		sr  *SearchResult

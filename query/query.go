@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package zoekt
+package query
 
 import (
 	"fmt"
@@ -30,42 +30,41 @@ type Query interface {
 }
 
 // RegexpQuery is a query looking for regular expressions matches.
-type RegexpQuery struct {
+type Regexp struct {
 	Regexp *syntax.Regexp
 }
 
-func (q *RegexpQuery) String() string {
+func (q *Regexp) String() string {
 	return fmt.Sprintf("regex:%q", q.Regexp.String())
 }
 
-type TrueQuery struct{}
-
-func (q *TrueQuery) String() string {
-	return "TRUE"
+type Const struct {
+	Value bool
 }
 
-type FalseQuery struct{}
-
-func (q *FalseQuery) String() string {
+func (q *Const) String() string {
+	if q.Value {
+		return "TRUE"
+	}
 	return "FALSE"
 }
 
-type RepoQuery struct {
+type Repo struct {
 	Name string
 }
 
-func (q *RepoQuery) String() string {
+func (q *Repo) String() string {
 	return fmt.Sprintf("repo:%s", q.Name)
 }
 
-// SubstringQuery is the most basic query: a query for a substring.
-type SubstringQuery struct {
+// Substring is the most basic query: a query for a substring.
+type Substring struct {
 	Pattern       string
 	CaseSensitive bool
 	FileName      bool
 }
 
-func (q *SubstringQuery) String() string {
+func (q *Substring) String() string {
 	s := ""
 
 	t := "sub"
@@ -80,12 +79,12 @@ func (q *SubstringQuery) String() string {
 	return s
 }
 
-// OrQuery is matched when any of its children is matched.
-type OrQuery struct {
+// Or is matched when any of its children is matched.
+type Or struct {
 	Children []Query
 }
 
-func (q *OrQuery) String() string {
+func (q *Or) String() string {
 	var sub []string
 	for _, ch := range q.Children {
 		sub = append(sub, ch.String())
@@ -93,21 +92,21 @@ func (q *OrQuery) String() string {
 	return fmt.Sprintf("(or %s)", strings.Join(sub, " "))
 }
 
-// NotQuery inverts the meaning of its child.
-type NotQuery struct {
+// Not inverts the meaning of its child.
+type Not struct {
 	Child Query
 }
 
-func (q *NotQuery) String() string {
+func (q *Not) String() string {
 	return fmt.Sprintf("(not %s)", q.Child)
 }
 
-// AndQuery is matched when all its children are.
-type AndQuery struct {
+// And is matched when all its children are.
+type And struct {
 	Children []Query
 }
 
-func (q *AndQuery) String() string {
+func (q *And) String() string {
 	var sub []string
 	for _, ch := range q.Children {
 		sub = append(sub, ch.String())
@@ -115,20 +114,20 @@ func (q *AndQuery) String() string {
 	return fmt.Sprintf("(and %s)", strings.Join(sub, " "))
 }
 
-// BranchQuery limits search to a specific branch.
-type BranchQuery struct {
+// Branch limits search to a specific branch.
+type Branch struct {
 	Name string
 }
 
-func (q *BranchQuery) String() string {
+func (q *Branch) String() string {
 	return fmt.Sprintf("branch:%q", q.Name)
 }
 
 func queryChildren(q Query) []Query {
 	switch s := q.(type) {
-	case *AndQuery:
+	case *And:
 		return s.Children
-	case *OrQuery:
+	case *Or:
 		return s.Children
 	}
 	return nil
@@ -157,18 +156,18 @@ func flattenAndOr(children []Query, typ Query) ([]Query, bool) {
 // (and (and x y) z) => (and x y z) , the same for "or"
 func flatten(q Query) (Query, bool) {
 	switch s := q.(type) {
-	case *AndQuery:
+	case *And:
 		if len(s.Children) == 1 {
 			return s.Children[0], true
 		}
 		flatChildren, changed := flattenAndOr(s.Children, s)
-		return &AndQuery{flatChildren}, changed
-	case *OrQuery:
+		return &And{flatChildren}, changed
+	case *Or:
 		if len(s.Children) == 1 {
 			return s.Children[0], true
 		}
 		flatChildren, changed := flattenAndOr(s.Children, s)
-		return &OrQuery{flatChildren}, changed
+		return &Or{flatChildren}, changed
 	default:
 		return q, false
 	}
@@ -182,41 +181,24 @@ func mapQueryList(qs []Query, f func(Query) Query) []Query {
 	return neg
 }
 
-func constQuery(c bool) Query {
-	if c {
-		return &TrueQuery{}
-	}
-	return &FalseQuery{}
-}
-
-func isConst(q Query) (bool, bool) {
-	if _, ok := q.(*TrueQuery); ok {
-		return true, true
-	}
-	if _, ok := q.(*FalseQuery); ok {
-		return false, true
-	}
-	return false, false
-}
-
 func invertConst(q Query) Query {
-	c, ok := isConst(q)
+	c, ok := q.(*Const)
 	if ok {
-		return constQuery(!c)
+		return &Const{!c.Value}
 	}
 	return q
 }
 
 func evalAndOrConstants(q Query, children []Query) Query {
-	_, isAnd := q.(*AndQuery)
+	_, isAnd := q.(*And)
 
 	children = mapQueryList(children, evalConstants)
 
 	newCH := children[:0]
 	for _, ch := range children {
-		c, ok := isConst(ch)
+		c, ok := ch.(*Const)
 		if ok {
-			if c == isAnd {
+			if c.Value == isAnd {
 				continue
 			} else {
 				return ch
@@ -225,31 +207,31 @@ func evalAndOrConstants(q Query, children []Query) Query {
 		newCH = append(newCH, ch)
 	}
 	if len(newCH) == 0 {
-		return constQuery(isAnd)
+		return &Const{isAnd}
 	}
 	if isAnd {
-		return &AndQuery{newCH}
+		return &And{newCH}
 	}
-	return &OrQuery{newCH}
+	return &Or{newCH}
 }
 
 func evalConstants(q Query) Query {
 	switch s := q.(type) {
-	case *AndQuery:
+	case *And:
 		return evalAndOrConstants(q, s.Children)
-	case *OrQuery:
+	case *Or:
 		return evalAndOrConstants(q, s.Children)
-	case *NotQuery:
+	case *Not:
 		ch := evalConstants(s.Child)
-		if _, ok := isConst(ch); ok {
+		if _, ok := ch.(*Const); ok {
 			return invertConst(ch)
 		}
-		return &NotQuery{ch}
+		return &Not{ch}
 	}
 	return q
 }
 
-func simplify(q Query) Query {
+func Simplify(q Query) Query {
 	q = evalConstants(q)
 	for {
 		var changed bool
@@ -262,15 +244,15 @@ func simplify(q Query) Query {
 	return q
 }
 
-// mapQueryList runs f over the q.
-func mapQuery(q Query, f func(q Query) Query) Query {
+// Map runs f over the q.
+func Map(q Query, f func(q Query) Query) Query {
 	switch s := q.(type) {
-	case *AndQuery:
-		return &AndQuery{Children: mapQueryList(s.Children, f)}
-	case *OrQuery:
-		return &OrQuery{Children: mapQueryList(s.Children, f)}
-	case *NotQuery:
-		return &NotQuery{Child: f(s.Child)}
+	case *And:
+		return &And{Children: mapQueryList(s.Children, f)}
+	case *Or:
+		return &Or{Children: mapQueryList(s.Children, f)}
+	case *Not:
+		return &Not{Child: f(s.Child)}
 	}
 	return f(q)
 }

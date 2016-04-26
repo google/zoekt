@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+
+	"github.com/google/zoekt/query"
 )
 
 var _ = log.Println
@@ -32,7 +34,7 @@ type notMatchTree struct {
 }
 
 type regexpMatchTree struct {
-	query  *RegexpQuery
+	query  *query.Regexp
 	regexp *regexp.Regexp
 	child  matchTree
 
@@ -42,7 +44,7 @@ type regexpMatchTree struct {
 }
 
 type substrMatchTree struct {
-	query *SubstringQuery
+	query *query.Substring
 
 	cands         []*candidateMatch
 	coversContent bool
@@ -310,10 +312,10 @@ func (t *substrMatchTree) matches(known map[matchTree]bool) (bool, bool) {
 	return true, sure
 }
 
-func (d *indexData) newMatchTree(q Query, sq map[*SubstringQuery]*substrMatchTree) (matchTree, error) {
+func (d *indexData) newMatchTree(q query.Query, sq map[*query.Substring]*substrMatchTree) (matchTree, error) {
 	switch s := q.(type) {
-	case *RegexpQuery:
-		subQ := regexpToQuery(s.Regexp)
+	case *query.Regexp:
+		subQ := query.RegexpToQuery(s.Regexp)
 		subMT, err := d.newMatchTree(subQ, sq)
 		if err != nil {
 			return nil, err
@@ -323,7 +325,7 @@ func (d *indexData) newMatchTree(q Query, sq map[*SubstringQuery]*substrMatchTre
 			regexp: regexp.MustCompile(s.Regexp.String()),
 			child:  subMT,
 		}, nil
-	case *AndQuery:
+	case *query.And:
 		var r []matchTree
 		for _, ch := range s.Children {
 			ct, err := d.newMatchTree(ch, sq)
@@ -333,7 +335,7 @@ func (d *indexData) newMatchTree(q Query, sq map[*SubstringQuery]*substrMatchTre
 			r = append(r, ct)
 		}
 		return &andMatchTree{r}, nil
-	case *OrQuery:
+	case *query.Or:
 		var r []matchTree
 		for _, ch := range s.Children {
 			ct, err := d.newMatchTree(ch, sq)
@@ -343,12 +345,12 @@ func (d *indexData) newMatchTree(q Query, sq map[*SubstringQuery]*substrMatchTre
 			r = append(r, ct)
 		}
 		return &andMatchTree{r}, nil
-	case *NotQuery:
+	case *query.Not:
 		ct, err := d.newMatchTree(s.Child, sq)
 		return &notMatchTree{
 			child: ct,
 		}, err
-	case *SubstringQuery:
+	case *query.Substring:
 		iter, err := d.getDocIterator(s)
 		if err != nil {
 			return nil, err
@@ -361,35 +363,35 @@ func (d *indexData) newMatchTree(q Query, sq map[*SubstringQuery]*substrMatchTre
 		sq[s] = st
 		return st, nil
 
-	case *BranchQuery:
+	case *query.Branch:
 		return &branchQueryMatchTree{
 			mask:      uint32(d.branchIDs[s.Name]),
 			fileMasks: d.fileBranchMasks,
 		}, nil
 	}
-	panic("type")
+	log.Panicf("type %T", q)
 	return nil, nil
 }
 
-func (d *indexData) simplify(in Query) Query {
-	eval := mapQuery(in, func(q Query) Query {
-		if r, ok := q.(*RepoQuery); ok {
-			return constQuery(r.Name == d.repoName)
+func (d *indexData) simplify(in query.Query) query.Query {
+	eval := query.Map(in, func(q query.Query) query.Query {
+		if r, ok := q.(*query.Repo); ok {
+			return &query.Const{r.Name == d.repoName}
 		}
 		return q
 	})
-	return simplify(eval)
+	return query.Simplify(eval)
 }
 
-func (d *indexData) Search(q Query) (*SearchResult, error) {
+func (d *indexData) Search(q query.Query) (*SearchResult, error) {
 	var res SearchResult
 
 	q = d.simplify(q)
-	if c, ok := isConst(q); ok && !c {
+	if c, ok := q.(*query.Const); ok && !c.Value {
 		return &res, nil
 	}
 
-	atoms := map[*SubstringQuery]*substrMatchTree{}
+	atoms := map[*query.Substring]*substrMatchTree{}
 	mt, err := d.newMatchTree(q, atoms)
 	if err != nil {
 		return nil, err
@@ -567,20 +569,20 @@ nextFileMatch:
 	return &res, nil
 }
 
-func extractSubstringQueries(q Query) []*SubstringQuery {
-	var r []*SubstringQuery
+func extractSubstringQueries(q query.Query) []*query.Substring {
+	var r []*query.Substring
 	switch s := q.(type) {
-	case *AndQuery:
+	case *query.And:
 		for _, ch := range s.Children {
 			r = append(r, extractSubstringQueries(ch)...)
 		}
-	case *OrQuery:
+	case *query.Or:
 		for _, ch := range s.Children {
 			r = append(r, extractSubstringQueries(ch)...)
 		}
-	case *NotQuery:
+	case *query.Not:
 		r = append(r, extractSubstringQueries(s.Child)...)
-	case *SubstringQuery:
+	case *query.Substring:
 		r = append(r, s)
 	}
 	return r

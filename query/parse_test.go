@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package zoekt
+package query
 
 import (
 	"reflect"
@@ -37,33 +37,33 @@ func TestParseQuery(t *testing.T) {
 	}
 
 	for _, c := range []testcase{
-		{"sub-pixel", &SubstringQuery{Pattern: "sub-pixel"}, false},
-		{"abc", &SubstringQuery{Pattern: "abc"}, false},
-		{"\"abc bcd\"", &SubstringQuery{Pattern: "abc bcd"}, false},
-		{"abc bcd", &AndQuery{[]Query{
-			&SubstringQuery{Pattern: "abc"},
-			&SubstringQuery{Pattern: "bcd"},
+		{"sub-pixel", &Substring{Pattern: "sub-pixel"}, false},
+		{"abc", &Substring{Pattern: "abc"}, false},
+		{"\"abc bcd\"", &Substring{Pattern: "abc bcd"}, false},
+		{"abc bcd", &And{[]Query{
+			&Substring{Pattern: "abc"},
+			&Substring{Pattern: "bcd"},
 		}}, false},
-		{"-abc", &NotQuery{&SubstringQuery{Pattern: "abc"}}, false},
+		{"-abc", &Not{&Substring{Pattern: "abc"}}, false},
 		{"regex:a.b", nil, true},
 
-		{"abccase:yes", &SubstringQuery{Pattern: "abccase:yes"}, false},
-		{"file:abc", &SubstringQuery{Pattern: "abc", FileName: true}, false},
-		{"branch:pqr", &BranchQuery{Name: "pqr"}, false},
+		{"abccase:yes", &Substring{Pattern: "abccase:yes"}, false},
+		{"file:abc", &Substring{Pattern: "abc", FileName: true}, false},
+		{"branch:pqr", &Branch{Name: "pqr"}, false},
 
-		{"file:helpers.go byte", &AndQuery{[]Query{
-			&SubstringQuery{Pattern: "helpers.go", FileName: true},
-			&SubstringQuery{Pattern: "byte"},
+		{"file:helpers.go byte", &And{[]Query{
+			&Substring{Pattern: "helpers.go", FileName: true},
+			&Substring{Pattern: "byte"},
 		}}, false},
 
-		{"regex:abc[p-q]", &RegexpQuery{mustParseRE("abc[p-q]")}, false},
-		{"repo:go", &RepoQuery{"go"}, false},
+		{"regex:abc[p-q]", &Regexp{mustParseRE("abc[p-q]")}, false},
+		{"repo:go", &Repo{"go"}, false},
 
 		// case
-		{"abc case:yes", &SubstringQuery{Pattern: "abc", CaseSensitive: true}, false},
-		{"abc case:auto", &SubstringQuery{Pattern: "abc", CaseSensitive: false}, false},
-		{"ABC case:auto", &SubstringQuery{Pattern: "ABC", CaseSensitive: true}, false},
-		{"ABC case:\"auto\"", &SubstringQuery{Pattern: "ABC", CaseSensitive: true}, false},
+		{"abc case:yes", &Substring{Pattern: "abc", CaseSensitive: true}, false},
+		{"abc case:auto", &Substring{Pattern: "abc", CaseSensitive: false}, false},
+		{"ABC case:auto", &Substring{Pattern: "ABC", CaseSensitive: true}, false},
+		{"ABC case:\"auto\"", &Substring{Pattern: "ABC", CaseSensitive: true}, false},
 		// errors.
 		{"\"abc", nil, true},
 		{"\"a\\", nil, true},

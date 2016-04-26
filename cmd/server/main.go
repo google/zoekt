@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/google/zoekt"
+	"github.com/google/zoekt/query"
 )
 
 type httpServer struct {
@@ -46,7 +47,7 @@ var didYouMeanTemplate = template.Must(template.New("didyoumean").Parse(`<html>
 func (s *httpServer) serveSearch(w http.ResponseWriter, r *http.Request) {
 	err := s.serveSearchErr(w, r)
 
-	if suggest, ok := err.(*zoekt.SuggestQueryError); ok {
+	if suggest, ok := err.(*query.SuggestQueryError); ok {
 		var buf bytes.Buffer
 		if err := didYouMeanTemplate.Execute(&buf, suggest); err != nil {
 			http.Error(w, err.Error(), http.StatusTeapot)
@@ -159,16 +160,17 @@ var resultTemplate = template.Must(template.New("page").Parse(`<html>
 
 func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) error {
 	qvals := r.URL.Query()
-	query := qvals.Get("q")
-	q, err := zoekt.Parse(query)
+	queryStr := qvals.Get("q")
+	if queryStr == "" {
+		return fmt.Errorf("no query found")
+	}
+
+	q, err := query.Parse(queryStr)
 	if err != nil {
 		return err
 	}
 
 	numStr := qvals.Get("num")
-	if query == "" {
-		return fmt.Errorf("no query found")
-	}
 
 	num, err := strconv.Atoi(numStr)
 	if err != nil {
