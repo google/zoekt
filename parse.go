@@ -244,27 +244,20 @@ func Parse(qStr string) (Query, error) {
 	}
 
 	for _, q := range qs {
-		if s, ok := q.(*SubstringQuery); ok && len(s.Pattern) < 3 {
-			return nil, &SuggestQueryError{
-				fmt.Sprintf("pattern %q too short", s.Pattern),
-				fmt.Sprintf("%q", qStr),
+		if sq, ok := q.(*SubstringQuery); ok {
+			if len(sq.Pattern) < 3 {
+				return nil, &SuggestQueryError{
+					fmt.Sprintf("pattern %q too short", sq.Pattern),
+					fmt.Sprintf("%q", qStr),
+				}
 			}
-		}
-	}
-
-	switch setCase {
-	case "yes":
-		for _, q := range qs {
-			q.(*SubstringQuery).CaseSensitive = true
-		}
-	case "no":
-		for _, q := range qs {
-			q.(*SubstringQuery).CaseSensitive = false
-		}
-	case "auto":
-		for _, q := range qs {
-			if s, ok := q.(*SubstringQuery); ok {
-				s.CaseSensitive = (s.Pattern != string(toLower([]byte(s.Pattern))))
+			switch setCase {
+			case "yes":
+				sq.CaseSensitive = true
+			case "no":
+				sq.CaseSensitive = false
+			case "auto":
+				sq.CaseSensitive = (sq.Pattern != string(toLower([]byte(sq.Pattern))))
 			}
 		}
 	}
