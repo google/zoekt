@@ -26,7 +26,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/hanwen/zoekt"
+	"github.com/google/zoekt"
 )
 
 type httpServer struct {

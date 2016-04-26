@@ -26,7 +26,7 @@ import (
 	"sync"
 	"text/template"
 
-	"github.com/hanwen/zoekt"
+	"github.com/google/zoekt"
 )
 
 // Options sets options for the index building.

@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"runtime/pprof"
 
-	"github.com/hanwen/zoekt"
+	"github.com/google/zoekt"
 )
 
 const CONTEXT = 20

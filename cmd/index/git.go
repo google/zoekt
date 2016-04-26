@@ -19,7 +19,7 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/hanwen/zoekt/build"
+	"github.com/google/zoekt/build"
 	"github.com/speedata/gogit"
 )
 
