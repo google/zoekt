@@ -57,6 +57,7 @@ func TestParseQuery(t *testing.T) {
 		}}, false},
 
 		{"regex:abc[p-q]", &RegexpQuery{mustParseRE("abc[p-q]")}, false},
+		{"repo:go", &RepoQuery{"go"}, false},
 
 		// case
 		{"abc case:yes", &SubstringQuery{Pattern: "abc", CaseSensitive: true}, false},

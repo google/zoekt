@@ -50,6 +50,14 @@ func (q *FalseQuery) String() string {
 	return "FALSE"
 }
 
+type RepoQuery struct {
+	Name string
+}
+
+func (q *RepoQuery) String() string {
+	return fmt.Sprintf("repo:%s", q.Name)
+}
+
 // SubstringQuery is the most basic query: a query for a substring.
 type SubstringQuery struct {
 	Pattern       string
@@ -166,12 +174,19 @@ func flatten(q Query) (Query, bool) {
 	}
 }
 
-func mapQuery(qs []Query, f func(Query) Query) []Query {
+func mapQueryList(qs []Query, f func(Query) Query) []Query {
 	var neg []Query
 	for _, sub := range qs {
 		neg = append(neg, f(sub))
 	}
 	return neg
+}
+
+func constQuery(c bool) Query {
+	if c {
+		return &TrueQuery{}
+	}
+	return &FalseQuery{}
 }
 
 func isConst(q Query) (bool, bool) {
@@ -185,11 +200,9 @@ func isConst(q Query) (bool, bool) {
 }
 
 func invertConst(q Query) Query {
-	switch q.(type) {
-	case *TrueQuery:
-		return &FalseQuery{}
-	case *FalseQuery:
-		return &TrueQuery{}
+	c, ok := isConst(q)
+	if ok {
+		return constQuery(!c)
 	}
 	return q
 }
@@ -197,7 +210,7 @@ func invertConst(q Query) Query {
 func evalAndOrConstants(q Query, children []Query) Query {
 	_, isAnd := q.(*AndQuery)
 
-	children = mapQuery(children, evalConstants)
+	children = mapQueryList(children, evalConstants)
 
 	newCH := children[:0]
 	for _, ch := range children {
@@ -212,10 +225,7 @@ func evalAndOrConstants(q Query, children []Query) Query {
 		newCH = append(newCH, ch)
 	}
 	if len(newCH) == 0 {
-		if isAnd {
-			return &TrueQuery{}
-		}
-		return &FalseQuery{}
+		return constQuery(isAnd)
 	}
 	if isAnd {
 		return &AndQuery{newCH}
@@ -250,4 +260,17 @@ func simplify(q Query) Query {
 	}
 
 	return q
+}
+
+// mapQueryList runs f over the q.
+func mapQuery(q Query, f func(q Query) Query) Query {
+	switch s := q.(type) {
+	case *AndQuery:
+		return &AndQuery{Children: mapQueryList(s.Children, f)}
+	case *OrQuery:
+		return &OrQuery{Children: mapQueryList(s.Children, f)}
+	case *NotQuery:
+		return &NotQuery{Child: f(s.Child)}
+	}
+	return f(q)
 }

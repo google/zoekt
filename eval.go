@@ -371,8 +371,23 @@ func (d *indexData) newMatchTree(q Query, sq map[*SubstringQuery]*substrMatchTre
 	return nil, nil
 }
 
+func (d *indexData) simplify(in Query) Query {
+	eval := mapQuery(in, func(q Query) Query {
+		if r, ok := q.(*RepoQuery); ok {
+			return constQuery(r.Name == d.repoName)
+		}
+		return q
+	})
+	return simplify(eval)
+}
+
 func (d *indexData) Search(q Query) (*SearchResult, error) {
 	var res SearchResult
+
+	q = d.simplify(q)
+	if c, ok := isConst(q); ok && !c {
+		return &res, nil
+	}
 
 	atoms := map[*SubstringQuery]*substrMatchTree{}
 	mt, err := d.newMatchTree(q, atoms)
@@ -475,6 +490,7 @@ nextFileMatch:
 		}
 
 		fileMatch := FileMatch{
+			Repo: d.repoName,
 			Name: d.fileName(nextDoc),
 			// Maintain ordering of input files. This
 			// strictly dominates the in-file ordering of

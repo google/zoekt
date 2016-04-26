@@ -69,6 +69,9 @@ type IndexBuilder struct {
 
 	// Branch name => ID
 	branches map[string]int
+
+	// The repository name
+	repoName string
 }
 
 // ContentSize returns the number of content bytes so far ingested.
@@ -85,6 +88,10 @@ func NewIndexBuilder() *IndexBuilder {
 		namePostings:    make(map[ngram][]uint32),
 		branches:        make(map[string]int),
 	}
+}
+
+func (b *IndexBuilder) SetName(nm string) {
+	b.repoName = nm
 }
 
 // AddFile adds a file. This is the basic ordering for search results,

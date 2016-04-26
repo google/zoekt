@@ -24,6 +24,7 @@ type FileMatch struct {
 	// Ranking; the higher, the better.
 	Score    float64
 	Name     string
+	Repo     string
 	Branches []string
 	Matches  []Match
 }

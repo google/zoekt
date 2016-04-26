@@ -144,6 +144,7 @@ func (b *Builder) buildShard(todo []entry, nextShardNum int) error {
 		return err
 	}
 	shardBuilder := zoekt.NewIndexBuilder()
+	shardBuilder.SetName(b.opts.RepoName)
 	for _, t := range todo {
 		shardBuilder.AddFileBranches(t.name, t.content, t.branches)
 	}

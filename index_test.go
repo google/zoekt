@@ -639,3 +639,42 @@ func TestRegexpOrder(t *testing.T) {
 		t.Fatalf("got %v, want 0 matches", sres.Files)
 	}
 }
+
+func TestRepoName(t *testing.T) {
+	b := NewIndexBuilder()
+
+	content := []byte("bla the needle")
+	// ----------------01234567890123
+	b.AddFile("f1", content)
+	b.SetName("bla")
+
+	searcher := searcherForTest(t, b)
+	sres, err := searcher.Search(
+		&AndQuery{[]Query{
+			&SubstringQuery{Pattern: "needle"},
+			&RepoQuery{Name: "foo"},
+		}})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if len(sres.Files) != 0 {
+		t.Fatalf("got %v, want 0 matches", sres.Files)
+	}
+
+	if sres.Stats.FilesConsidered > 0 {
+		t.Fatalf("got FilesConsidered %d, should have short circuited", sres.Stats.FilesConsidered)
+	}
+
+	sres, err = searcher.Search(
+		&AndQuery{[]Query{
+			&SubstringQuery{Pattern: "needle"},
+			&RepoQuery{Name: "bla"},
+		}})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if len(sres.Files) != 1 {
+		t.Fatalf("got %v, want 1 match", sres.Files)
+	}
+
+}

@@ -99,6 +99,8 @@ Examples:
   <dt>path file:java</dt><dd>search for the word "path" in files whose name contains "java"
 </dd>
   <dt>path -file:java</dt><dd>search for the word "path" excluding files whose name contains "java"
+  <dt>regex:foo.*bar</dt><dd>search for the regular expression "foo.*bar"</dd>
+  <dt>repo:android</dt><dd>restrict to the "android" repository</dd>
 </dl>
 </div>
 </body>
@@ -113,6 +115,7 @@ type MatchLine struct {
 
 type FileMatchData struct {
 	FileName string
+	Repo     string
 	Matches  []MatchData
 }
 
@@ -143,7 +146,7 @@ var resultTemplate = template.Must(template.New("page").Parse(`<html>
   in {{.Stats.Duration}}
   <p>
   {{range .FileMatches}}
-    <b><tt>{{.FileName}}:</tt></b>
+    <b><tt>{{.Repo}}:{{.FileName}}:</tt></b>
       <div style="background: #eef;">
     {{range .Matches}}
         <pre>{{.LineNum}}: {{.Pre}}<b>{{.MatchText}}</b>{{.Post}}</pre>
@@ -189,6 +192,7 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 	for _, f := range result.Files {
 		fMatch := FileMatchData{
 			FileName: f.Name,
+			Repo:     f.Repo,
 		}
 		for _, m := range f.Matches {
 			l := m.LineOff

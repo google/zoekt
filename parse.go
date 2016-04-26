@@ -138,6 +138,11 @@ func tryConsumeRegexp(in []byte) (string, int, bool, error) {
 	return string(arg), n, ok, err
 }
 
+func tryConsumeRepo(in []byte) (string, int, bool, error) {
+	arg, n, ok, err := consumeKeyword(in, []byte("repo:"))
+	return string(arg), n, ok, err
+}
+
 func Parse(qStr string) (Query, error) {
 	b := []byte(qStr)
 
@@ -178,6 +183,14 @@ func Parse(qStr string) (Query, error) {
 					Pattern:  fn,
 					FileName: true,
 				})
+				b = b[n:]
+				continue
+			}
+
+			if fn, n, ok, err := tryConsumeRepo(b); err != nil {
+				return nil, err
+			} else if ok {
+				add(&RepoQuery{Name: fn})
 				b = b[n:]
 				continue
 			}

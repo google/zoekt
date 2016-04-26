@@ -36,6 +36,7 @@ type indexTOC struct {
 
 	nameNgramText simpleSection
 	namePostings  compoundSection
+	repoName      simpleSection
 }
 
 func (t *indexTOC) sections() []section {
@@ -49,6 +50,7 @@ func (t *indexTOC) sections() []section {
 		&t.namePostings,
 		&t.branchMasks,
 		&t.branchNames,
+		&t.repoName,
 	}
 }
 
@@ -131,6 +133,10 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 		toc.branchNames.addItem(w, []byte(inv[k]))
 	}
 	toc.branchNames.end(w)
+
+	toc.repoName.start(w)
+	w.Write([]byte(b.repoName))
+	toc.repoName.end(w)
 
 	var tocSection simpleSection
 

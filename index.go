@@ -47,6 +47,8 @@ type indexData struct {
 	fileBranchMasks []uint32
 	branchNames     map[int]string
 	branchIDs       map[string]int
+
+	repoName string
 }
 
 func (data *indexData) getDocIterator(query *SubstringQuery) (*docIterator, error) {
