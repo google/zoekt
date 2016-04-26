@@ -45,6 +45,7 @@ func TestParseQuery(t *testing.T) {
 			&SubstringQuery{Pattern: "bcd"},
 		}}, false},
 		{"-abc", &NotQuery{&SubstringQuery{Pattern: "abc"}}, false},
+		{"regex:a.b", nil, true},
 
 		{"abccase:yes", &SubstringQuery{Pattern: "abccase:yes"}, false},
 		{"file:abc", &SubstringQuery{Pattern: "abc", FileName: true}, false},
@@ -70,7 +71,7 @@ func TestParseQuery(t *testing.T) {
 	} {
 		q, err := Parse(c.in)
 		if c.hasErr != (err != nil) {
-			t.Errorf("Parse(%s): error %v", c.in, err)
+			t.Errorf("Parse(%s): error %v, value %v", c.in, err, q)
 		} else if q != nil {
 			if !reflect.DeepEqual(q, c.out) {
 				t.Errorf("Parse(%s): got %v want %v", c.in, q, c.out)

@@ -44,6 +44,8 @@ func TestRegexpParse(t *testing.T) {
 	}
 
 	cases := []testcase{
+		{"(foo|)bar", &SubstringQuery{Pattern: "bar"}},
+		{"(foo|)", &TrueQuery{}},
 		{"(foo|bar)baz.*bla", &AndQuery{[]Query{
 			&OrQuery{[]Query{
 				&SubstringQuery{Pattern: "foo"},
@@ -52,7 +54,6 @@ func TestRegexpParse(t *testing.T) {
 			&SubstringQuery{Pattern: "baz"},
 			&SubstringQuery{Pattern: "bla"},
 		}}},
-
 		{"^[a-z](People)+barrabas$",
 			&AndQuery{[]Query{
 				&SubstringQuery{Pattern: "People"},

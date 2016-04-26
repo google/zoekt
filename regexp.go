@@ -1,8 +1,11 @@
 package zoekt
 
 import (
+	"log"
 	"regexp/syntax"
 )
+
+var _ = log.Println
 
 func lowerRegexp(r *syntax.Regexp) *syntax.Regexp {
 	newRE := *r
@@ -22,9 +25,15 @@ func lowerRegexp(r *syntax.Regexp) *syntax.Regexp {
 	return &newRE
 }
 
+func regexpToQuery(r *syntax.Regexp) Query {
+	q := regexpToQueryRecursive(r)
+	q = simplify(q)
+	return q
+}
+
 // regexpToQuery tries to distill a substring search query that
 // matches a superset of the regexp.
-func regexpToQuery(r *syntax.Regexp) Query {
+func regexpToQueryRecursive(r *syntax.Regexp) Query {
 	// TODO - we could perhaps transform Begin/EndText in '\n'?
 	// TODO - we could perhaps transform CharClass in (OrQuery )
 	// if there are just a few runes, and part of a OpConcat?
@@ -57,5 +66,5 @@ func regexpToQuery(r *syntax.Regexp) Query {
 		}
 		return &OrQuery{qs}
 	}
-	return nil
+	return &TrueQuery{}
 }

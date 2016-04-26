@@ -200,6 +200,11 @@ func Parse(qStr string) (Query, error) {
 					return nil, err
 				}
 
+				substrQ := regexpToQuery(r)
+				if v, ok := isConst(substrQ); ok && v {
+					return nil, fmt.Errorf("regexp %s is too general. Need at least %d consecutive characters", arg, ngramSize)
+				}
+
 				add(&RegexpQuery{
 					Regexp: r,
 				})

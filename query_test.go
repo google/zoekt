@@ -16,6 +16,7 @@ package zoekt
 
 import (
 	"log"
+	"reflect"
 	"testing"
 )
 
@@ -35,25 +36,44 @@ func TestQueryString(t *testing.T) {
 	}
 }
 
-func TestQueryFlatten(t *testing.T) {
-	var q Query
-	q = &OrQuery{[]Query{
-		&OrQuery{[]Query{
-			&AndQuery{[]Query{
-				&SubstringQuery{Pattern: "hoi"},
-				&NotQuery{&SubstringQuery{Pattern: "hai"}},
-			}},
-			&OrQuery{[]Query{
+func TestSimplify(t *testing.T) {
+	type testcase struct {
+		in   Query
+		want Query
+	}
+
+	cases := []testcase{
+		{
+			in: &OrQuery{[]Query{
+				&OrQuery{[]Query{
+					&AndQuery{[]Query{
+						&SubstringQuery{Pattern: "hoi"},
+						&NotQuery{&SubstringQuery{Pattern: "hai"}},
+					}},
+					&OrQuery{[]Query{
+						&SubstringQuery{Pattern: "zip"},
+						&SubstringQuery{Pattern: "zap"},
+					}},
+				}}}},
+			want: &OrQuery{[]Query{
+				&AndQuery{[]Query{
+					&SubstringQuery{Pattern: "hoi"},
+					&NotQuery{&SubstringQuery{Pattern: "hai"}},
+				}},
 				&SubstringQuery{Pattern: "zip"},
-				&SubstringQuery{Pattern: "zap"},
+				&SubstringQuery{Pattern: "zap"}},
 			}},
-		}}}}
+		{in: &AndQuery{}, want: &TrueQuery{}},
+		{in: &OrQuery{}, want: &FalseQuery{}},
+		{in: &AndQuery{[]Query{&TrueQuery{}, &FalseQuery{}}}, want: &FalseQuery{}},
+		{in: &OrQuery{[]Query{&FalseQuery{}, &TrueQuery{}}}, want: &TrueQuery{}},
+		{in: &NotQuery{&TrueQuery{}}, want: &FalseQuery{}},
+	}
 
-	q = simplify(q)
-	got := q.String()
-
-	want := `(or (and substr:"hoi" (not substr:"hai")) substr:"zip" substr:"zap")`
-	if got != want {
-		t.Errorf("got %s, want %s", got, want)
+	for _, c := range cases {
+		got := simplify(c.in)
+		if !reflect.DeepEqual(got, c.want) {
+			t.Errorf("got %s, want %s", got, c.want)
+		}
 	}
 }

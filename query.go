@@ -38,6 +38,18 @@ func (q *RegexpQuery) String() string {
 	return fmt.Sprintf("regex:%q", q.Regexp.String())
 }
 
+type TrueQuery struct{}
+
+func (q *TrueQuery) String() string {
+	return "TRUE"
+}
+
+type FalseQuery struct{}
+
+func (q *FalseQuery) String() string {
+	return "FALSE"
+}
+
 // SubstringQuery is the most basic query: a query for a substring.
 type SubstringQuery struct {
 	Pattern       string
@@ -162,7 +174,73 @@ func mapQuery(qs []Query, f func(Query) Query) []Query {
 	return neg
 }
 
+func isConst(q Query) (bool, bool) {
+	if _, ok := q.(*TrueQuery); ok {
+		return true, true
+	}
+	if _, ok := q.(*FalseQuery); ok {
+		return false, true
+	}
+	return false, false
+}
+
+func invertConst(q Query) Query {
+	switch q.(type) {
+	case *TrueQuery:
+		return &FalseQuery{}
+	case *FalseQuery:
+		return &TrueQuery{}
+	}
+	return q
+}
+
+func evalAndOrConstants(q Query, children []Query) Query {
+	_, isAnd := q.(*AndQuery)
+
+	children = mapQuery(children, evalConstants)
+
+	newCH := children[:0]
+	for _, ch := range children {
+		c, ok := isConst(ch)
+		if ok {
+			if c == isAnd {
+				continue
+			} else {
+				return ch
+			}
+		}
+		newCH = append(newCH, ch)
+	}
+	if len(newCH) == 0 {
+		if isAnd {
+			return &TrueQuery{}
+		}
+		return &FalseQuery{}
+	}
+	if isAnd {
+		return &AndQuery{newCH}
+	}
+	return &OrQuery{newCH}
+}
+
+func evalConstants(q Query) Query {
+	switch s := q.(type) {
+	case *AndQuery:
+		return evalAndOrConstants(q, s.Children)
+	case *OrQuery:
+		return evalAndOrConstants(q, s.Children)
+	case *NotQuery:
+		ch := evalConstants(s.Child)
+		if _, ok := isConst(ch); ok {
+			return invertConst(ch)
+		}
+		return &NotQuery{ch}
+	}
+	return q
+}
+
 func simplify(q Query) Query {
+	q = evalConstants(q)
 	for {
 		var changed bool
 		q, changed = flatten(q)
