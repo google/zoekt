@@ -75,14 +75,11 @@ func main() {
 	var branches []string
 	if *branchesStr != "" {
 		branches = strings.Split(*branchesStr, ",")
-		for i := range branches {
-			branches[i] = *branchPrefix + branches[i]
-		}
 	}
 
 	for _, arg := range flag.Args() {
 		if len(branches) > 0 {
-			if err := indexGitRepo(opts, arg, branches); err != nil {
+			if err := indexGitRepo(opts, arg, *branchPrefix, branches); err != nil {
 				log.Fatal("indexGitRepo", err)
 			}
 			continue

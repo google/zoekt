@@ -44,10 +44,11 @@ func treeToFiles(tree *gogit.Tree) (map[string]gogit.Oid, error) {
 	return res, err
 }
 
-func indexGitRepo(opts build.Options, repoDir string, branches []string) error {
-	opts.RepoName = repoDir
+func indexGitRepo(opts build.Options, repoDir, branchPrefix string, branches []string) error {
+	repoDir = filepath.Clean(repoDir)
+	opts.RepoName = filepath.Base(repoDir)
 	if filepath.Base(repoDir) == ".git" {
-		opts.RepoName = filepath.Dir(repoDir)
+		opts.RepoName = filepath.Base(filepath.Dir(repoDir))
 	}
 
 	builder, err := build.NewBuilder(opts)
@@ -69,7 +70,7 @@ func indexGitRepo(opts build.Options, repoDir string, branches []string) error {
 	data := map[string]map[string]gogit.Oid{}
 
 	for _, b := range branches {
-		ref, err := repo.LookupReference(b)
+		ref, err := repo.LookupReference(filepath.Join(branchPrefix, b))
 		if err != nil {
 			return err
 		}
@@ -120,6 +121,7 @@ func indexGitRepo(opts build.Options, repoDir string, branches []string) error {
 			builder.AddFileBranches(n, blob.Contents(), branches)
 		}
 	}
+	builder.Finish()
 
 	return nil
 }

@@ -117,6 +117,7 @@ type MatchLine struct {
 type FileMatchData struct {
 	FileName string
 	Repo     string
+	Branches []string
 	Matches  []MatchData
 }
 
@@ -147,7 +148,7 @@ var resultTemplate = template.Must(template.New("page").Parse(`<html>
   in {{.Stats.Duration}}
   <p>
   {{range .FileMatches}}
-    <b><tt>{{.Repo}}:{{.FileName}}:</tt></b>
+    <tt><b>{{.Repo}}</b>:<b>{{.FileName}}</b>:{{if .Branches}}<small>[{{range .Branches}}{{.}}, {{end}}]</small>{{end}} </tt>
       <div style="background: #eef;">
     {{range .Matches}}
         <pre>{{.LineNum}}: {{.Pre}}<b>{{.MatchText}}</b>{{.Post}}</pre>
@@ -195,6 +196,7 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 		fMatch := FileMatchData{
 			FileName: f.Name,
 			Repo:     f.Repo,
+			Branches: f.Branches,
 		}
 		for _, m := range f.Matches {
 			l := m.LineOff
