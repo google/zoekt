@@ -168,6 +168,7 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 		return fmt.Errorf("no query found")
 	}
 
+	log.Printf("got query %q", queryStr)
 	q, err := query.Parse(queryStr)
 	if err != nil {
 		return err
