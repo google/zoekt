@@ -21,7 +21,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/pprof"
-	"strings"
 
 	"github.com/google/zoekt/build"
 )
@@ -47,9 +46,6 @@ func main() {
 	var shardLimit = flag.Int("shard_limit", 100<<20, "maximum corpus size for a shard")
 	var parallelism = flag.Int("parallelism", 4, "maximum number of parallel indexing processes.")
 
-	branchesStr := flag.String("branches", "", "git branches to index. If set, arguments should be bare git repositories.")
-	branchPrefix := flag.String("branch_prefix", "refs/heads/", "git refs to index")
-
 	indexTemplate := flag.String("index",
 		"{{.Home}}/.csindex/{{.Base}}.{{.FP}}.{{.Shard}}",
 		"template for index file to use.")
@@ -72,19 +68,7 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	var branches []string
-	if *branchesStr != "" {
-		branches = strings.Split(*branchesStr, ",")
-	}
-
 	for _, arg := range flag.Args() {
-		if len(branches) > 0 {
-			if err := indexGitRepo(opts, arg, *branchPrefix, branches); err != nil {
-				log.Fatal("indexGitRepo", err)
-			}
-			continue
-		}
-
 		if err := indexArg(arg, opts); err != nil {
 			log.Fatal(err)
 		}

@@ -2,3 +2,4 @@
 cmd/search/search
 cmd/index/index
 cmd/server/server
+cmd/zoekt-git-index/zoekt-git-index

@@ -15,9 +15,12 @@
 package main
 
 import (
+	"flag"
 	"log"
+	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/google/zoekt/build"
 	"github.com/speedata/gogit"
@@ -43,6 +46,48 @@ func treeToFiles(tree *gogit.Tree) (map[string]gogit.Oid, error) {
 
 	return res, err
 }
+
+
+func main() {
+	var sizeMax = flag.Int("file_limit", 128*1024, "maximum file size")
+	var shardLimit = flag.Int("shard_limit", 100<<20, "maximum corpus size for a shard")
+	var parallelism = flag.Int("parallelism", 4, "maximum number of parallel indexing processes.")
+
+	branchesStr := flag.String("branches", "master", "git branches to index. If set, arguments should be bare git repositories.")
+	branchPrefix := flag.String("branch_prefix", "refs/heads/", "git refs to index")
+
+	indexTemplate := flag.String("index",
+		"{{.Home}}/.csindex/{{.Base}}.{{.FP}}.{{.Shard}}",
+		"template for index file to use.")
+
+	flag.Parse()
+
+	opts := build.Options{
+		Parallelism:      *parallelism,
+		SizeMax:          *sizeMax,
+		ShardMax:         *shardLimit,
+		FileNameTemplate: *indexTemplate,
+	}
+
+	var branches []string
+	if *branchesStr != "" {
+		branches = strings.Split(*branchesStr, ",")
+	}
+
+	for _, arg := range flag.Args() {
+		if _, err := os.Lstat(filepath.Join(arg, ".git")); err == nil {
+			arg = filepath.Join(arg, ".git")
+		}
+		arg, err := filepath.Abs(arg)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err := indexGitRepo(opts, arg, *branchPrefix, branches); err != nil {
+			log.Fatal("indexGitRepo", err)
+		}
+	}
+}
+
 
 func indexGitRepo(opts build.Options, repoDir, branchPrefix string, branches []string) error {
 	repoDir = filepath.Clean(repoDir)
