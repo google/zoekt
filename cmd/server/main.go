@@ -100,7 +100,9 @@ Examples:
   <dt>path file:java</dt><dd>search for the word "path" in files whose name contains "java"
 </dd>
   <dt>path -file:java</dt><dd>search for the word "path" excluding files whose name contains "java"
-  <dt>regex:foo.*bar</dt><dd>search for the regular expression "foo.*bar"</dd>
+  <dt>foo.*bar</dt><dd>search for the regular expression "foo.*bar"</dd>
+  <dt>-(Path File) Stream</dt><dd>search "Stream", but exclude files containing both "Path" and "File"</dd>
+  <dt>-Path\ File Stream</dt><dd>search "Stream", but exclude files containing "Path File"</dd>
   <dt>repo:android</dt><dd>restrict to the "android" repository</dd>
 </dl>
 </div>
