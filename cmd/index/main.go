@@ -76,6 +76,7 @@ func main() {
 }
 
 func indexArg(arg string, opts build.Options) error {
+	arg = filepath.Clean(arg)
 	opts.RepoName = filepath.Base(arg)
 	builder, err := build.NewBuilder(opts)
 	if err != nil {
@@ -101,6 +102,7 @@ func indexArg(arg string, opts build.Options) error {
 			return err
 		}
 
+		f = strings.TrimPrefix(f, arg+"/")
 		builder.AddFile(f, content)
 	}
 
