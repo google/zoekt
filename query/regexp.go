@@ -39,14 +39,14 @@ func LowerRegexp(r *syntax.Regexp) *syntax.Regexp {
 	return &newRE
 }
 
+// RegexpToQuery tries to distill a substring search query that
+// matches a superset of the regexp.
 func RegexpToQuery(r *syntax.Regexp) Query {
 	q := regexpToQueryRecursive(r)
 	q = Simplify(q)
 	return q
 }
 
-// regexpToQuery tries to distill a substring search query that
-// matches a superset of the regexp.
 func regexpToQueryRecursive(r *syntax.Regexp) Query {
 	// TODO - we could perhaps transform Begin/EndText in '\n'?
 	// TODO - we could perhaps transform CharClass in (OrQuery )

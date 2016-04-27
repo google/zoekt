@@ -55,9 +55,17 @@ func TestParseQuery(t *testing.T) {
 			&Substring{Pattern: "helpers.go", FileName: true},
 			&Substring{Pattern: "byte"},
 		}}, false},
-
+		{"(abc def)", &And{[]Query{
+			&Substring{Pattern: "abc"},
+			&Substring{Pattern: "def"},
+		}}, false},
+		{"(abc def", nil, true},
 		{"regex:abc[p-q]", &Regexp{mustParseRE("abc[p-q]")}, false},
 		{"repo:go", &Repo{"go"}, false},
+
+		{"abc.*def", &Regexp{mustParseRE("abc.*def")}, false},
+		{"abc\\.\\*def", &Substring{Pattern: "abc.*def"}, false},
+		{"(abc)", &Regexp{mustParseRE("(abc)")}, false},
 
 		// case
 		{"abc case:yes", &Substring{Pattern: "abc", CaseSensitive: true}, false},
@@ -77,6 +85,42 @@ func TestParseQuery(t *testing.T) {
 			if !reflect.DeepEqual(q, c.out) {
 				t.Errorf("Parse(%s): got %v want %v", c.in, q, c.out)
 			}
+		}
+	}
+}
+
+func TestTokenize(t *testing.T) {
+	type testcase struct {
+		in   string
+		typ  int
+		text string
+	}
+
+	cases := []testcase{
+		{"file:bla", tokFile, "bla"},
+		{"file:bla ", tokFile, "bla"},
+		{"(abc def) ", tokParenOpen, "("},
+		{"(abcdef)", tokText, "(abcdef)"},
+		{"(ab(c)def) ", tokText, "(ab(c)def)"},
+		{"(ab\\ def) ", tokText, "(ab\\ def)"},
+		{") ", tokParenClose, ")"},
+		{"abc) ", tokText, "abc"},
+		{"file:\"bla\"", tokFile, "bla"},
+		{"\"file:bla\"", tokText, "file:bla"},
+		{"\\", tokError, ""},
+	}
+	for _, c := range cases {
+		tok, err := nextToken([]byte(c.in))
+		if err != nil {
+			tok = &token{Type: tokError}
+		}
+		if tok.Type != c.typ {
+			t.Errorf("%s: got type %d, want %d", c.in, tok.Type, c.typ)
+			continue
+		}
+
+		if string(tok.Text) != c.text {
+			t.Errorf("%s: got text %q, want %q", c.in, tok.Text, c.text)
 		}
 	}
 }

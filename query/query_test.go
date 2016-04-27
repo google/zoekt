@@ -71,7 +71,7 @@ func TestSimplify(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		got := simplify(c.in)
+		got := Simplify(c.in)
 		if !reflect.DeepEqual(got, c.want) {
 			t.Errorf("got %s, want %s", got, c.want)
 		}

@@ -34,6 +34,8 @@ func (e *SuggestQueryError) Error() string {
 	return fmt.Sprintf("%s. Suggestion: %s", e.Message, e.Suggestion)
 }
 
+// parseStringLiteral parses a string literal, consumes the starting
+// quote too.
 func parseStringLiteral(in []byte) (lit []byte, n int, err error) {
 	left := in[1:]
 	found := false
@@ -148,122 +150,130 @@ func tryConsumeRepo(in []byte) (string, int, bool, error) {
 func Parse(qStr string) (Query, error) {
 	b := []byte(qStr)
 
-	var qs []Query
-	var negate bool
-	var current []byte
-	add := func(q Query) {
-		if negate {
-			q = &Not{q}
-		}
-		qs = append(qs, q)
-		negate = false
+	qs, _, err := parseExprList(b)
+	if err != nil {
+		return nil, err
 	}
 
-	setCase := "auto"
-	inWord := false
-	for len(b) > 0 {
-		c := b[0]
+	return Simplify(&And{qs}), nil
+}
 
-		if !inWord {
-			if c == '-' && !negate {
-				negate = true
-				b = b[1:]
-				continue
-			}
-
-			if q, n, ok, err := tryConsumeCase(b); err != nil {
-				return nil, err
-			} else if ok {
-				setCase = q
-				b = b[n:]
-				continue
-			}
-			if fn, n, ok, err := tryConsumeFile(b); err != nil {
-				return nil, err
-			} else if ok {
-				add(&Substring{
-					Pattern:  fn,
-					FileName: true,
-				})
-				b = b[n:]
-				continue
-			}
-
-			if fn, n, ok, err := tryConsumeRepo(b); err != nil {
-				return nil, err
-			} else if ok {
-				add(&Repo{Name: fn})
-				b = b[n:]
-				continue
-			}
-
-			if fn, n, ok, err := tryConsumeBranch(b); err != nil {
-				return nil, err
-			} else if ok {
-				add(&Branch{
-					Name: fn,
-				})
-				b = b[n:]
-				continue
-			}
-
-			if arg, n, ok, err := tryConsumeRegexp(b); err != nil {
-				return nil, err
-			} else if ok {
-				r, err := syntax.Parse(arg, 0)
-				if err != nil {
-					return nil, err
-				}
-
-				substrQ := RegexpToQuery(r)
-				if v, ok := substrQ.(*Const); ok && v.Value {
-					return nil, fmt.Errorf("regexp %s is too general. Need at least %d consecutive characters", arg, ngramSize)
-				}
-
-				add(&Regexp{
-					Regexp: r,
-				})
-				b = b[n:]
-				continue
-			}
-
-			if c == '"' {
-				parse, n, err := parseStringLiteral(b)
-				if err != nil {
-					return nil, err
-				}
-				b = b[n:]
-
-				current = append(current, parse...)
-				continue
-			}
-		}
-
-		if isSpace(c) {
-			inWord = false
-			if len(current) > 0 {
-				add(&Substring{Pattern: string(current)})
-				current = current[:0]
-			}
-			b = b[1:]
-			continue
-		}
-
-		inWord = true
-		current = append(current, c)
+func parseExpr(in []byte) (Query, int, error) {
+	b := in[:]
+	var expr Query
+	for len(b) > 0 && isSpace(b[0]) {
 		b = b[1:]
 	}
 
-	if len(current) > 0 {
-		add(&Substring{Pattern: string(current)})
+	tok, err := nextToken(b)
+	if err != nil {
+		return nil, 0, err
+	}
+	if tok == nil {
+		return nil, 0, nil
+	}
+	b = b[len(tok.Input):]
+
+	text := string(tok.Text)
+	switch tok.Type {
+	case tokFile:
+		expr = &Substring{
+			Pattern:  text,
+			FileName: true,
+		}
+	case tokCase:
+		switch text {
+		case "yes":
+		case "no":
+		case "auto":
+		default:
+			return nil, 0, fmt.Errorf("unknown case argument %q, want {yes,no,auto}", text)
+		}
+		expr = &Case{text}
+	case tokRepo:
+		expr = &Repo{Name: text}
+	case tokBranch:
+		expr = &Branch{Name: text}
+	case tokText, tokRegex:
+		r, err := syntax.Parse(text, 0)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		if r.Op == syntax.OpLiteral {
+			expr = &Substring{Pattern: string(r.Rune)}
+		} else {
+			substrQ := RegexpToQuery(r)
+			if v, ok := substrQ.(*Const); ok && v.Value {
+				return nil, 0, fmt.Errorf("regexp %s is too general. Need at least %d consecutive characters", text, ngramSize)
+			}
+
+			expr = &Regexp{r}
+		}
+	case tokParenClose:
+		// Caller must consume paren.
+		expr = nil
+
+	case tokParenOpen:
+		qs, n, err := parseExprList(b)
+		b = b[n:]
+		pTok, err := nextToken(b)
+		if err != nil {
+			return nil, 0, err
+		}
+		if pTok == nil || pTok.Type != tokParenClose {
+			return nil, 0, fmt.Errorf("missing close paren, token %v", pTok)
+		}
+
+		b = b[len(pTok.Input):]
+		expr = &And{qs}
+	case tokNegate:
+		subQ, n, err := parseExpr(b)
+		if err != nil {
+			return nil, 0, err
+		}
+		b = b[n:]
+		expr = &Not{subQ}
 	}
 
+	return expr, len(in) - len(b), nil
+}
+
+func parseExprList(in []byte) ([]Query, int, error) {
+	b := in[:]
+	var qs []Query
+	for len(b) > 0 {
+		for len(b) > 0 && isSpace(b[0]) {
+			b = b[1:]
+		}
+		q, n, err := parseExpr(b)
+		if err != nil {
+			return nil, 0, err
+		}
+		if q == nil {
+			// eof or a ')'
+			break
+		}
+		qs = append(qs, q)
+		b = b[n:]
+	}
+
+	setCase := ""
+	newQS := qs[:0]
 	for _, q := range qs {
-		if sq, ok := q.(*Substring); ok {
+		if sc, ok := q.(*Case); ok {
+			setCase = sc.Flavor
+		} else {
+			newQS = append(newQS, q)
+		}
+	}
+	qs = newQS
+	for _, q := range qs {
+		if sq, ok := q.(*Substring); ok && setCase != "" {
 			if len(sq.Pattern) < 3 {
-				return nil, &SuggestQueryError{
+				return nil, 0, &SuggestQueryError{
 					fmt.Sprintf("pattern %q too short", sq.Pattern),
-					fmt.Sprintf("%q", qStr),
+					fmt.Sprintf("%q", in),
 				}
 			}
 			switch setCase {
@@ -278,12 +288,152 @@ func Parse(qStr string) (Query, error) {
 	}
 
 	if len(qs) == 0 {
-		return nil, fmt.Errorf("empty query")
+		return nil, 0, fmt.Errorf("empty query")
 	}
 
-	if len(qs) == 1 {
-		return qs[0], nil
+	return qs, len(in) - len(b), nil
+}
+
+type token struct {
+	Type  int
+	Text  []byte
+	Input []byte
+}
+
+func (t *token) String() string {
+	return fmt.Sprintf("%s:%q", tokNames[t.Type], t.Text)
+}
+
+const (
+	tokText       = 0
+	tokFile       = 1
+	tokRepo       = 2
+	tokCase       = 3
+	tokBranch     = 4
+	tokParenOpen  = 5
+	tokParenClose = 6
+	tokError      = 7
+	tokNegate     = 8
+	tokRegex      = 9
+)
+
+var tokNames = map[int]string{
+	tokText:       "Text",
+	tokFile:       "File",
+	tokRepo:       "Repo",
+	tokCase:       "Case",
+	tokBranch:     "Branch",
+	tokParenOpen:  "ParenOpen",
+	tokParenClose: "ParenClose",
+	tokError:      "Error",
+	tokNegate:     "Negate",
+	tokRegex:      "Regex",
+}
+
+var prefixes = map[string]int{
+	"file:":   tokFile,
+	"repo:":   tokRepo,
+	"case:":   tokCase,
+	"branch:": tokBranch,
+	"regex:":  tokRegex,
+}
+
+func (t *token) setType() {
+	if len(t.Text) == 1 && t.Text[0] == '(' {
+		t.Type = tokParenOpen
+	}
+	if len(t.Text) == 1 && t.Text[0] == ')' {
+		t.Type = tokParenClose
 	}
 
-	return &And{qs}, nil
+	for pref, typ := range prefixes {
+		if !bytes.HasPrefix(t.Input, []byte(pref)) {
+			continue
+		}
+
+		t.Text = t.Text[len(pref):]
+		t.Type = typ
+		break
+	}
+}
+
+func nextToken(in []byte) (*token, error) {
+	left := in[:]
+	parenCount := 0
+	var cur token
+	if len(left) == 0 {
+		return nil, nil
+	}
+
+	if left[0] == '-' {
+		return &token{
+			Type:  tokNegate,
+			Text:  []byte{'-'},
+			Input: in[:1],
+		}, nil
+	}
+
+	foundSpace := false
+	foundParenOpen := false
+loop:
+	for len(left) > 0 {
+		c := left[0]
+		switch c {
+		case '(':
+			foundParenOpen = true
+			parenCount++
+			cur.Text = append(cur.Text, c)
+			left = left[1:]
+		case ')':
+			if foundParenOpen {
+				cur.Text = append(cur.Text, c)
+				left = left[1:]
+				parenCount--
+			} else if len(cur.Text) == 0 {
+				cur.Text = []byte{')'}
+				left = left[1:]
+			}
+
+			if parenCount == 0 {
+				break loop
+			}
+		case '"':
+			t, n, err := parseStringLiteral(left)
+			if err != nil {
+				return nil, err
+			}
+			cur.Text = append(cur.Text, t...)
+			left = left[n:]
+		case '\\':
+			left = left[1:]
+			if len(left) == 0 {
+				return nil, fmt.Errorf("lone \\ at end")
+			}
+			c := left[0]
+			cur.Text = append(cur.Text, '\\', c)
+			left = left[1:]
+
+		case ' ', '\n', '\t':
+			if parenCount > 0 {
+				foundSpace = true
+			}
+			break loop
+		default:
+			cur.Text = append(cur.Text, c)
+			left = left[1:]
+		}
+	}
+
+	if len(cur.Text) == 0 {
+		return nil, nil
+	}
+
+	if foundSpace && cur.Text[0] == '(' {
+		cur.Text = cur.Text[:1]
+		cur.Input = in[:1]
+	} else {
+		cur.Input = in[:len(in)-len(left)]
+	}
+	cur.setType()
+	return &cur, nil
 }

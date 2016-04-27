@@ -38,6 +38,14 @@ func (q *Regexp) String() string {
 	return fmt.Sprintf("regex:%q", q.Regexp.String())
 }
 
+type Case struct {
+	Flavor string
+}
+
+func (c *Case) String() string {
+	return "case:" + c.Flavor
+}
+
 type Const struct {
 	Value bool
 }
