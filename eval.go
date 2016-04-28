@@ -331,13 +331,22 @@ func (t *substrMatchTree) matches(known map[matchTree]bool) (bool, bool) {
 func (d *indexData) newMatchTree(q query.Query, sq map[*query.Substring]*substrMatchTree) (matchTree, error) {
 	switch s := q.(type) {
 	case *query.Regexp:
-		subQ := query.RegexpToQuery(s.Regexp)
+		sz := ngramSize
+		if s.FileName {
+			sz = 1
+		}
+		subQ := query.RegexpToQuery(s.Regexp, sz)
 		subQ = query.Map(subQ, func(q query.Query) query.Query {
 			if sub, ok := q.(*query.Substring); ok {
 				sub.FileName = s.FileName
 			}
 			return q
 		})
+
+		if c, ok := subQ.(*query.Const); ok && c.Value && s.FileName {
+			subQ = &query.Substring{Pattern: "", FileName: true}
+		}
+
 		subMT, err := d.newMatchTree(subQ, sq)
 		if err != nil {
 			return nil, err
@@ -379,7 +388,7 @@ func (d *indexData) newMatchTree(q query.Query, sq map[*query.Substring]*substrM
 		}
 		st := &substrMatchTree{
 			query:         s,
-			coversContent: iter.coversContent,
+			coversContent: iter.coversContent(),
 			cands:         iter.next(),
 		}
 		sq[s] = st

@@ -15,6 +15,7 @@
 package zoekt
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/google/zoekt/query"
 	"log"
@@ -52,20 +53,60 @@ type indexData struct {
 	repoName string
 }
 
-func (data *indexData) getDocIterator(query *query.Substring) (*docIterator, error) {
+func (data *indexData) getDocIterator(query *query.Substring) (docIterator, error) {
+	if query.FileName {
+		return data.getFileNameDocIterator(query), nil
+	}
 	if len(query.Pattern) < ngramSize {
 		return nil, fmt.Errorf("pattern %q less than %d bytes", query.Pattern, ngramSize)
 	}
 
-	if query.FileName {
-		return data.getFileNameDocIterator(query), nil
-	}
 	return data.getContentDocIterator(query)
 }
 
-func (data *indexData) getFileNameDocIterator(query *query.Substring) *docIterator {
+type bruteForceIter struct {
+	cands []*candidateMatch
+}
+
+func (i *bruteForceIter) next() []*candidateMatch {
+	return i.cands
+}
+func (i *bruteForceIter) coversContent() bool {
+	return true
+}
+
+func (data *indexData) getBruteForceFileNameDocIterator(query *query.Substring) docIterator {
+	lowerStr := toLower([]byte(query.Pattern))
+	last := uint32(0)
+
+	var cands []*candidateMatch
+	for i, off := range data.fileNameIndex[1:] {
+		name := data.fileNameContent[last:off]
+		last = off
+		idx := bytes.Index(name, lowerStr)
+		if idx == -1 {
+			continue
+		}
+		cands = append(cands, &candidateMatch{
+			caseSensitive: query.CaseSensitive,
+			fileName:      true,
+			substrBytes:   []byte(query.Pattern),
+			substrLowered: lowerStr,
+			file:          uint32(i),
+			offset:        uint32(idx),
+			matchSz:       uint32(len(lowerStr)),
+		})
+	}
+
+	return &bruteForceIter{cands}
+}
+
+func (data *indexData) getFileNameDocIterator(query *query.Substring) docIterator {
+	if len(query.Pattern) < ngramSize {
+		return data.getBruteForceFileNameDocIterator(query)
+	}
 	str := strings.ToLower(query.Pattern) // TODO - UTF-8
-	di := &docIterator{
+	di := &ngramDocIterator{
 		query:    query,
 		distance: uint32(len(str)) - ngramSize,
 		ends:     data.fileNameIndex[1:],
@@ -90,9 +131,9 @@ func minarg(xs []uint32) uint32 {
 	return uint32(j)
 }
 
-func (data *indexData) getContentDocIterator(query *query.Substring) (*docIterator, error) {
+func (data *indexData) getContentDocIterator(query *query.Substring) (docIterator, error) {
 	str := strings.ToLower(query.Pattern) // TODO - UTF-8
-	input := &docIterator{
+	input := &ngramDocIterator{
 		query: query,
 		ends:  data.fileEnds,
 	}
@@ -134,7 +175,7 @@ func (data *indexData) getContentDocIterator(query *query.Substring) (*docIterat
 	}
 
 	if lastI-firstI <= ngramSize && input.leftPad == 0 && input.rightPad == 0 {
-		input.coversContent = true
+		input._coversContent = true
 	}
 	return input, nil
 }

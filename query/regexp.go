@@ -41,37 +41,37 @@ func LowerRegexp(r *syntax.Regexp) *syntax.Regexp {
 
 // RegexpToQuery tries to distill a substring search query that
 // matches a superset of the regexp.
-func RegexpToQuery(r *syntax.Regexp) Query {
-	q := regexpToQueryRecursive(r)
+func RegexpToQuery(r *syntax.Regexp, minTextSize int) Query {
+	q := regexpToQueryRecursive(r, minTextSize)
 	q = Simplify(q)
 	return q
 }
 
-func regexpToQueryRecursive(r *syntax.Regexp) Query {
+func regexpToQueryRecursive(r *syntax.Regexp, minTextSize int) Query {
 	// TODO - we could perhaps transform Begin/EndText in '\n'?
 	// TODO - we could perhaps transform CharClass in (OrQuery )
 	// if there are just a few runes, and part of a OpConcat?
 	switch r.Op {
 	case syntax.OpLiteral:
 		s := string(r.Rune)
-		if len(s) >= ngramSize {
+		if len(s) >= minTextSize {
 			return &Substring{Pattern: s}
 		}
 	case syntax.OpCapture:
-		return regexpToQueryRecursive(r.Sub[0])
+		return regexpToQueryRecursive(r.Sub[0], minTextSize)
 
 	case syntax.OpPlus:
-		return regexpToQueryRecursive(r.Sub[0])
+		return regexpToQueryRecursive(r.Sub[0], minTextSize)
 
 	case syntax.OpRepeat:
 		if r.Min >= 1 {
-			return regexpToQueryRecursive(r.Sub[0])
+			return regexpToQueryRecursive(r.Sub[0], minTextSize)
 		}
 
 	case syntax.OpConcat, syntax.OpAlternate:
 		var qs []Query
 		for _, sr := range r.Sub {
-			if sq := regexpToQueryRecursive(sr); sq != nil {
+			if sq := regexpToQueryRecursive(sr, minTextSize); sq != nil {
 				qs = append(qs, sq)
 			}
 		}

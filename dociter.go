@@ -25,23 +25,6 @@ import (
 
 var _ = log.Println
 
-type docIterator struct {
-	query *query.Substring
-
-	leftPad  uint32
-	rightPad uint32
-	distance uint32
-	first    []uint32
-	last     []uint32
-
-	fileIdx int
-	ends    []uint32
-
-	// The ngram matches cover the pattern, so no need to check
-	// contents.
-	coversContent bool
-}
-
 type candidateMatch struct {
 	caseSensitive bool
 	fileName      bool
@@ -108,7 +91,33 @@ func (m *candidateMatch) line(newlines []uint32, fileSize uint32) (lineNum, line
 	return idx + 1, start, end
 }
 
-func (s *docIterator) next() []*candidateMatch {
+type docIterator interface {
+	next() []*candidateMatch
+	coversContent() bool
+}
+
+type ngramDocIterator struct {
+	query *query.Substring
+
+	leftPad  uint32
+	rightPad uint32
+	distance uint32
+	first    []uint32
+	last     []uint32
+
+	fileIdx int
+	ends    []uint32
+
+	// The ngram matches cover the pattern, so no need to check
+	// contents.
+	_coversContent bool
+}
+
+func (s *ngramDocIterator) coversContent() bool {
+	return s._coversContent
+}
+
+func (s *ngramDocIterator) next() []*candidateMatch {
 	patBytes := []byte(s.query.Pattern)
 	lowerPatBytes := toLower(patBytes)
 

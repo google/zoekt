@@ -245,8 +245,8 @@ func regexpQuery(text string, file bool) (Query, error) {
 			FileName: file,
 		}
 	} else {
-		substrQ := RegexpToQuery(r)
-		if v, ok := substrQ.(*Const); ok && v.Value {
+		substrQ := RegexpToQuery(r, ngramSize)
+		if v, ok := substrQ.(*Const); ok && v.Value && !file {
 			return nil, fmt.Errorf("regexp %s is too general. Need at least %d consecutive characters", text, ngramSize)
 		}
 

@@ -412,6 +412,30 @@ func TestFileSearch(t *testing.T) {
 	}
 }
 
+func TestFileSearchBruteForce(t *testing.T) {
+	b := NewIndexBuilder()
+
+	b.AddFile("banzana", []byte("x orange y"))
+	// --------------------------0123456879
+	b.AddFile("banana", []byte("x apple y"))
+	searcher := searcherForTest(t, b)
+
+	sres, err := searcher.Search(
+		&query.Regexp{
+			Regexp:  mustParseRE("[qn][zx]"),
+			FileName: true,
+		})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	clearScores(sres)
+
+	matches := sres.Files
+	if len(matches) != 1 || matches[0].Name != "banzana" {
+		t.Fatalf("got %v, want 1 match on 'banzana'", matches)
+	}
+}
+
 func TestFileRestriction(t *testing.T) {
 	b := NewIndexBuilder()
 
