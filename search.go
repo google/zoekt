@@ -72,26 +72,28 @@ func (p *contentProvider) matchContent(m *candidateMatch) bool {
 }
 
 func (p *contentProvider) fillMatch(m *candidateMatch) Match {
+	var finalMatch Match
 	if m.fileName {
-		return Match{
+		finalMatch = Match{
 			Offset:      m.offset,
 			Line:        p.data(true),
 			LineOff:     int(m.offset),
 			MatchLength: int(m.matchSz),
 			FileName:    true,
 		}
+	} else {
+		num, start, end := m.line(p.newlines(), p.fileSize)
+		finalMatch = Match{
+			Offset:      m.offset,
+			LineStart:   start,
+			LineEnd:     end,
+			LineNum:     num,
+			LineOff:     int(m.offset) - start,
+			MatchLength: int(m.matchSz),
+		}
+		finalMatch.Line = toOriginal(p.data(false), p.caseBits(false), start, end)
 	}
 
-	num, start, end := m.line(p.newlines(), p.fileSize)
-	finalMatch := Match{
-		Offset:      m.offset,
-		LineStart:   start,
-		LineEnd:     end,
-		LineNum:     num,
-		LineOff:     int(m.offset) - start,
-		MatchLength: int(m.matchSz),
-	}
-	finalMatch.Line = toOriginal(p.data(false), p.caseBits(false), start, end)
 	finalMatch.Score = matchScore(&finalMatch)
 
 	return finalMatch

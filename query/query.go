@@ -31,11 +31,16 @@ type Query interface {
 
 // RegexpQuery is a query looking for regular expressions matches.
 type Regexp struct {
-	Regexp *syntax.Regexp
+	Regexp   *syntax.Regexp
+	FileName bool
 }
 
 func (q *Regexp) String() string {
-	return fmt.Sprintf("regex:%q", q.Regexp.String())
+	pref := ""
+	if q.FileName {
+		pref = "file_"
+	}
+	return fmt.Sprintf("%sregex:%q", pref, q.Regexp.String())
 }
 
 type Case struct {
@@ -75,12 +80,12 @@ type Substring struct {
 func (q *Substring) String() string {
 	s := ""
 
-	t := "sub"
+	t := ""
 	if q.FileName {
-		t = "file"
+		t = "file_"
 	}
 
-	s += fmt.Sprintf("%sstr:%q", t, q.Pattern)
+	s += fmt.Sprintf("%ssubstr:%q", t, q.Pattern)
 	if q.CaseSensitive {
 		s = "case_" + s
 	}

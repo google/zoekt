@@ -51,7 +51,7 @@ func TestParseQuery(t *testing.T) {
 		{"file:abc", &Substring{Pattern: "abc", FileName: true}, false},
 		{"branch:pqr", &Branch{Name: "pqr"}, false},
 
-		{"file:helpers.go byte", &And{[]Query{
+		{"file:helpers\\.go byte", &And{[]Query{
 			&Substring{Pattern: "helpers.go", FileName: true},
 			&Substring{Pattern: "byte"},
 		}}, false},
@@ -60,12 +60,12 @@ func TestParseQuery(t *testing.T) {
 			&Substring{Pattern: "def"},
 		}}, false},
 		{"(abc def", nil, true},
-		{"regex:abc[p-q]", &Regexp{mustParseRE("abc[p-q]")}, false},
+		{"regex:abc[p-q]", &Regexp{Regexp: mustParseRE("abc[p-q]")}, false},
 		{"repo:go", &Repo{"go"}, false},
 
-		{"abc.*def", &Regexp{mustParseRE("abc.*def")}, false},
+		{"abc.*def", &Regexp{Regexp: mustParseRE("abc.*def")}, false},
 		{"abc\\.\\*def", &Substring{Pattern: "abc.*def"}, false},
-		{"(abc)", &Regexp{mustParseRE("(abc)")}, false},
+		{"(abc)", &Regexp{Regexp: mustParseRE("(abc)")}, false},
 
 		// case
 		{"abc case:yes", &Substring{Pattern: "abc", CaseSensitive: true}, false},

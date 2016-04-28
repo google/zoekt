@@ -176,11 +176,6 @@ func parseExpr(in []byte) (Query, int, error) {
 
 	text := string(tok.Text)
 	switch tok.Type {
-	case tokFile:
-		expr = &Substring{
-			Pattern:  text,
-			FileName: true,
-		}
 	case tokCase:
 		switch text {
 		case "yes":
@@ -195,21 +190,18 @@ func parseExpr(in []byte) (Query, int, error) {
 	case tokBranch:
 		expr = &Branch{Name: text}
 	case tokText, tokRegex:
-		r, err := syntax.Parse(text, 0)
+		q, err := regexpQuery(text, false)
 		if err != nil {
 			return nil, 0, err
 		}
-
-		if r.Op == syntax.OpLiteral {
-			expr = &Substring{Pattern: string(r.Rune)}
-		} else {
-			substrQ := RegexpToQuery(r)
-			if v, ok := substrQ.(*Const); ok && v.Value {
-				return nil, 0, fmt.Errorf("regexp %s is too general. Need at least %d consecutive characters", text, ngramSize)
-			}
-
-			expr = &Regexp{r}
+		expr = q
+	case tokFile:
+		q, err := regexpQuery(text, true)
+		if err != nil {
+			return nil, 0, err
 		}
+		expr = q
+
 	case tokParenClose:
 		// Caller must consume paren.
 		expr = nil
@@ -237,6 +229,34 @@ func parseExpr(in []byte) (Query, int, error) {
 	}
 
 	return expr, len(in) - len(b), nil
+}
+
+func regexpQuery(text string, file bool) (Query, error) {
+	var expr Query
+
+	r, err := syntax.Parse(text, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	if r.Op == syntax.OpLiteral {
+		expr = &Substring{
+			Pattern:  string(r.Rune),
+			FileName: file,
+		}
+	} else {
+		substrQ := RegexpToQuery(r)
+		if v, ok := substrQ.(*Const); ok && v.Value {
+			return nil, fmt.Errorf("regexp %s is too general. Need at least %d consecutive characters", text, ngramSize)
+		}
+
+		expr = &Regexp{
+			Regexp:   r,
+			FileName: file,
+		}
+	}
+
+	return expr, nil
 }
 
 func parseExprList(in []byte) ([]Query, int, error) {

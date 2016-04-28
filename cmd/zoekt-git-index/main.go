@@ -48,7 +48,6 @@ func treeToFiles(tree *git.Tree) (map[string]git.Oid, error) {
 	return res, err
 }
 
-
 func main() {
 	var sizeMax = flag.Int("file_limit", 128*1024, "maximum file size")
 	var shardLimit = flag.Int("shard_limit", 100<<20, "maximum corpus size for a shard")

@@ -602,7 +602,7 @@ func TestRegexp(t *testing.T) {
 	searcher := searcherForTest(t, b)
 	sres, err := searcher.Search(
 		&query.Regexp{
-			mustParseRE("dle.*bla"),
+			Regexp: mustParseRE("dle.*bla"),
 		})
 
 	if err != nil {
@@ -630,6 +630,34 @@ func TestRegexp(t *testing.T) {
 	}
 }
 
+func TestRegexpFile(t *testing.T) {
+	b := NewIndexBuilder()
+
+	content := []byte("needle the bla")
+	// ----------------01234567890123
+	name := "let's play: find the mussel"
+	b.AddFile(name, content)
+	b.AddFile("play.txt", content)
+	searcher := searcherForTest(t, b)
+	sres, err := searcher.Search(
+		&query.Regexp{
+			Regexp:   mustParseRE("play.*mussel"),
+			FileName: true,
+		})
+
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	clearScores(sres)
+	if len(sres.Files) != 1 || len(sres.Files[0].Matches) != 1 {
+		t.Fatalf("got %v, want 1 match in 1 file", sres.Files)
+	}
+
+	if sres.Files[0].Name != name {
+		t.Errorf("got match %#v, want name %q", sres.Files[0])
+	}
+}
+
 func TestRegexpOrder(t *testing.T) {
 	b := NewIndexBuilder()
 
@@ -640,7 +668,7 @@ func TestRegexpOrder(t *testing.T) {
 	searcher := searcherForTest(t, b)
 	sres, err := searcher.Search(
 		&query.Regexp{
-			mustParseRE("dle.*bla"),
+			Regexp: mustParseRE("dle.*bla"),
 		})
 
 	if err != nil {

@@ -48,9 +48,10 @@ type notMatchTree struct {
 }
 
 type regexpMatchTree struct {
-	query  *query.Regexp
-	regexp *regexp.Regexp
-	child  matchTree
+	query    *query.Regexp
+	regexp   *regexp.Regexp
+	child    matchTree
+	fileName bool
 
 	// mutable
 	reEvaluated bool
@@ -229,11 +230,12 @@ func (p *contentProvider) evalContentMatches(s *substrMatchTree) {
 }
 
 func (p *contentProvider) evalRegexpMatches(s *regexpMatchTree) {
-	idxs := s.regexp.FindAllIndex(p.data(false), -1)
+	idxs := s.regexp.FindAllIndex(p.data(s.fileName), -1)
 	for _, idx := range idxs {
 		s.found = append(s.found, &candidateMatch{
-			offset:  uint32(idx[0]),
-			matchSz: uint32(idx[1] - idx[0]),
+			offset:   uint32(idx[0]),
+			matchSz:  uint32(idx[1] - idx[0]),
+			fileName: s.fileName,
 		})
 	}
 	s.reEvaluated = true
@@ -330,14 +332,20 @@ func (d *indexData) newMatchTree(q query.Query, sq map[*query.Substring]*substrM
 	switch s := q.(type) {
 	case *query.Regexp:
 		subQ := query.RegexpToQuery(s.Regexp)
+		subQ = query.Map(subQ, func(q query.Query) query.Query {
+			if sub, ok := q.(*query.Substring); ok {
+				sub.FileName = s.FileName
+			}
+			return q
+		})
 		subMT, err := d.newMatchTree(subQ, sq)
 		if err != nil {
 			return nil, err
 		}
-
 		return &regexpMatchTree{
-			regexp: regexp.MustCompile(s.Regexp.String()),
-			child:  subMT,
+			regexp:   regexp.MustCompile(s.Regexp.String()),
+			child:    subMT,
+			fileName: s.FileName,
 		}, nil
 	case *query.And:
 		var r []matchTree
@@ -526,7 +534,7 @@ nextFileMatch:
 
 		visitRegexMatches(mt, known, func(re *regexpMatchTree) {
 			for _, c := range re.found {
-				foundContentMatch = true
+				foundContentMatch = foundContentMatch || !re.fileName
 				fileMatch.Matches = append(fileMatch.Matches, cp.fillMatch(c))
 			}
 		})
