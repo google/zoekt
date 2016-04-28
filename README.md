@@ -1,6 +1,7 @@
-"Zoekt, en gij zult spinazie eten" - Jan Eertink
 
-  ("seek, and ye shall eat spinach" - My primary school teacher)
+    "Zoekt, en gij zult spinazie eten" - Jan Eertink
+
+    ("seek, and ye shall eat spinach" - My primary school teacher)
 
 This is a fast text search engine, intended for use with source code.
 
@@ -28,15 +29,15 @@ This means that if we look for "the quick brown fox", we can look for just the
 trigrams "the" and "fox", and check that they are found at the right distance
 apart.
 
-Regular expressions can be handled (but aren't yet) by extracting
-normal strings from the regular expressions, and running the full
-regular expression match on candidates that this yields. For example,
+Regular expressions are handled by extracting normal strings from the
+regular expressions, searching for them, and then running a full regular
+expression match on candidates. For example,
 
   (Path|PathFragment).*=.*/usr/local
 
 would be transformed in
 
-  (AND (OR "Path" "PathFragment") "/usr/local")
+  (AND (OR substr:"Path" substr:"PathFragment") substr:"/usr/local")
 
 and any documents thus found would be searched for the regular
 expression.
@@ -44,8 +45,8 @@ expression.
 Compared to indexing 3-grams on a per-file basis, as described
 [here](https://swtch.com/~rsc/regexp/regexp4.html), there are some advantages:
 
-* for each pattern, we only have to intersect just two posting-lists:
-  one for the beginning, and one for the end.
+* for each substring, we only have to intersect just two
+  posting-lists: one for the beginning, and one for the end.
 
 * we can select any pair of trigrams from the pattern for which the
   number of matches is minimal. For example, we could search for "qui"
