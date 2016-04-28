@@ -16,6 +16,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -23,21 +24,21 @@ import (
 	"strings"
 
 	"github.com/google/zoekt/build"
-	"github.com/speedata/gogit"
+	git "github.com/libgit2/git2go"
 )
 
 var _ = log.Println
 
-func treeToFiles(tree *gogit.Tree) (map[string]gogit.Oid, error) {
-	res := map[string]gogit.Oid{}
-	err := tree.Walk(func(n string, e *gogit.TreeEntry) int {
+func treeToFiles(tree *git.Tree) (map[string]git.Oid, error) {
+	res := map[string]git.Oid{}
+	err := tree.Walk(func(n string, e *git.TreeEntry) int {
 		switch e.Filemode {
-		case gogit.FileModeBlob, gogit.FileModeBlobExec:
+		case git.FilemodeBlob, git.FilemodeBlobExecutable:
 		default:
 			return 0
 		}
 
-		if e.Type != gogit.ObjectBlob {
+		if e.Type != git.ObjectBlob {
 			return 0
 		}
 		res[filepath.Join(n, e.Name)] = *e.Id
@@ -88,6 +89,28 @@ func main() {
 	}
 }
 
+func getTreeID(repo *git.Repository, ref string) (*git.Oid, error) {
+	obj, err := repo.RevparseSingle(ref)
+	if err != nil {
+		return nil, err
+	}
+	defer obj.Free()
+
+	var treeId *git.Oid
+	switch obj.Type() {
+	case git.ObjectCommit:
+		commit, err := repo.LookupCommit(obj.Id())
+		if err != nil {
+			return nil, err
+		}
+		treeId = commit.TreeId()
+	case git.ObjectTree:
+		treeId = obj.Id()
+	default:
+		return nil, fmt.Errorf("unsupported object type %d", obj.Type())
+	}
+	return treeId, nil
+}
 
 func indexGitRepo(opts build.Options, repoDir, branchPrefix string, branches []string) error {
 	repoDir = filepath.Clean(repoDir)
@@ -101,7 +124,7 @@ func indexGitRepo(opts build.Options, repoDir, branchPrefix string, branches []s
 		return err
 	}
 
-	repo, err := gogit.OpenRepository(repoDir)
+	repo, err := git.OpenRepository(repoDir)
 	if err != nil {
 		return err
 	}
@@ -112,20 +135,20 @@ func indexGitRepo(opts build.Options, repoDir, branchPrefix string, branches []s
 	var names []string
 
 	// branch => name => sha1
-	data := map[string]map[string]gogit.Oid{}
+	data := map[string]map[string]git.Oid{}
 
 	for _, b := range branches {
-		ref, err := repo.LookupReference(filepath.Join(branchPrefix, b))
+		treeID, err := getTreeID(repo, filepath.Join(branchPrefix, b))
 		if err != nil {
 			return err
 		}
 
-		commit, err := repo.LookupCommit(ref.Oid)
+		tree, err := repo.LookupTree(treeID)
 		if err != nil {
 			return err
 		}
 
-		fs, err := treeToFiles(commit.Tree)
+		fs, err := treeToFiles(tree)
 		if err != nil {
 			return err
 		}
@@ -142,25 +165,20 @@ func indexGitRepo(opts build.Options, repoDir, branchPrefix string, branches []s
 	sort.Strings(names)
 
 	for _, n := range names {
-		shas := map[gogit.Oid][]string{}
+		shas := map[git.Oid][]string{}
 		for _, b := range allfiles[n] {
 			shas[data[b][n]] = append(shas[data[b][n]], b)
 		}
 
 		for sha, branches := range shas {
-			sz, err := repo.ObjectSize(&sha)
+			blob, err := repo.LookupBlob(&sha)
 			if err != nil {
 				return err
 			}
 
 			const maxSz = 128 << 10
-			if sz > maxSz {
+			if blob.Size() > maxSz {
 				continue
-			}
-
-			blob, err := repo.LookupBlob(&sha)
-			if err != nil {
-				return err
 			}
 
 			builder.AddFileBranches(n, blob.Contents(), branches)
