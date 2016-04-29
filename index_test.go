@@ -456,6 +456,26 @@ func TestSearchMatchAll(t *testing.T) {
 	}
 }
 
+func TestSearchNewline(t *testing.T) {
+	b := NewIndexBuilder()
+
+	b.AddFile("banzana", []byte("abcd\ndefg"))
+	searcher := searcherForTest(t, b)
+
+	sres, err := searcher.Search(&query.Substring{Pattern: "d\nd"})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	clearScores(sres)
+
+	// Just check that we don't crash.
+
+	matches := sres.Files
+	if len(matches) != 1 {
+		t.Fatalf("got %v, want 1 matches", matches)
+	}
+}
+
 func TestSearchMatchAllRegexp(t *testing.T) {
 	b := NewIndexBuilder()
 

@@ -15,6 +15,7 @@
 package zoekt
 
 import (
+	"bytes"
 	"log"
 	"sort"
 )
@@ -84,7 +85,17 @@ func (p *contentProvider) fillMatch(m *candidateMatch) Match {
 			FileName:    true,
 		}
 	} else {
+		data := p.data(false)
+		endMatch := m.offset + m.matchSz
+
 		num, start, end := m.line(p.newlines(), p.fileSize)
+		for end < len(data) && endMatch > uint32(end) {
+			end = bytes.IndexByte(data[end+1:], '\n')
+			if end == -1 {
+				end = len(data)
+			}
+		}
+
 		finalMatch = Match{
 			Offset:      m.offset,
 			LineStart:   start,
