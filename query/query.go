@@ -240,6 +240,14 @@ func evalConstants(q Q) Q {
 			return invertConst(ch)
 		}
 		return &Not{ch}
+	case *Substring:
+		if len(s.Pattern) == 0 {
+			return &Const{true}
+		}
+	case *Regexp:
+		if s.Regexp.Op == syntax.OpEmptyMatch {
+			return &Const{true}
+		}
 	}
 	return q
 }

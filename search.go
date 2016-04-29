@@ -106,17 +106,17 @@ const (
 )
 
 func matchScore(m *Match) float64 {
-	startBoundary := m.LineOff == 0 || byteClass(m.Line[m.LineOff-1]) != byteClass(m.Line[m.LineOff])
+	startBoundary := m.LineOff < len(m.Line) && (m.LineOff == 0 || byteClass(m.Line[m.LineOff-1]) != byteClass(m.Line[m.LineOff]))
 
 	end := int(m.LineOff) + m.MatchLength
-	if end < 1 || end > len(m.Line) {
+	if end > len(m.Line) {
 		// I see an occasional out-of-bounds panic when
 		// computing endBoundary. Since the problem is not
 		// reproducible, try to gather some more data.
 		log.Panicf("end %d out of bounds (l %d), match: %#v", end, len(m.Line), m)
 	}
 
-	endBoundary := end == len(m.Line) || byteClass(m.Line[end-1]) != byteClass(m.Line[end])
+	endBoundary := end > 0 && (end == len(m.Line) || byteClass(m.Line[end-1]) != byteClass(m.Line[end]))
 
 	if startBoundary && endBoundary {
 		return scoreWordMatch

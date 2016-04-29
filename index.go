@@ -17,9 +17,10 @@ package zoekt
 import (
 	"bytes"
 	"fmt"
-	"github.com/google/zoekt/query"
 	"log"
 	"strings"
+
+	"github.com/google/zoekt/query"
 )
 
 var _ = log.Println
@@ -53,15 +54,27 @@ type indexData struct {
 	repoName string
 }
 
-func (data *indexData) getDocIterator(query *query.Substring) (docIterator, error) {
-	if query.FileName {
-		return data.getFileNameDocIterator(query), nil
-	}
-	if len(query.Pattern) < ngramSize {
-		return nil, fmt.Errorf("pattern %q less than %d bytes", query.Pattern, ngramSize)
+func (data *indexData) getDocIterator(q query.Q) (docIterator, error) {
+	switch s := q.(type) {
+
+	case *query.Substring:
+		if s.FileName {
+			return data.getFileNameDocIterator(s), nil
+		}
+		if len(s.Pattern) < ngramSize {
+			return nil, fmt.Errorf("pattern %q less than %d bytes", s.Pattern, ngramSize)
+		}
+
+		return data.getContentDocIterator(s)
+	case *query.Const:
+		if s.Value {
+			return data.matchAllDocIterator(), nil
+		}
+		return &bruteForceIter{}, nil
 	}
 
-	return data.getContentDocIterator(query)
+	log.Panicf("type %T", q)
+	return nil, nil
 }
 
 type bruteForceIter struct {
@@ -73,6 +86,25 @@ func (i *bruteForceIter) next() []*candidateMatch {
 }
 func (i *bruteForceIter) coversContent() bool {
 	return true
+}
+
+func (data *indexData) matchAllDocIterator() docIterator {
+	var cands []*candidateMatch
+	var last uint32
+	for i, off := range data.fileNameIndex[1:] {
+		name := data.fileNameContent[last:off]
+		last = off
+		cands = append(cands, &candidateMatch{
+			caseSensitive: false,
+			fileName:      true,
+			substrBytes:   name,
+			substrLowered: name,
+			file:          uint32(i),
+			offset:        uint32(0),
+			matchSz:       uint32(len(name)),
+		})
+	}
+	return &bruteForceIter{cands}
 }
 
 func (data *indexData) getBruteForceFileNameDocIterator(query *query.Substring) docIterator {

@@ -59,10 +59,10 @@ type regexpMatchTree struct {
 }
 
 type substrMatchTree struct {
-	query *query.Substring
-
 	cands         []*candidateMatch
 	coversContent bool
+	caseSensitive bool
+	fileName      bool
 
 	// mutable
 	current       []*candidateMatch
@@ -137,7 +137,7 @@ func (t *notMatchTree) String() string {
 }
 
 func (t *substrMatchTree) String() string {
-	return fmt.Sprintf("substr(%s, %v)", t.query, t.current)
+	return fmt.Sprintf("substr(%v)", t.current)
 }
 
 func (t *branchQueryMatchTree) String() string {
@@ -242,7 +242,7 @@ func (p *contentProvider) evalRegexpMatches(s *regexpMatchTree) {
 }
 
 func (p *contentProvider) evalCaseMatches(s *substrMatchTree) {
-	if s.query.CaseSensitive {
+	if s.caseSensitive {
 		pruned := s.current[:0]
 		for _, m := range s.current {
 			if p.caseMatches(m) {
@@ -324,7 +324,7 @@ func (t *substrMatchTree) matches(known map[matchTree]bool) (bool, bool) {
 		return false, true
 	}
 
-	sure := (!t.query.CaseSensitive || t.caseEvaluated) && (t.coversContent || t.contEvaluated)
+	sure := (!t.caseSensitive || t.caseEvaluated) && (t.coversContent || t.contEvaluated)
 	return true, sure
 }
 
@@ -342,10 +342,6 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*query.Substring]*substrMatch
 			}
 			return q
 		})
-
-		if c, ok := subQ.(*query.Const); ok && c.Value && s.FileName {
-			subQ = &query.Substring{Pattern: "", FileName: true}
-		}
 
 		subMT, err := d.newMatchTree(subQ, sq)
 		if err != nil {
@@ -387,7 +383,7 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*query.Substring]*substrMatch
 			return nil, err
 		}
 		st := &substrMatchTree{
-			query:         s,
+			caseSensitive: s.CaseSensitive,
 			coversContent: iter.coversContent(),
 			cands:         iter.next(),
 		}
@@ -399,6 +395,18 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*query.Substring]*substrMatch
 			mask:      uint32(d.branchIDs[s.Name]),
 			fileMasks: d.fileBranchMasks,
 		}, nil
+	case *query.Const:
+		if s.Value {
+			iter := d.matchAllDocIterator()
+			return &substrMatchTree{
+				coversContent: true,
+				caseSensitive: false,
+				fileName:      true,
+				cands:         iter.next(),
+			}, nil
+		} else {
+			return &substrMatchTree{}, nil
+		}
 	}
 	log.Panicf("type %T", q)
 	return nil, nil
@@ -443,7 +451,7 @@ func (d *indexData) Search(q query.Q) (*SearchResult, error) {
 	})
 
 	for _, st := range atoms {
-		if st.query.FileName {
+		if st.fileName {
 			fileAtoms = append(fileAtoms, st)
 		}
 	}

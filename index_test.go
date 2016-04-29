@@ -246,7 +246,7 @@ func TestCaseFold(t *testing.T) {
 	}
 	matches := sres.Files
 	if len(matches) != 0 {
-		t.Errorf("foldcase: got %v, want 0 matches", matches)
+		t.Errorf("foldcase: got %#v, want 0 matches", matches)
 	}
 
 	sres, err = searcher.Search(
@@ -433,6 +433,46 @@ func TestFileSearchBruteForce(t *testing.T) {
 	matches := sres.Files
 	if len(matches) != 1 || matches[0].Name != "banzana" {
 		t.Fatalf("got %v, want 1 match on 'banzana'", matches)
+	}
+}
+
+func TestSearchMatchAll(t *testing.T) {
+	b := NewIndexBuilder()
+
+	b.AddFile("banzana", []byte("x orange y"))
+	// --------------------------0123456879
+	b.AddFile("banana", []byte("x apple y"))
+	searcher := searcherForTest(t, b)
+
+	sres, err := searcher.Search(&query.Const{true})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	clearScores(sres)
+
+	matches := sres.Files
+	if len(matches) != 2 {
+		t.Fatalf("got %v, want 2 matches", matches)
+	}
+}
+
+func TestSearchMatchAllRegexp(t *testing.T) {
+	b := NewIndexBuilder()
+
+	b.AddFile("banzana", []byte("abcd"))
+	// --------------------------0123456879
+	b.AddFile("banana", []byte("pqrs"))
+	searcher := searcherForTest(t, b)
+
+	sres, err := searcher.Search(&query.Regexp{Regexp: mustParseRE(".")})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	clearScores(sres)
+
+	matches := sres.Files
+	if len(matches) != 2 || sres.Stats.MatchCount != 8 {
+		t.Fatalf("got %v, want 2 matches", matches)
 	}
 }
 
