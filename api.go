@@ -63,6 +63,7 @@ type Stats struct {
 	FileCount       int
 	MatchCount      int
 	Duration        time.Duration
+	FilesSkipped    int
 }
 
 func (s Stats) HumanBytesLoaded() string {
@@ -89,6 +90,7 @@ func (s *Stats) Add(o Stats) {
 	s.FileCount += o.FileCount
 	s.FilesConsidered += o.FilesConsidered
 	s.BytesLoaded += o.BytesLoaded
+	s.FilesSkipped += o.FilesSkipped
 }
 
 // SearchResult contains search matches and extra data

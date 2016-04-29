@@ -422,6 +422,10 @@ func (d *indexData) simplify(in query.Q) query.Q {
 	return query.Simplify(eval)
 }
 
+// We cap the total number of matches, so overly broad searches don't
+// crash the machine.
+const maxMatchCount = 100000
+
 func (d *indexData) Search(q query.Q) (*SearchResult, error) {
 	var res SearchResult
 
@@ -472,6 +476,10 @@ nextFileMatch:
 
 		res.Stats.FilesConsidered++
 		mt.prepare(nextDoc)
+		if res.Stats.MatchCount > maxMatchCount {
+			res.Stats.FilesSkipped++
+			continue
+		}
 
 		var fileStart uint32
 		if nextDoc > 0 {
