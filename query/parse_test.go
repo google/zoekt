@@ -37,6 +37,8 @@ func TestParseQuery(t *testing.T) {
 	}
 
 	for _, c := range []testcase{
+		{"( )", &Const{Value: true}, false},
+		{"(abc)(de)", &Regexp{Regexp: mustParseRE("(abc)(de)")}, false},
 		{"sub-pixel", &Substring{Pattern: "sub-pixel"}, false},
 		{"abc", &Substring{Pattern: "abc"}, false},
 		{"\"abc bcd\"", &Substring{Pattern: "abc bcd"}, false},
@@ -46,7 +48,6 @@ func TestParseQuery(t *testing.T) {
 		}}, false},
 		{"-abc", &Not{&Substring{Pattern: "abc"}}, false},
 		{"regex:a.b", nil, true},
-
 		{"abccase:yes", &Substring{Pattern: "abccase:yes"}, false},
 		{"file:abc", &Substring{Pattern: "abc", FileName: true}, false},
 		{"branch:pqr", &Branch{Name: "pqr"}, false},
@@ -76,11 +77,11 @@ func TestParseQuery(t *testing.T) {
 		{"\"abc", nil, true},
 		{"\"a\\", nil, true},
 		{"case:foo", nil, true},
-		{"", nil, true},
+		{"", &Const{Value: true}, false},
 	} {
 		q, err := Parse(c.in)
 		if c.hasErr != (err != nil) {
-			t.Errorf("Parse(%s): error %v, value %v", c.in, err, q)
+			t.Errorf("Parse(%q): error %v, value %v", c.in, err, q)
 		} else if q != nil {
 			if !reflect.DeepEqual(q, c.out) {
 				t.Errorf("Parse(%s): got %v want %v", c.in, q, c.out)
@@ -99,8 +100,10 @@ func TestTokenize(t *testing.T) {
 	cases := []testcase{
 		{"file:bla", tokFile, "bla"},
 		{"file:bla ", tokFile, "bla"},
+		{"f:bla ", tokFile, "bla"},
 		{"(abc def) ", tokParenOpen, "("},
 		{"(abcdef)", tokText, "(abcdef)"},
+		{"(abc)(de)", tokText, "(abc)(de)"},
 		{"(ab(c)def) ", tokText, "(ab(c)def)"},
 		{"(ab\\ def) ", tokText, "(ab\\ def)"},
 		{") ", tokParenClose, ")"},

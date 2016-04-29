@@ -266,6 +266,11 @@ func parseExprList(in []byte) ([]Q, int, error) {
 		for len(b) > 0 && isSpace(b[0]) {
 			b = b[1:]
 		}
+
+		if tok, _ := nextToken(b); tok != nil && tok.Type == tokParenClose {
+			break
+		}
+
 		q, n, err := parseExpr(b)
 		if err != nil {
 			return nil, 0, err
@@ -305,10 +310,6 @@ func parseExprList(in []byte) ([]Q, int, error) {
 				sq.CaseSensitive = (sq.Pattern != string(toLower([]byte(sq.Pattern))))
 			}
 		}
-	}
-
-	if len(qs) == 0 {
-		return nil, 0, fmt.Errorf("empty query")
 	}
 
 	return qs, len(in) - len(b), nil
@@ -352,6 +353,7 @@ var tokNames = map[int]string{
 
 var prefixes = map[string]int{
 	"file:":   tokFile,
+	"f:":      tokFile,
 	"repo:":   tokRepo,
 	"case:":   tokCase,
 	"branch:": tokBranch,
@@ -395,6 +397,7 @@ func nextToken(in []byte) (*token, error) {
 
 	foundSpace := false
 	foundParenOpen := false
+
 loop:
 	for len(left) > 0 {
 		c := left[0]
@@ -412,11 +415,10 @@ loop:
 			} else if len(cur.Text) == 0 {
 				cur.Text = []byte{')'}
 				left = left[1:]
-			}
-
-			if parenCount == 0 {
+			} else {
 				break loop
 			}
+
 		case '"':
 			t, n, err := parseStringLiteral(left)
 			if err != nil {

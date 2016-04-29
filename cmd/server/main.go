@@ -85,25 +85,28 @@ dt {
 Examples:
 <div style="margin-left: 4em;">
 <dl>
-  <dt>file</dt><dd>search for "file"
+  <dt>needle</dt><dd>search for "needle"
 </dd>
-  <dt>class file</dt><dd>search for files containing both "class" and "file"
+  <dt>class needle</dt><dd>search for files containing both "class" and "needle"
 </dd>
-  <dt>class File</dt><dd>search for files containing both "class" (case insensitive) and "File" (case sensitive)
+  <dt>class Needle</dt><dd>search for files containing both "class" (case insensitive) and "Needle" (case sensitive)
 </dd>
-  <dt>class File case:yes</dt><dd>search for files containing both "class" and "File", case sensitively
+  <dt>class Needle case:yes</dt><dd>search for files containing "class" and "Needle", both case sensitively
 </dd>
-  <dt>"class file"</dt><dd>search for files with the phrase "class file"
+  <dt>"class Needle"</dt><dd>search for files with the phrase "class Needle"
 </dd>
-  <dt>class -file</dt><dd>search for files with the word "class" but not the word "file"
+  <dt>needle -hay</dt><dd>search for files with the word "needle" but not the word "hay"
 </dd>
   <dt>path file:java</dt><dd>search for the word "path" in files whose name contains "java"
 </dd>
-  <dt>path -file:java</dt><dd>search for the word "path" excluding files whose name contains "java"
+  <dt>f:\.c$</dt><dd>search for files whose name ends with ".c"
+</dd>
+  <dt>path -file:java</dt><dd>search for the word "path" excluding files whose name contains "java"</dd>
   <dt>foo.*bar</dt><dd>search for the regular expression "foo.*bar"</dd>
   <dt>-(Path File) Stream</dt><dd>search "Stream", but exclude files containing both "Path" and "File"</dd>
   <dt>-Path\ File Stream</dt><dd>search "Stream", but exclude files containing "Path File"</dd>
   <dt>repo:android</dt><dd>restrict to the "android" repository</dd>
+  <dt>branch:master</dt><dd>for Git repos, only look for files in the "master" branch.</dd>
 </dl>
 </div>
 </body>
