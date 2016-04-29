@@ -54,7 +54,7 @@ func main() {
 	var parallelism = flag.Int("parallelism", 4, "maximum number of parallel indexing processes.")
 
 	branchesStr := flag.String("branches", "master", "git branches to index. If set, arguments should be bare git repositories.")
-	branchPrefix := flag.String("branch_prefix", "refs/heads/", "git refs to index")
+	branchPrefix := flag.String("prefix", "refs/heads/", "prefix for branch names")
 
 	indexTemplate := flag.String("index",
 		"{{.Home}}/.csindex/{{.Base}}.{{.FP}}.{{.Shard}}",

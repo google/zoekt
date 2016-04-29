@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/pprof"
+	"strings"
 
 	"github.com/google/zoekt/build"
 )
@@ -76,8 +77,12 @@ func main() {
 }
 
 func indexArg(arg string, opts build.Options) error {
-	arg = filepath.Clean(arg)
-	opts.RepoName = filepath.Base(arg)
+	dir, err := filepath.Abs(filepath.Clean(arg))
+	if err != nil {
+		return err
+	}
+
+	opts.RepoName = filepath.Base(dir)
 	builder, err := build.NewBuilder(opts)
 	if err != nil {
 		return err
@@ -90,7 +95,7 @@ func indexArg(arg string, opts build.Options) error {
 	}
 
 	go func() {
-		if err := filepath.Walk(arg, agg.add); err != nil {
+		if err := filepath.Walk(dir, agg.add); err != nil {
 			log.Fatal(err)
 		}
 		close(comm)
@@ -102,7 +107,7 @@ func indexArg(arg string, opts build.Options) error {
 			return err
 		}
 
-		f = strings.TrimPrefix(f, arg+"/")
+		f = strings.TrimPrefix(f, dir+"/")
 		builder.AddFile(f, content)
 	}
 

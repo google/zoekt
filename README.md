@@ -10,32 +10,40 @@ INSTRUCTIONS
 
 Indexing:
 
-    go build github.com/hanwen/zoekt/cmd/index
-    ./index .
+    go install github.com/google/zoekt/cmd/zoekt-index
+    $GOPATH/bin/zoekt-index .
 
 Searching
 
-    go build github.com/hanwen/zoekt/cmd/search
-    ./search "some string"
+    go install github.com/google/zoekt/cmd/zoekt
+    $GOPATH/bin/zoekt 'ngram f:READ'
+
+Indexing git repositories:
+
+    go install github.com/google/zoekt/cmd/zoekt-git-index
+    $GOPATH/bin/zoekt-git-index -branches master,stable-1.4 -prefix origin/ .
+
+Starting the web interface
+
+    go install github.com/google/zoekt/cmd/zoekt-webserver
+    $GOPATH/bin/zoekt-webserver -listen :6070
+
 
 
 BACKGROUND
 ==========
 
-This uses ngrams (n=3) for searching data, and builds an index
-containing the offset of each ngram's occurrence within a file.
+This uses ngrams (n=3) for searching data, and builds an index containing the
+offset of each ngram's occurrence within a file.  If we look for "the quick
+brown fox", we look for two trigrams (eg. "the" and "fox"), and check that they
+are found at the right distance apart.
 
-This means that if we look for "the quick brown fox", we can look for just the
-trigrams "the" and "fox", and check that they are found at the right distance
-apart.
-
-Regular expressions are handled by extracting normal strings from the
-regular expressions, searching for them, and then running a full regular
-expression match on candidates. For example,
+Regular expressions are handled by extracting normal strings from the regular
+expressions. For example, to search for
 
   (Path|PathFragment).*=.*/usr/local
 
-would be transformed in
+we look for
 
   (AND (OR substr:"Path" substr:"PathFragment") substr:"/usr/local")
 
@@ -45,8 +53,8 @@ expression.
 Compared to indexing 3-grams on a per-file basis, as described
 [here](https://swtch.com/~rsc/regexp/regexp4.html), there are some advantages:
 
-* for each substring, we only have to intersect just two
-  posting-lists: one for the beginning, and one for the end.
+* for each substring, we only have to intersect just a couple of posting-lists:
+  one for the beginning, and one for the end.
 
 * we can select any pair of trigrams from the pattern for which the
   number of matches is minimal. For example, we could search for "qui"
@@ -54,9 +62,9 @@ Compared to indexing 3-grams on a per-file basis, as described
 
 There are some downsides compared to trigrams:
 
-* The index is large. Emprically, it is about 3x the corpus size, composed of 2x
-  (offsets), and 1x (original content). However, since we have to look at just a
-  limited number of ngrams, we don't have to keep the index in memory.
+* The index is large. Empirically, it is about 3x the corpus size, composed of
+  2x (offsets), and 1x (original content). However, since we have to look at
+  just a limited number of ngrams, we don't have to keep the index in memory.
 
 Compared to [suffix
 arrays](https://blog.nelhage.com/2015/02/regular-expression-search-with-suffix-arrays/),
@@ -80,7 +88,8 @@ Downsides compared to suffix array:
 ACKNOWLEDGEMENTS
 ================
 
-Thanks to Alexander Neubeck for coming up with this idea.
+Thanks to Alexander Neubeck for coming up with this idea, and helping me flesh
+it out.
 
 
 DISCLAIMER
