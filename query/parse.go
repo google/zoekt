@@ -209,12 +209,16 @@ func parseExpr(in []byte) (Q, int, error) {
 	case tokParenOpen:
 		qs, n, err := parseExprList(b)
 		b = b[n:]
+		if err != nil {
+			return nil, 0, err
+		}
+
 		pTok, err := nextToken(b)
 		if err != nil {
 			return nil, 0, err
 		}
 		if pTok == nil || pTok.Type != tokParenClose {
-			return nil, 0, fmt.Errorf("missing close paren, token %v", pTok)
+			return nil, 0, fmt.Errorf("missing close paren, got token %v", pTok)
 		}
 
 		b = b[len(pTok.Input):]
@@ -261,7 +265,6 @@ func parseExprList(in []byte) ([]Q, int, error) {
 		for len(b) > 0 && isSpace(b[0]) {
 			b = b[1:]
 		}
-
 		if tok, _ := nextToken(b); tok != nil && tok.Type == tokParenClose {
 			break
 		}
@@ -270,6 +273,7 @@ func parseExprList(in []byte) ([]Q, int, error) {
 		if err != nil {
 			return nil, 0, err
 		}
+
 		if q == nil {
 			// eof or a ')'
 			break
@@ -391,28 +395,27 @@ func nextToken(in []byte) (*token, error) {
 	}
 
 	foundSpace := false
-	foundParenOpen := false
 
 loop:
 	for len(left) > 0 {
 		c := left[0]
 		switch c {
 		case '(':
-			foundParenOpen = true
 			parenCount++
 			cur.Text = append(cur.Text, c)
 			left = left[1:]
 		case ')':
-			if foundParenOpen {
-				cur.Text = append(cur.Text, c)
-				left = left[1:]
-				parenCount--
-			} else if len(cur.Text) == 0 {
-				cur.Text = []byte{')'}
-				left = left[1:]
-			} else {
+			if parenCount == 0 {
+				if len(cur.Text) == 0 {
+					cur.Text = []byte{')'}
+					left = left[1:]
+				}
 				break loop
 			}
+
+			cur.Text = append(cur.Text, c)
+			left = left[1:]
+			parenCount--
 
 		case '"':
 			t, n, err := parseStringLiteral(left)

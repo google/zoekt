@@ -37,6 +37,12 @@ func TestParseQuery(t *testing.T) {
 	}
 
 	for _, c := range []testcase{
+		{"((x) ora b(z(d)))", &And{[]Q{
+			&Regexp{Regexp: mustParseRE("(x)")},
+			&Substring{Pattern: "ora"},
+			&Regexp{Regexp: mustParseRE("b(z(d))")},
+		}}, false},
+
 		{"( )", &Const{Value: true}, false},
 		{"(abc)(de)", &Regexp{Regexp: mustParseRE("(abc)(de)")}, false},
 		{"sub-pixel", &Substring{Pattern: "sub-pixel"}, false},
@@ -50,7 +56,7 @@ func TestParseQuery(t *testing.T) {
 		{"abccase:yes", &Substring{Pattern: "abccase:yes"}, false},
 		{"file:abc", &Substring{Pattern: "abc", FileName: true}, false},
 		{"branch:pqr", &Branch{Name: "pqr"}, false},
-
+		{"((x) )", &Regexp{Regexp: mustParseRE("(x)")}, false},
 		{"file:helpers\\.go byte", &And{[]Q{
 			&Substring{Pattern: "helpers.go", FileName: true},
 			&Substring{Pattern: "byte"},
@@ -107,6 +113,7 @@ func TestTokenize(t *testing.T) {
 		{"(ab(c)def) ", tokText, "(ab(c)def)"},
 		{"(ab\\ def) ", tokText, "(ab\\ def)"},
 		{") ", tokParenClose, ")"},
+		{"a(bc))", tokText, "a(bc)"},
 		{"abc) ", tokText, "abc"},
 		{"file:\"bla\"", tokFile, "bla"},
 		{"\"file:bla\"", tokText, "file:bla"},
