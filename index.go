@@ -25,7 +25,7 @@ import (
 
 var _ = log.Println
 
-// indexData holds the pattern independent data that we have to have
+// indexData holds the pattern-independent data that we have to have
 // in memory to search.
 type indexData struct {
 	reader *reader

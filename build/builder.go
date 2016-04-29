@@ -90,6 +90,10 @@ func (b *Builder) AddFile(name string, content []byte) {
 	b.AddFileBranches(name, content, nil)
 }
 
+// TODO - this should be an Add(content []byte, FileOptions) where
+// FileOptions contains filename, branches, offsets of interesting
+// sections (symbols, comments etc.)
+
 func (b *Builder) AddFileBranches(name string, content []byte, branches []string) {
 	if len(content) > b.opts.SizeMax {
 		return
@@ -175,6 +179,11 @@ func writeShard(fn string, b *zoekt.IndexBuilder) error {
 	if err := os.MkdirAll(filepath.Dir(fn), 0700); err != nil {
 		return err
 	}
+
+	// TODO - write to temp file and rename on close.  Use a
+	// standard extension so the temp file is never recognized as
+	// an index file.
+
 	f, err := os.OpenFile(
 		fn, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0600)
 	if err != nil {

@@ -258,6 +258,9 @@ func regexpQuery(text string, file bool) (Q, error) {
 	return expr, nil
 }
 
+// TODO - parse OR and AND operators. Right now, there is no way to
+// input an OR query.
+
 func parseExprList(in []byte) ([]Q, int, error) {
 	b := in[:]
 	var qs []Q
@@ -294,6 +297,8 @@ func parseExprList(in []byte) ([]Q, int, error) {
 	qs = newQS
 	for _, q := range qs {
 		if sq, ok := q.(*Substring); ok && setCase != "" {
+			// TODO - this should just generate a
+			// brute-force query.
 			if len(sq.Pattern) < 3 {
 				return nil, 0, &SuggestQueryError{
 					fmt.Sprintf("pattern %q too short", sq.Pattern),

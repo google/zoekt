@@ -21,6 +21,8 @@ import (
 
 var _ = log.Println
 
+// contentProvider is an abstraction to treat matches for names and
+// content with the same code.
 type contentProvider struct {
 	reader   *reader
 	id       *indexData
@@ -100,7 +102,7 @@ func (p *contentProvider) fillMatch(m *candidateMatch) Match {
 }
 
 const (
-	// TODO - how to anchor this relative to rank?
+	// TODO - how to scale this relative to rank?
 	scorePartialWordMatch = 5000.0
 	scoreWordMatch        = 50000.0
 )

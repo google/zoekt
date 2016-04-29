@@ -29,8 +29,9 @@ type matchTree interface {
 	// returns whether this matches, and if we are sure.
 	matches(known map[matchTree]bool) (match bool, sure bool)
 
-	// clears any per-document state of the matchTree, and prepares for
-	// evaluating the given doc
+	// clears any per-document state of the matchTree, and
+	// prepares for evaluating the given doc. The argument is
+	// strictly increasing over time.
 	prepare(nextDoc uint32)
 	String() string
 }
@@ -477,6 +478,10 @@ nextFileMatch:
 		res.Stats.FilesConsidered++
 		mt.prepare(nextDoc)
 		if res.Stats.MatchCount > maxMatchCount {
+			// TODO - maxMatchCount should come from the
+			// max results specified in the web interface.
+			// If we have enough 'important' matches, we
+			// should break out of this loop.
 			res.Stats.FilesSkipped++
 			continue
 		}

@@ -42,6 +42,8 @@ func (r *reader) readTOC(toc *indexTOC) {
 	}
 }
 
+// TODO - mmap the file. We cycle through a lot of garbage to load
+// file contents.
 func (r *reader) readSectionBlob(sec simpleSection) []byte {
 	d := make([]byte, sec.sz)
 	r.r.Seek(int64(sec.off), 0)
@@ -176,6 +178,10 @@ type shardedSearcher struct {
 // NewShardedSearcher returns a searcher instance that loads all
 // shards corresponding to a glob into memory.
 func NewShardedSearcher(indexGlob string) (Searcher, error) {
+	// TODO - this should create a map[string]Searcher{} and
+	// reload changed shards. Must first write the shards
+	// atomically, though.
+
 	fs, err := filepath.Glob(indexGlob)
 	if err != nil {
 		return nil, err

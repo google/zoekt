@@ -39,6 +39,11 @@ type indexTOC struct {
 	repoName      simpleSection
 }
 
+// TODO - write the number of sections in the TOC as a number, and
+// don't try to read sections that haven't been written?  Right now,
+// if we change the index schema by adding a section, all hell breaks
+// loose.
+
 func (t *indexTOC) sections() []section {
 	return []section{
 		&t.fileContents,

@@ -25,6 +25,7 @@ import (
 
 var _ = log.Println
 
+// candidateMatch is a candidate match for a substring.
 type candidateMatch struct {
 	caseSensitive bool
 	fileName      bool
@@ -92,6 +93,8 @@ func (m *candidateMatch) line(newlines []uint32, fileSize uint32) (lineNum, line
 }
 
 type docIterator interface {
+	// TODO - reconsider this name? Or don't get all the
+	// candidateMatch in one go?
 	next() []*candidateMatch
 	coversContent() bool
 }
