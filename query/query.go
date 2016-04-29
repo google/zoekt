@@ -24,8 +24,8 @@ import (
 
 var _ = log.Println
 
-// Query is a representation for a possibly hierarchical search query.
-type Query interface {
+// Q is a representation for a possibly hierarchical search query.
+type Q interface {
 	String() string
 }
 
@@ -94,7 +94,7 @@ func (q *Substring) String() string {
 
 // Or is matched when any of its children is matched.
 type Or struct {
-	Children []Query
+	Children []Q
 }
 
 func (q *Or) String() string {
@@ -107,7 +107,7 @@ func (q *Or) String() string {
 
 // Not inverts the meaning of its child.
 type Not struct {
-	Child Query
+	Child Q
 }
 
 func (q *Not) String() string {
@@ -116,7 +116,7 @@ func (q *Not) String() string {
 
 // And is matched when all its children are.
 type And struct {
-	Children []Query
+	Children []Q
 }
 
 func (q *And) String() string {
@@ -136,7 +136,7 @@ func (q *Branch) String() string {
 	return fmt.Sprintf("branch:%q", q.Name)
 }
 
-func queryChildren(q Query) []Query {
+func queryChildren(q Q) []Q {
 	switch s := q.(type) {
 	case *And:
 		return s.Children
@@ -146,8 +146,8 @@ func queryChildren(q Query) []Query {
 	return nil
 }
 
-func flattenAndOr(children []Query, typ Query) ([]Query, bool) {
-	var flat []Query
+func flattenAndOr(children []Q, typ Q) ([]Q, bool) {
+	var flat []Q
 	changed := false
 	for _, ch := range children {
 		ch, subChanged := flatten(ch)
@@ -167,7 +167,7 @@ func flattenAndOr(children []Query, typ Query) ([]Query, bool) {
 }
 
 // (and (and x y) z) => (and x y z) , the same for "or"
-func flatten(q Query) (Query, bool) {
+func flatten(q Q) (Q, bool) {
 	switch s := q.(type) {
 	case *And:
 		if len(s.Children) == 1 {
@@ -186,15 +186,15 @@ func flatten(q Query) (Query, bool) {
 	}
 }
 
-func mapQueryList(qs []Query, f func(Query) Query) []Query {
-	var neg []Query
+func mapQueryList(qs []Q, f func(Q) Q) []Q {
+	var neg []Q
 	for _, sub := range qs {
 		neg = append(neg, f(sub))
 	}
 	return neg
 }
 
-func invertConst(q Query) Query {
+func invertConst(q Q) Q {
 	c, ok := q.(*Const)
 	if ok {
 		return &Const{!c.Value}
@@ -202,7 +202,7 @@ func invertConst(q Query) Query {
 	return q
 }
 
-func evalAndOrConstants(q Query, children []Query) Query {
+func evalAndOrConstants(q Q, children []Q) Q {
 	_, isAnd := q.(*And)
 
 	children = mapQueryList(children, evalConstants)
@@ -228,7 +228,7 @@ func evalAndOrConstants(q Query, children []Query) Query {
 	return &Or{newCH}
 }
 
-func evalConstants(q Query) Query {
+func evalConstants(q Q) Q {
 	switch s := q.(type) {
 	case *And:
 		return evalAndOrConstants(q, s.Children)
@@ -244,7 +244,7 @@ func evalConstants(q Query) Query {
 	return q
 }
 
-func Simplify(q Query) Query {
+func Simplify(q Q) Q {
 	q = evalConstants(q)
 	for {
 		var changed bool
@@ -258,7 +258,7 @@ func Simplify(q Query) Query {
 }
 
 // Map runs f over the q.
-func Map(q Query, f func(q Query) Query) Query {
+func Map(q Q, f func(q Q) Q) Q {
 	switch s := q.(type) {
 	case *And:
 		return &And{Children: mapQueryList(s.Children, f)}

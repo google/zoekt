@@ -23,8 +23,8 @@ import (
 var _ = log.Println
 
 func TestQueryString(t *testing.T) {
-	q := &Or{[]Query{
-		&And{[]Query{
+	q := &Or{[]Q{
+		&And{[]Q{
 			&Substring{Pattern: "hoi"},
 			&Not{&Substring{Pattern: "hai"}},
 		}}}}
@@ -38,25 +38,25 @@ func TestQueryString(t *testing.T) {
 
 func TestSimplify(t *testing.T) {
 	type testcase struct {
-		in   Query
-		want Query
+		in   Q
+		want Q
 	}
 
 	cases := []testcase{
 		{
-			in: &Or{[]Query{
-				&Or{[]Query{
-					&And{[]Query{
+			in: &Or{[]Q{
+				&Or{[]Q{
+					&And{[]Q{
 						&Substring{Pattern: "hoi"},
 						&Not{&Substring{Pattern: "hai"}},
 					}},
-					&Or{[]Query{
+					&Or{[]Q{
 						&Substring{Pattern: "zip"},
 						&Substring{Pattern: "zap"},
 					}},
 				}}}},
-			want: &Or{[]Query{
-				&And{[]Query{
+			want: &Or{[]Q{
+				&And{[]Q{
 					&Substring{Pattern: "hoi"},
 					&Not{&Substring{Pattern: "hai"}},
 				}},
@@ -65,8 +65,8 @@ func TestSimplify(t *testing.T) {
 			}},
 		{in: &And{}, want: &Const{true}},
 		{in: &Or{}, want: &Const{false}},
-		{in: &And{[]Query{&Const{true}, &Const{false}}}, want: &Const{false}},
-		{in: &Or{[]Query{&Const{false}, &Const{true}}}, want: &Const{true}},
+		{in: &And{[]Q{&Const{true}, &Const{false}}}, want: &Const{false}},
+		{in: &Or{[]Q{&Const{false}, &Const{true}}}, want: &Const{true}},
 		{in: &Not{&Const{true}}, want: &Const{false}},
 	}
 

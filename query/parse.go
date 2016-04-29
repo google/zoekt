@@ -147,7 +147,7 @@ func tryConsumeRepo(in []byte) (string, int, bool, error) {
 	return string(arg), n, ok, err
 }
 
-func Parse(qStr string) (Query, error) {
+func Parse(qStr string) (Q, error) {
 	b := []byte(qStr)
 
 	qs, _, err := parseExprList(b)
@@ -158,9 +158,9 @@ func Parse(qStr string) (Query, error) {
 	return Simplify(&And{qs}), nil
 }
 
-func parseExpr(in []byte) (Query, int, error) {
+func parseExpr(in []byte) (Q, int, error) {
 	b := in[:]
-	var expr Query
+	var expr Q
 	for len(b) > 0 && isSpace(b[0]) {
 		b = b[1:]
 	}
@@ -231,8 +231,8 @@ func parseExpr(in []byte) (Query, int, error) {
 	return expr, len(in) - len(b), nil
 }
 
-func regexpQuery(text string, file bool) (Query, error) {
-	var expr Query
+func regexpQuery(text string, file bool) (Q, error) {
+	var expr Q
 
 	r, err := syntax.Parse(text, 0)
 	if err != nil {
@@ -259,9 +259,9 @@ func regexpQuery(text string, file bool) (Query, error) {
 	return expr, nil
 }
 
-func parseExprList(in []byte) ([]Query, int, error) {
+func parseExprList(in []byte) ([]Q, int, error) {
 	b := in[:]
-	var qs []Query
+	var qs []Q
 	for len(b) > 0 {
 		for len(b) > 0 && isSpace(b[0]) {
 			b = b[1:]

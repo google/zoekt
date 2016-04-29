@@ -275,7 +275,7 @@ func TestAndSearch(t *testing.T) {
 	searcher := searcherForTest(t, b)
 	sres, err := searcher.Search(
 		&query.And{
-			Children: []query.Query{
+			Children: []query.Q{
 				&query.Substring{
 					Pattern: "banana",
 				},
@@ -319,7 +319,7 @@ func TestAndNegateSearch(t *testing.T) {
 	searcher := searcherForTest(t, b)
 	sres, err := searcher.Search(
 		&query.And{
-			Children: []query.Query{
+			Children: []query.Q{
 				&query.Substring{
 					Pattern: "banana",
 				},
@@ -357,7 +357,7 @@ func TestNegativeMatchesOnlyShortcut(t *testing.T) {
 	searcher := searcherForTest(t, b)
 	sres, err := searcher.Search(
 		&query.And{
-			Children: []query.Query{
+			Children: []query.Q{
 				&query.Substring{
 					Pattern: "banana",
 				},
@@ -422,7 +422,7 @@ func TestFileSearchBruteForce(t *testing.T) {
 
 	sres, err := searcher.Search(
 		&query.Regexp{
-			Regexp:  mustParseRE("[qn][zx]"),
+			Regexp:   mustParseRE("[qn][zx]"),
 			FileName: true,
 		})
 	if err != nil {
@@ -446,7 +446,7 @@ func TestFileRestriction(t *testing.T) {
 	searcher := searcherForTest(t, b)
 
 	sres, err := searcher.Search(
-		&query.And{[]query.Query{
+		&query.And{[]query.Q{
 			&query.Substring{
 				Pattern:  "banana",
 				FileName: true,
@@ -533,7 +533,7 @@ func TestBranchMask(t *testing.T) {
 	searcher := searcherForTest(t, b)
 
 	sres, err := searcher.Search(
-		&query.And{[]query.Query{
+		&query.And{[]query.Q{
 			&query.Substring{
 				Pattern: "needle",
 			},
@@ -588,7 +588,7 @@ func TestCoversContent(t *testing.T) {
 	searcher := searcherForTest(t, b)
 	sres, err := searcher.Search(
 		&query.And{
-			Children: []query.Query{
+			Children: []query.Q{
 				&query.Substring{
 					Pattern: "needle",
 				},
@@ -714,7 +714,7 @@ func TestRepoName(t *testing.T) {
 
 	searcher := searcherForTest(t, b)
 	sres, err := searcher.Search(
-		&query.And{[]query.Query{
+		&query.And{[]query.Q{
 			&query.Substring{Pattern: "needle"},
 			&query.Repo{Name: "foo"},
 		}})
@@ -730,7 +730,7 @@ func TestRepoName(t *testing.T) {
 	}
 
 	sres, err = searcher.Search(
-		&query.And{[]query.Query{
+		&query.And{[]query.Q{
 			&query.Substring{Pattern: "needle"},
 			&query.Repo{Name: "bla"},
 		}})

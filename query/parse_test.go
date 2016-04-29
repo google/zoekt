@@ -32,7 +32,7 @@ func mustParseRE(s string) *syntax.Regexp {
 func TestParseQuery(t *testing.T) {
 	type testcase struct {
 		in     string
-		out    Query
+		out    Q
 		hasErr bool
 	}
 
@@ -40,7 +40,7 @@ func TestParseQuery(t *testing.T) {
 		{"sub-pixel", &Substring{Pattern: "sub-pixel"}, false},
 		{"abc", &Substring{Pattern: "abc"}, false},
 		{"\"abc bcd\"", &Substring{Pattern: "abc bcd"}, false},
-		{"abc bcd", &And{[]Query{
+		{"abc bcd", &And{[]Q{
 			&Substring{Pattern: "abc"},
 			&Substring{Pattern: "bcd"},
 		}}, false},
@@ -51,11 +51,11 @@ func TestParseQuery(t *testing.T) {
 		{"file:abc", &Substring{Pattern: "abc", FileName: true}, false},
 		{"branch:pqr", &Branch{Name: "pqr"}, false},
 
-		{"file:helpers\\.go byte", &And{[]Query{
+		{"file:helpers\\.go byte", &And{[]Q{
 			&Substring{Pattern: "helpers.go", FileName: true},
 			&Substring{Pattern: "byte"},
 		}}, false},
-		{"(abc def)", &And{[]Query{
+		{"(abc def)", &And{[]Q{
 			&Substring{Pattern: "abc"},
 			&Substring{Pattern: "def"},
 		}}, false},

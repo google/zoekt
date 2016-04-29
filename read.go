@@ -210,7 +210,7 @@ func (ss *shardedSearcher) Close() error {
 	return nil
 }
 
-func (ss *shardedSearcher) Search(pat query.Query) (*SearchResult, error) {
+func (ss *shardedSearcher) Search(pat query.Q) (*SearchResult, error) {
 	start := time.Now()
 	type res struct {
 		sr  *SearchResult

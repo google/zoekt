@@ -328,7 +328,7 @@ func (t *substrMatchTree) matches(known map[matchTree]bool) (bool, bool) {
 	return true, sure
 }
 
-func (d *indexData) newMatchTree(q query.Query, sq map[*query.Substring]*substrMatchTree) (matchTree, error) {
+func (d *indexData) newMatchTree(q query.Q, sq map[*query.Substring]*substrMatchTree) (matchTree, error) {
 	switch s := q.(type) {
 	case *query.Regexp:
 		sz := ngramSize
@@ -336,7 +336,7 @@ func (d *indexData) newMatchTree(q query.Query, sq map[*query.Substring]*substrM
 			sz = 1
 		}
 		subQ := query.RegexpToQuery(s.Regexp, sz)
-		subQ = query.Map(subQ, func(q query.Query) query.Query {
+		subQ = query.Map(subQ, func(q query.Q) query.Q {
 			if sub, ok := q.(*query.Substring); ok {
 				sub.FileName = s.FileName
 			}
@@ -404,8 +404,8 @@ func (d *indexData) newMatchTree(q query.Query, sq map[*query.Substring]*substrM
 	return nil, nil
 }
 
-func (d *indexData) simplify(in query.Query) query.Query {
-	eval := query.Map(in, func(q query.Query) query.Query {
+func (d *indexData) simplify(in query.Q) query.Q {
+	eval := query.Map(in, func(q query.Q) query.Q {
 		if r, ok := q.(*query.Repo); ok {
 			return &query.Const{r.Name == d.repoName}
 		}
@@ -414,7 +414,7 @@ func (d *indexData) simplify(in query.Query) query.Query {
 	return query.Simplify(eval)
 }
 
-func (d *indexData) Search(q query.Query) (*SearchResult, error) {
+func (d *indexData) Search(q query.Q) (*SearchResult, error) {
 	var res SearchResult
 
 	q = d.simplify(q)
@@ -600,7 +600,7 @@ nextFileMatch:
 	return &res, nil
 }
 
-func extractSubstringQueries(q query.Query) []*query.Substring {
+func extractSubstringQueries(q query.Q) []*query.Substring {
 	var r []*query.Substring
 	switch s := q.(type) {
 	case *query.And:

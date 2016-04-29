@@ -41,13 +41,13 @@ func LowerRegexp(r *syntax.Regexp) *syntax.Regexp {
 
 // RegexpToQuery tries to distill a substring search query that
 // matches a superset of the regexp.
-func RegexpToQuery(r *syntax.Regexp, minTextSize int) Query {
+func RegexpToQuery(r *syntax.Regexp, minTextSize int) Q {
 	q := regexpToQueryRecursive(r, minTextSize)
 	q = Simplify(q)
 	return q
 }
 
-func regexpToQueryRecursive(r *syntax.Regexp, minTextSize int) Query {
+func regexpToQueryRecursive(r *syntax.Regexp, minTextSize int) Q {
 	// TODO - we could perhaps transform Begin/EndText in '\n'?
 	// TODO - we could perhaps transform CharClass in (OrQuery )
 	// if there are just a few runes, and part of a OpConcat?
@@ -69,7 +69,7 @@ func regexpToQueryRecursive(r *syntax.Regexp, minTextSize int) Query {
 		}
 
 	case syntax.OpConcat, syntax.OpAlternate:
-		var qs []Query
+		var qs []Q
 		for _, sr := range r.Sub {
 			if sq := regexpToQueryRecursive(sr, minTextSize); sq != nil {
 				qs = append(qs, sq)

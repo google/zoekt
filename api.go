@@ -98,6 +98,6 @@ type SearchResult struct {
 }
 
 type Searcher interface {
-	Search(q query.Query) (*SearchResult, error)
+	Search(q query.Q) (*SearchResult, error)
 	Close() error
 }

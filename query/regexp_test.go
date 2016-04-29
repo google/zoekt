@@ -54,14 +54,14 @@ func printRegexp(r *syntax.Regexp, lvl int) {
 func TestRegexpParse(t *testing.T) {
 	type testcase struct {
 		in   string
-		want Query
+		want Q
 	}
 
 	cases := []testcase{
 		{"(foo|)bar", &Substring{Pattern: "bar"}},
 		{"(foo|)", &Const{true}},
-		{"(foo|bar)baz.*bla", &And{[]Query{
-			&Or{[]Query{
+		{"(foo|bar)baz.*bla", &And{[]Q{
+			&Or{[]Q{
 				&Substring{Pattern: "foo"},
 				&Substring{Pattern: "bar"},
 			}},
@@ -69,7 +69,7 @@ func TestRegexpParse(t *testing.T) {
 			&Substring{Pattern: "bla"},
 		}}},
 		{"^[a-z](People)+barrabas$",
-			&And{[]Query{
+			&And{[]Q{
 				&Substring{Pattern: "People"},
 				&Substring{Pattern: "barrabas"},
 			}}},
