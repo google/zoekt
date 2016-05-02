@@ -545,7 +545,7 @@ nextFileMatch:
 
 		fileMatch := FileMatch{
 			Repo: d.repoName,
-			Name: d.fileName(nextDoc),
+			Name: string(d.fileName(nextDoc)),
 			// Maintain ordering of input files. This
 			// strictly dominates the in-file ordering of
 			// the matches.

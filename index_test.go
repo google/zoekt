@@ -412,6 +412,28 @@ func TestFileSearch(t *testing.T) {
 	}
 }
 
+func TestFileCase(t *testing.T) {
+	b := NewIndexBuilder()
+
+	b.AddFile("BANANA", []byte("x orange y"))
+	searcher := searcherForTest(t, b)
+
+	sres, err := searcher.Search(
+		&query.Substring{
+			Pattern:  "banana",
+			FileName: true,
+		})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	clearScores(sres)
+
+	matches := sres.Files
+	if len(matches) != 1 || matches[0].Name != "BANANA" {
+		t.Fatalf("got %v, want 1 match 'BANANA'", matches)
+	}
+}
+
 func TestFileSearchBruteForce(t *testing.T) {
 	b := NewIndexBuilder()
 

@@ -79,7 +79,7 @@ func (p *contentProvider) fillMatch(m *candidateMatch) Match {
 	if m.fileName {
 		finalMatch = Match{
 			Offset:      m.offset,
-			Line:        p.data(true),
+			Line:        p.id.fileName(p.idx),
 			LineOff:     int(m.offset),
 			MatchLength: int(m.matchSz),
 			FileName:    true,

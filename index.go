@@ -212,8 +212,11 @@ func (data *indexData) getContentDocIterator(query *query.Substring) (docIterato
 	return input, nil
 }
 
-func (d *indexData) fileName(i uint32) string {
-	return string(d.fileNameContent[d.fileNameIndex[i]:d.fileNameIndex[i+1]])
+func (d *indexData) fileName(i uint32) []byte {
+	data := d.fileNameContent[d.fileNameIndex[i]:d.fileNameIndex[i+1]]
+	cb := d.fileNameCaseBits[d.fileNameCaseBitsIndex[i]:d.fileNameCaseBitsIndex[i+1]]
+
+	return toOriginal(data, cb, 0, len(data))
 }
 
 func (s *indexData) Close() error {

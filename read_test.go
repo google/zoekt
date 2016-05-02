@@ -62,8 +62,8 @@ func TestReadWrite(t *testing.T) {
 	}
 
 	data := r.readIndexData(&toc)
-	if got := data.fileName(0); got != "filename" {
-		t.Errorf("got filename %s, want %v", got, "filename")
+	if got := data.fileName(0); string(got) != "filename" {
+		t.Errorf("got filename %q, want %q", got, "filename")
 	}
 
 	if len(data.ngrams) != 3 {
