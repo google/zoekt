@@ -23,24 +23,6 @@ import (
 
 var _ = log.Println
 
-func TestReadWriteBranch(t *testing.T) {
-	b := NewIndexBuilder()
-	b.AddFileBranches("filename", []byte("abcde"), []string{"b2", "b1"})
-	b.AddFileBranches("filename", []byte("abcde"), []string{"b3"})
-
-	want := map[string]int{"b2": 1, "b1": 2, "b3": 3}
-	if !reflect.DeepEqual(b.branches, want) {
-		t.Fatalf("got branches %v in builder, want %v", b.branches, want)
-	}
-
-	searcher := searcherForTest(t, b)
-	index := searcher.(*indexData)
-
-	if !reflect.DeepEqual(index.branchIDs, want) {
-		t.Fatalf("got branches %v in index, want %v", index.branchNames, want)
-	}
-}
-
 func TestReadWrite(t *testing.T) {
 	b := NewIndexBuilder()
 	b.AddFile("filename", []byte("abcde"))

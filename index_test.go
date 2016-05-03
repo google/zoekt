@@ -40,12 +40,7 @@ func TestBoundary(t *testing.T) {
 
 	b.AddFile("f1", []byte("x the"))
 	b.AddFile("f1", []byte("reader"))
-	searcher := searcherForTest(t, b)
-
-	res, err := searcher.Search(&query.Substring{Pattern: "there"})
-	if err != nil {
-		t.Errorf("search: %v", err)
-	}
+	res := searchForTest(t, b, &query.Substring{Pattern: "there"})
 
 	if len(res.Files) > 0 {
 		t.Fatalf("got %v, want no matches", res.Files)
@@ -60,11 +55,7 @@ func TestBasic(t *testing.T) {
 	b.AddFile("f2", []byte("to carry water in the no later bla"))
 	// -------------------- 0123456789012345678901234567890123456789
 
-	searcher := searcherForTest(t, b)
-	res, err := searcher.Search(&query.Substring{Pattern: "water"})
-	if err != nil {
-		t.Errorf("search: %v", err)
-	}
+	res := searchForTest(t, b, &query.Substring{Pattern: "water"})
 	fmatches := res.Files
 	if len(fmatches) != 1 || len(fmatches[0].Matches) != 1 {
 		t.Fatalf("got %v, want 1 matches", fmatches)
@@ -119,12 +110,7 @@ func TestNewlines(t *testing.T) {
 	b.AddFile("filename", []byte("line1\nline2\nbla"))
 	//----------------------------012345 678901 23456
 
-	searcher := searcherForTest(t, b)
-	sres, err := searcher.Search(&query.Substring{Pattern: "ne2"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	clearScores(sres)
+	sres := searchForTest(t, b, &query.Substring{Pattern: "ne2"})
 
 	matches := sres.Files
 	want := []FileMatch{{
@@ -190,7 +176,7 @@ func TestDelta(t *testing.T) {
 	}
 }
 
-func searcherForTest(t *testing.T, b *IndexBuilder) Searcher {
+func searchForTest(t *testing.T, b *IndexBuilder, q query.Q) *SearchResult {
 	var buf bytes.Buffer
 	b.Write(&buf)
 	f := &memSeeker{buf.Bytes(), 0}
@@ -199,7 +185,13 @@ func searcherForTest(t *testing.T, b *IndexBuilder) Searcher {
 	if err != nil {
 		t.Fatalf("NewSearcher: %v", err)
 	}
-	return searcher
+
+	res, err := searcher.Search(q)
+	if err != nil {
+		t.Fatalf("Search(%s): %v", q, err)
+	}
+	clearScores(res)
+	return res
 }
 
 func TestFileBasedSearch(t *testing.T) {
@@ -212,12 +204,7 @@ func TestFileBasedSearch(t *testing.T) {
 	// -----------0123456789012345678901234567890123456789
 	b.AddFile("f2", c2)
 
-	searcher := searcherForTest(t, b)
-	sres, err := searcher.Search(&query.Substring{Pattern: "ananas"})
-	if err != nil {
-		t.Fatalf("Search: %v", err)
-	}
-	clearScores(sres)
+	sres := searchForTest(t, b, &query.Substring{Pattern: "ananas"})
 
 	matches := sres.Files
 	if len(matches) != 2 || matches[0].Name != "f2" || matches[1].Name != "f1" {
@@ -235,28 +222,20 @@ func TestCaseFold(t *testing.T) {
 	// ---------- 012345678901234567890123456
 	b.AddFile("f1", c1)
 
-	searcher := searcherForTest(t, b)
-	sres, err := searcher.Search(
-		&query.Substring{
-			Pattern:       "bananas",
-			CaseSensitive: true,
-		})
-	if err != nil {
-		t.Fatalf("Search: %v", err)
-	}
+	sres := searchForTest(t, b, &query.Substring{
+		Pattern:       "bananas",
+		CaseSensitive: true,
+	})
 	matches := sres.Files
 	if len(matches) != 0 {
 		t.Errorf("foldcase: got %#v, want 0 matches", matches)
 	}
 
-	sres, err = searcher.Search(
+	sres = searchForTest(t, b,
 		&query.Substring{
 			Pattern:       "BaNaNAS",
 			CaseSensitive: true,
 		})
-	if err != nil {
-		t.Fatalf("Search: %v", err)
-	}
 	matches = sres.Files
 	if len(matches) != 1 {
 		t.Errorf("no foldcase: got %v, want 1 matches", matches)
@@ -272,22 +251,16 @@ func TestAndSearch(t *testing.T) {
 	b.AddFile("f2", []byte("x apple y"))
 	b.AddFile("f3", []byte("x banana apple y"))
 	// ---------------------0123456789012345
-	searcher := searcherForTest(t, b)
-	sres, err := searcher.Search(
-		&query.And{
-			Children: []query.Q{
-				&query.Substring{
-					Pattern: "banana",
-				},
-				&query.Substring{
-					Pattern: "apple",
-				},
+	sres := searchForTest(t, b, &query.And{
+		Children: []query.Q{
+			&query.Substring{
+				Pattern: "banana",
 			},
-		})
-
-	if err != nil {
-		t.Fatalf("Search: %v", err)
-	}
+			&query.Substring{
+				Pattern: "apple",
+			},
+		},
+	})
 	matches := sres.Files
 	if len(matches) != 1 {
 		t.Fatalf("got %v, want 1 match", matches)
@@ -316,22 +289,17 @@ func TestAndNegateSearch(t *testing.T) {
 	b.AddFile("f1", []byte("x banana y"))
 	b.AddFile("f4", []byte("x banana apple y"))
 	// ---------------------0123456789012345
-	searcher := searcherForTest(t, b)
-	sres, err := searcher.Search(
-		&query.And{
-			Children: []query.Q{
-				&query.Substring{
-					Pattern: "banana",
-				},
-				&query.Not{&query.Substring{
-					Pattern: "apple",
-				}},
+	sres := searchForTest(t, b, &query.And{
+		Children: []query.Q{
+			&query.Substring{
+				Pattern: "banana",
 			},
-		})
+			&query.Not{&query.Substring{
+				Pattern: "apple",
+			}},
+		},
+	})
 
-	if err != nil {
-		t.Fatalf("Search: %v", err)
-	}
 	matches := sres.Files
 
 	if len(matches) != 1 || len(matches[0].Matches) != 1 {
@@ -354,22 +322,17 @@ func TestNegativeMatchesOnlyShortcut(t *testing.T) {
 	b.AddFile("f3", []byte("x appelmoes y"))
 	b.AddFile("f3", []byte("x appelmoes y"))
 
-	searcher := searcherForTest(t, b)
-	sres, err := searcher.Search(
-		&query.And{
-			Children: []query.Q{
-				&query.Substring{
-					Pattern: "banana",
-				},
-				&query.Not{&query.Substring{
-					Pattern: "appel",
-				}},
+	sres := searchForTest(t, b, &query.And{
+		Children: []query.Q{
+			&query.Substring{
+				Pattern: "banana",
 			},
-		})
+			&query.Not{&query.Substring{
+				Pattern: "appel",
+			}},
+		},
+	})
 
-	if err != nil {
-		t.Fatalf("Search: %v", err)
-	}
 	if sres.Stats.FilesConsidered != 1 {
 		t.Errorf("got %#v, want FilesConsidered: 1", sres.Stats)
 	}
@@ -381,17 +344,10 @@ func TestFileSearch(t *testing.T) {
 	b.AddFile("banzana", []byte("x orange y"))
 	// --------------------------0123456879
 	b.AddFile("banana", []byte("x apple y"))
-	searcher := searcherForTest(t, b)
-
-	sres, err := searcher.Search(
-		&query.Substring{
-			Pattern:  "anan",
-			FileName: true,
-		})
-	if err != nil {
-		t.Fatalf("Search: %v", err)
-	}
-	clearScores(sres)
+	sres := searchForTest(t, b, &query.Substring{
+		Pattern:  "anan",
+		FileName: true,
+	})
 
 	matches := sres.Files
 	if len(matches) != 1 || len(matches[0].Matches) != 1 {
@@ -416,17 +372,10 @@ func TestFileCase(t *testing.T) {
 	b := NewIndexBuilder()
 
 	b.AddFile("BANANA", []byte("x orange y"))
-	searcher := searcherForTest(t, b)
-
-	sres, err := searcher.Search(
-		&query.Substring{
-			Pattern:  "banana",
-			FileName: true,
-		})
-	if err != nil {
-		t.Fatalf("Search: %v", err)
-	}
-	clearScores(sres)
+	sres := searchForTest(t, b, &query.Substring{
+		Pattern:  "banana",
+		FileName: true,
+	})
 
 	matches := sres.Files
 	if len(matches) != 1 || matches[0].Name != "BANANA" {
@@ -440,17 +389,10 @@ func TestFileSearchBruteForce(t *testing.T) {
 	b.AddFile("banzana", []byte("x orange y"))
 	// --------------------------0123456879
 	b.AddFile("banana", []byte("x apple y"))
-	searcher := searcherForTest(t, b)
-
-	sres, err := searcher.Search(
-		&query.Regexp{
-			Regexp:   mustParseRE("[qn][zx]"),
-			FileName: true,
-		})
-	if err != nil {
-		t.Fatalf("Search: %v", err)
-	}
-	clearScores(sres)
+	sres := searchForTest(t, b, &query.Regexp{
+		Regexp:   mustParseRE("[qn][zx]"),
+		FileName: true,
+	})
 
 	matches := sres.Files
 	if len(matches) != 1 || matches[0].Name != "banzana" {
@@ -464,13 +406,7 @@ func TestSearchMatchAll(t *testing.T) {
 	b.AddFile("banzana", []byte("x orange y"))
 	// --------------------------0123456879
 	b.AddFile("banana", []byte("x apple y"))
-	searcher := searcherForTest(t, b)
-
-	sres, err := searcher.Search(&query.Const{true})
-	if err != nil {
-		t.Fatalf("Search: %v", err)
-	}
-	clearScores(sres)
+	sres := searchForTest(t, b, &query.Const{true})
 
 	matches := sres.Files
 	if len(matches) != 2 {
@@ -482,13 +418,7 @@ func TestSearchNewline(t *testing.T) {
 	b := NewIndexBuilder()
 
 	b.AddFile("banzana", []byte("abcd\ndefg"))
-	searcher := searcherForTest(t, b)
-
-	sres, err := searcher.Search(&query.Substring{Pattern: "d\nd"})
-	if err != nil {
-		t.Fatalf("Search: %v", err)
-	}
-	clearScores(sres)
+	sres := searchForTest(t, b, &query.Substring{Pattern: "d\nd"})
 
 	// Just check that we don't crash.
 
@@ -504,13 +434,7 @@ func TestSearchMatchAllRegexp(t *testing.T) {
 	b.AddFile("banzana", []byte("abcd"))
 	// --------------------------0123456879
 	b.AddFile("banana", []byte("pqrs"))
-	searcher := searcherForTest(t, b)
-
-	sres, err := searcher.Search(&query.Regexp{Regexp: mustParseRE(".")})
-	if err != nil {
-		t.Fatalf("Search: %v", err)
-	}
-	clearScores(sres)
+	sres := searchForTest(t, b, &query.Regexp{Regexp: mustParseRE(".")})
 
 	matches := sres.Files
 	if len(matches) != 2 || sres.Stats.MatchCount != 8 {
@@ -525,22 +449,15 @@ func TestFileRestriction(t *testing.T) {
 	// --------------------------0123456879
 	b.AddFile("banana2", []byte("x apple y"))
 	b.AddFile("orange", []byte("x apple y"))
-	searcher := searcherForTest(t, b)
-
-	sres, err := searcher.Search(
-		&query.And{[]query.Q{
-			&query.Substring{
-				Pattern:  "banana",
-				FileName: true,
-			},
-			&query.Substring{
-				Pattern: "apple",
-			},
-		}})
-	if err != nil {
-		t.Fatalf("Search: %v", err)
-	}
-	clearScores(sres)
+	sres := searchForTest(t, b, &query.And{[]query.Q{
+		&query.Substring{
+			Pattern:  "banana",
+			FileName: true,
+		},
+		&query.Substring{
+			Pattern: "apple",
+		},
+	}})
 
 	matches := sres.Files
 	if len(matches) != 1 || len(matches[0].Matches) != 1 {
@@ -560,18 +477,10 @@ func TestFileNameBoundary(t *testing.T) {
 	b.AddFile("banana2", []byte("x apple y"))
 	b.AddFile("helpers.go", []byte("x apple y"))
 	b.AddFile("foo", []byte("x apple y"))
-	searcher := searcherForTest(t, b)
-
-	sres, err := searcher.Search(
-		&query.Substring{
-			Pattern:  "helpers.go",
-			FileName: true,
-		})
-	clearScores(sres)
-
-	if err != nil {
-		t.Fatalf("Search: %v", err)
-	}
+	sres := searchForTest(t, b, &query.Substring{
+		Pattern:  "helpers.go",
+		FileName: true,
+	})
 
 	matches := sres.Files
 	if len(matches) != 1 || len(matches[0].Matches) != 1 {
@@ -586,15 +495,9 @@ func TestWordBoundaryRanking(t *testing.T) {
 	// ---------------------012345678901234567890
 	b.AddFile("f3", []byte("xbytex ybytex"))
 
-	searcher := searcherForTest(t, b)
-
-	sres, err := searcher.Search(
-		&query.Substring{
-			Pattern: "byte",
-		})
-	if err != nil {
-		t.Fatalf("Search: %v", err)
-	}
+	sres := searchForTest(t, b, &query.Substring{
+		Pattern: "byte",
+	})
 
 	if len(sres.Files) != 3 || sres.Files[0].Name != "f2" || len(sres.Files[0].Matches) != 3 {
 		t.Fatalf("got %#v, want 3 matches in files f2", sres.Files)
@@ -612,21 +515,14 @@ func TestBranchMask(t *testing.T) {
 	b.AddFileBranches("f1", []byte("needle"), []string{"master"})
 	b.AddFileBranches("f2", []byte("needle"), []string{"stable", "master"})
 
-	searcher := searcherForTest(t, b)
-
-	sres, err := searcher.Search(
-		&query.And{[]query.Q{
-			&query.Substring{
-				Pattern: "needle",
-			},
-			&query.Branch{
-				Name: "stable",
-			},
-		}})
-
-	if err != nil {
-		t.Fatalf("Search", err)
-	}
+	sres := searchForTest(t, b, &query.And{[]query.Q{
+		&query.Substring{
+			Pattern: "needle",
+		},
+		&query.Branch{
+			Name: "stable",
+		},
+	}})
 
 	if len(sres.Files) != 1 || sres.Files[0].Name != "f2" {
 		t.Fatalf("got %v, want 1 result from f2", sres.Files)
@@ -642,15 +538,9 @@ func TestBranchReport(t *testing.T) {
 
 	branches := []string{"stable", "master"}
 	b.AddFileBranches("f2", []byte("needle"), branches)
-	searcher := searcherForTest(t, b)
-	sres, err := searcher.Search(
-		&query.Substring{
-			Pattern: "needle",
-		})
-	if err != nil {
-		t.Fatalf("Search", err)
-	}
-
+	sres := searchForTest(t, b, &query.Substring{
+		Pattern: "needle",
+	})
 	if len(sres.Files) != 1 {
 		t.Fatalf("got %v, want 1 result from f2", sres.Files)
 	}
@@ -667,8 +557,7 @@ func TestCoversContent(t *testing.T) {
 	branches := []string{"stable", "master"}
 	b.AddFileBranches("f1", []byte("needle the bla"), branches)
 
-	searcher := searcherForTest(t, b)
-	sres, err := searcher.Search(
+	sres := searchForTest(t, b,
 		&query.And{
 			Children: []query.Q{
 				&query.Substring{
@@ -680,8 +569,8 @@ func TestCoversContent(t *testing.T) {
 			},
 		})
 
-	if err != nil || len(sres.Files) > 0 {
-		t.Fatalf("got %v, %v, want success without results", sres.Files, err)
+	if len(sres.Files) > 0 {
+		t.Fatalf("got %v, want no results", sres.Files)
 	}
 
 	if sres.Stats.FilesLoaded > 0 {
@@ -705,16 +594,11 @@ func TestRegexp(t *testing.T) {
 	// ----------------01234567890123
 	b.AddFile("f1", content)
 
-	searcher := searcherForTest(t, b)
-	sres, err := searcher.Search(
+	sres := searchForTest(t, b,
 		&query.Regexp{
 			Regexp: mustParseRE("dle.*bla"),
 		})
 
-	if err != nil {
-		t.Fatalf("Search: %v", err)
-	}
-	clearScores(sres)
 	if len(sres.Files) != 1 || len(sres.Files[0].Matches) != 1 {
 		t.Fatalf("got %v, want 1 match in 1 file", sres.Files)
 	}
@@ -744,17 +628,12 @@ func TestRegexpFile(t *testing.T) {
 	name := "let's play: find the mussel"
 	b.AddFile(name, content)
 	b.AddFile("play.txt", content)
-	searcher := searcherForTest(t, b)
-	sres, err := searcher.Search(
+	sres := searchForTest(t, b,
 		&query.Regexp{
 			Regexp:   mustParseRE("play.*mussel"),
 			FileName: true,
 		})
 
-	if err != nil {
-		t.Fatalf("Search: %v", err)
-	}
-	clearScores(sres)
 	if len(sres.Files) != 1 || len(sres.Files[0].Matches) != 1 {
 		t.Fatalf("got %v, want 1 match in 1 file", sres.Files)
 	}
@@ -771,16 +650,11 @@ func TestRegexpOrder(t *testing.T) {
 	// ----------------01234567890123
 	b.AddFile("f1", content)
 
-	searcher := searcherForTest(t, b)
-	sres, err := searcher.Search(
+	sres := searchForTest(t, b,
 		&query.Regexp{
 			Regexp: mustParseRE("dle.*bla"),
 		})
 
-	if err != nil {
-		t.Fatalf("Search: %v", err)
-	}
-	clearScores(sres)
 	if len(sres.Files) != 0 {
 		t.Fatalf("got %v, want 0 matches", sres.Files)
 	}
@@ -794,15 +668,12 @@ func TestRepoName(t *testing.T) {
 	b.AddFile("f1", content)
 	b.SetName("bla")
 
-	searcher := searcherForTest(t, b)
-	sres, err := searcher.Search(
+	sres := searchForTest(t, b,
 		&query.And{[]query.Q{
 			&query.Substring{Pattern: "needle"},
 			&query.Repo{Name: "foo"},
 		}})
-	if err != nil {
-		t.Fatalf("Search: %v", err)
-	}
+
 	if len(sres.Files) != 0 {
 		t.Fatalf("got %v, want 0 matches", sres.Files)
 	}
@@ -811,14 +682,11 @@ func TestRepoName(t *testing.T) {
 		t.Fatalf("got FilesConsidered %d, should have short circuited", sres.Stats.FilesConsidered)
 	}
 
-	sres, err = searcher.Search(
+	sres = searchForTest(t, b,
 		&query.And{[]query.Q{
 			&query.Substring{Pattern: "needle"},
 			&query.Repo{Name: "bla"},
 		}})
-	if err != nil {
-		t.Fatalf("Search: %v", err)
-	}
 	if len(sres.Files) != 1 {
 		t.Fatalf("got %v, want 1 match", sres.Files)
 	}
