@@ -37,8 +37,8 @@ func displayMatches(files []zoekt.FileMatch, pat string) {
 }
 
 func main() {
-	index := flag.String("index",
-		filepath.Join(os.Getenv("HOME"), ".csindex", "*"), "index file glob to use")
+	index := flag.String("index_dir",
+		filepath.Join(os.Getenv("HOME"), ".zoekt"), "index dir")
 	cpuProfile := flag.String("cpu_profile", "", "write cpu profile to file")
 	verbose := flag.Bool("v", false, "print some background data")
 

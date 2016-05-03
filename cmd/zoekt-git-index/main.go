@@ -56,17 +56,14 @@ func main() {
 	branchesStr := flag.String("branches", "master", "git branches to index. If set, arguments should be bare git repositories.")
 	branchPrefix := flag.String("prefix", "refs/heads/", "prefix for branch names")
 
-	indexTemplate := flag.String("index",
-		"{{.Home}}/.csindex/{{.Base}}.{{.FP}}.{{.Shard}}",
-		"template for index file to use.")
-
+	indexDir := flag.String("index", build.DefaultDir, "index directory for *.zoekt files.")
 	flag.Parse()
 
 	opts := build.Options{
-		Parallelism:      *parallelism,
-		SizeMax:          *sizeMax,
-		ShardMax:         *shardLimit,
-		FileNameTemplate: *indexTemplate,
+		Parallelism: *parallelism,
+		SizeMax:     *sizeMax,
+		ShardMax:    *shardLimit,
+		IndexDir:    *indexDir,
 	}
 
 	var branches []string

@@ -16,14 +16,8 @@ package zoekt
 
 import (
 	"encoding/binary"
-	"fmt"
 	"io"
 	"log"
-	"os"
-	"path/filepath"
-	"time"
-
-	"github.com/google/zoekt/query"
 )
 
 var _ = log.Println
@@ -169,77 +163,4 @@ func NewSearcher(r ReadSeekCloser) (Searcher, error) {
 	}
 	indexData.reader = rd
 	return indexData, nil
-}
-
-type shardedSearcher struct {
-	searchers []Searcher
-}
-
-// NewShardedSearcher returns a searcher instance that loads all
-// shards corresponding to a glob into memory.
-func NewShardedSearcher(indexGlob string) (Searcher, error) {
-	// TODO - this should create a map[string]Searcher{} and
-	// reload changed shards. Must first write the shards
-	// atomically, though.
-
-	fs, err := filepath.Glob(indexGlob)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(fs) == 0 {
-		return nil, fmt.Errorf("glob %q does not match anything.", indexGlob)
-	}
-
-	ss := shardedSearcher{}
-
-	for _, fn := range fs {
-		f, err := os.Open(fn)
-		if err != nil {
-			return nil, err
-		}
-
-		s, err := NewSearcher(f)
-		if err != nil {
-			return nil, fmt.Errorf("NewSearcher(%s): %v", fn, err)
-		}
-		ss.searchers = append(ss.searchers, s)
-	}
-
-	return &ss, nil
-}
-
-func (ss *shardedSearcher) Close() error {
-	for _, s := range ss.searchers {
-		s.Close()
-	}
-	return nil
-}
-
-func (ss *shardedSearcher) Search(pat query.Q) (*SearchResult, error) {
-	start := time.Now()
-	type res struct {
-		sr  *SearchResult
-		err error
-	}
-	all := make(chan res, len(ss.searchers))
-	for _, s := range ss.searchers {
-		go func(s Searcher) {
-			ms, err := s.Search(pat)
-			all <- res{ms, err}
-		}(s)
-	}
-
-	var aggregate SearchResult
-	for _ = range ss.searchers {
-		r := <-all
-		if r.err != nil {
-			return nil, r.err
-		}
-		aggregate.Files = append(aggregate.Files, r.sr.Files...)
-		aggregate.Stats.Add(r.sr.Stats)
-	}
-	sortFilesByScore(aggregate.Files)
-	aggregate.Duration = time.Now().Sub(start)
-	return &aggregate, nil
 }

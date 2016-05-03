@@ -21,12 +21,11 @@ import (
 	"html/template"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
 	"time"
 
 	"github.com/google/zoekt"
+	"github.com/google/zoekt/build"
 	"github.com/google/zoekt/query"
 )
 
@@ -234,7 +233,7 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 
 func main() {
 	listen := flag.String("listen", ":6070", "address to listen on.")
-	index := flag.String("index", filepath.Join(os.Getenv("HOME"), ".csindex/*"), "index file glob to use")
+	index := flag.String("index", build.DefaultDir, "index file glob to use")
 	flag.Parse()
 
 	searcher, err := zoekt.NewShardedSearcher(*index)

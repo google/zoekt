@@ -47,17 +47,14 @@ func main() {
 	var shardLimit = flag.Int("shard_limit", 100<<20, "maximum corpus size for a shard")
 	var parallelism = flag.Int("parallelism", 4, "maximum number of parallel indexing processes.")
 
-	indexTemplate := flag.String("index",
-		"{{.Home}}/.csindex/{{.Base}}.{{.FP}}.{{.Shard}}",
-		"template for index file to use.")
-
+	indexDir := flag.String("index", build.DefaultDir, "directory for search indices")
 	flag.Parse()
 
 	opts := build.Options{
-		Parallelism:      *parallelism,
-		SizeMax:          *sizeMax,
-		ShardMax:         *shardLimit,
-		FileNameTemplate: *indexTemplate,
+		Parallelism: *parallelism,
+		SizeMax:     *sizeMax,
+		ShardMax:    *shardLimit,
+		IndexDir:    *indexDir,
 	}
 
 	if *cpuProfile != "" {

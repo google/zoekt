@@ -20,22 +20,21 @@ import (
 	"bytes"
 	"crypto/md5"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
 	"sync"
-	"text/template"
 
 	"github.com/google/zoekt"
 )
 
+var DefaultDir = filepath.Join(os.Getenv("HOME"), ".zoekt")
+
 // Options sets options for the index building.
 type Options struct {
-	// FileNameTemplate is a template to use for output files.
-	// Available substitution keys are Home ($HOME), Base (the
-	// repo name), FP a repo fingerprint (path to repository) and
-	// Shard (shard number)
-	FileNameTemplate string
+	// IndexDir is a directory that holds *.zoekt index files.
+	IndexDir string
 
 	// Maximum file size
 	SizeMax int
@@ -60,7 +59,6 @@ type entry struct {
 type Builder struct {
 	opts     Options
 	throttle chan int
-	name     *template.Template
 
 	nextShardNum int
 	todo         []entry
@@ -74,14 +72,8 @@ type Builder struct {
 
 // NewBuilder creates a new Builder instance.
 func NewBuilder(opt Options) (*Builder, error) {
-	tpl, err := template.New("index").Parse(opt.FileNameTemplate)
-	if err != nil {
-		return nil, err
-	}
-
 	return &Builder{
 		opts:     opt,
-		name:     tpl,
 		throttle: make(chan int, opt.Parallelism),
 	}, nil
 }
@@ -143,7 +135,7 @@ func (b *Builder) flush() {
 }
 
 func (b *Builder) buildShard(todo []entry, nextShardNum int) error {
-	name, err := shardName(b.name, b.opts.RepoName, nextShardNum)
+	name, err := shardName(b.opts.IndexDir, b.opts.RepoName, nextShardNum)
 	if err != nil {
 		return err
 	}
@@ -155,40 +147,28 @@ func (b *Builder) buildShard(todo []entry, nextShardNum int) error {
 	return writeShard(name, shardBuilder)
 }
 
-func shardName(tpl *template.Template, repo string, shardNum int) (string, error) {
+func shardName(dir string, repo string, shardNum int) (string, error) {
 	abs, err := filepath.Abs(repo)
 	if err != nil {
 		return "", err
 	}
 	fp := stableHash(filepath.Dir(abs))
 
-	var buf bytes.Buffer
-	if err := tpl.Execute(&buf, struct {
-		Home, FP, Base, Shard string
-	}{
-		os.Getenv("HOME"), fp, filepath.Base(abs),
-		fmt.Sprintf("%05d", shardNum),
-	}); err != nil {
-		return "", err
-	}
-
-	return buf.String(), nil
+	return filepath.Join(dir,
+		fmt.Sprintf("%s.%s.%05d.zoekt", filepath.Base(abs), fp, shardNum)), nil
 }
 
 func writeShard(fn string, b *zoekt.IndexBuilder) error {
-	if err := os.MkdirAll(filepath.Dir(fn), 0700); err != nil {
+	dir := filepath.Dir(fn)
+	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
 	}
 
-	// TODO - write to temp file and rename on close.  Use a
-	// standard extension so the temp file is never recognized as
-	// an index file.
-
-	f, err := os.OpenFile(
-		fn, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0600)
+	f, err := ioutil.TempFile(dir, filepath.Base(fn))
 	if err != nil {
 		return err
 	}
+
 	defer f.Close()
 	if err := b.Write(f); err != nil {
 		return err
@@ -200,6 +180,10 @@ func writeShard(fn string, b *zoekt.IndexBuilder) error {
 	if err := f.Close(); err != nil {
 		return err
 	}
+	if err := os.Rename(f.Name(), fn); err != nil {
+		return err
+	}
+
 	log.Printf("wrote %s: %d index bytes (overhead %3.1f)", fn, fi.Size(),
 		float64(fi.Size())/float64(b.ContentSize()+1))
 	return nil
