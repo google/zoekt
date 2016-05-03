@@ -267,7 +267,7 @@ func TestAndSearch(t *testing.T) {
 	}
 
 	if matches[0].Matches[0].Offset != 2 || matches[0].Matches[1].Offset != 9 {
-		t.Fatalf("got %v, want offsets 2,9", matches)
+		t.Fatalf("got %#v, want offsets 2,9", matches)
 	}
 
 	wantStats := Stats{
@@ -437,8 +437,11 @@ func TestSearchMatchAllRegexp(t *testing.T) {
 	sres := searchForTest(t, b, &query.Regexp{Regexp: mustParseRE(".")})
 
 	matches := sres.Files
-	if len(matches) != 2 || sres.Stats.MatchCount != 8 {
+	if len(matches) != 2 || sres.Stats.MatchCount != 2 {
 		t.Fatalf("got %v, want 2 matches", matches)
+	}
+	if len(matches[0].Matches[0].Line) != 4 || len(matches[1].Matches[0].Line) != 4 {
+		t.Fatalf("want 4 chars in every file, got %#v", matches)
 	}
 }
 
@@ -690,5 +693,16 @@ func TestRepoName(t *testing.T) {
 	if len(sres.Files) != 1 {
 		t.Fatalf("got %v, want 1 match", sres.Files)
 	}
+}
 
+func TestMergeMatches(t *testing.T) {
+	b := NewIndexBuilder()
+
+	content := []byte("blablabla")
+	b.AddFile("f1", content)
+	sres := searchForTest(t, b,
+		&query.Substring{Pattern: "bla"})
+	if len(sres.Files) != 1 || len(sres.Files[0].Matches) != 1 {
+		t.Fatalf("got %v, want 1 match", sres.Files)
+	}
 }

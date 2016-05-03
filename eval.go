@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"sort"
 
 	"github.com/google/zoekt/query"
 )
@@ -552,31 +553,9 @@ nextFileMatch:
 			Score: 10 * float64(nextDoc) / float64(len(d.boundaries)),
 		}
 
-		foundContentMatch := false
-		visitSubtreeMatches(mt, known, func(s *substrMatchTree) {
-			for _, c := range s.current {
-				fileMatch.Matches = append(fileMatch.Matches, cp.fillMatch(c))
-				if !c.fileName {
-					foundContentMatch = true
-				}
-			}
-		})
-
-		visitRegexMatches(mt, known, func(re *regexpMatchTree) {
-			for _, c := range re.found {
-				foundContentMatch = foundContentMatch || !re.fileName
-				fileMatch.Matches = append(fileMatch.Matches, cp.fillMatch(c))
-			}
-		})
-
-		if foundContentMatch {
-			trimmed := fileMatch.Matches[:0]
-			for _, m := range fileMatch.Matches {
-				if !m.FileName {
-					trimmed = append(trimmed, m)
-				}
-			}
-			fileMatch.Matches = trimmed
+		finalCands := gatherMatches(mt, known)
+		for _, c := range finalCands {
+			fileMatch.Matches = append(fileMatch.Matches, cp.fillMatch(c))
 		}
 
 		maxFileScore := 0.0
@@ -590,27 +569,7 @@ nextFileMatch:
 		}
 		fileMatch.Score += maxFileScore
 
-		foundBranchQuery := false
-		visitMatches(mt, known, func(mt matchTree) {
-			bq, ok := mt.(*branchQueryMatchTree)
-			if ok {
-				foundBranchQuery = true
-				fileMatch.Branches = append(fileMatch.Branches,
-					d.branchNames[int(bq.mask)])
-			}
-		})
-
-		if !foundBranchQuery {
-			mask := d.fileBranchMasks[nextDoc]
-			id := uint32(1)
-			for mask != 0 {
-				if mask&0x1 != 0 {
-					fileMatch.Branches = append(fileMatch.Branches, d.branchNames[int(id)])
-				}
-				id <<= 1
-				mask >>= 1
-			}
-		}
+		fileMatch.Branches = d.gatherBranches(nextDoc, mt, known)
 
 		sortMatchesByScore(fileMatch.Matches)
 		res.Files = append(res.Files, fileMatch)
@@ -638,4 +597,87 @@ func extractSubstringQueries(q query.Q) []*query.Substring {
 		r = append(r, s)
 	}
 	return r
+}
+
+type sortByOffsetSlice []*candidateMatch
+
+func (m sortByOffsetSlice) Len() int           { return len(m) }
+func (m sortByOffsetSlice) Swap(i, j int)      { m[i], m[j] = m[j], m[i] }
+func (m sortByOffsetSlice) Less(i, j int) bool { return m[i].offset < m[j].offset }
+
+func gatherMatches(mt matchTree, known map[matchTree]bool) []*candidateMatch {
+	var cands []*candidateMatch
+	visitMatches(mt, known, func(mt matchTree) {
+		if smt, ok := mt.(*substrMatchTree); ok {
+			cands = append(cands, smt.current...)
+		}
+		if rmt, ok := mt.(*regexpMatchTree); ok {
+			cands = append(cands, rmt.found...)
+		}
+	})
+
+	foundContentMatch := false
+	for _, c := range cands {
+		if !c.fileName {
+			foundContentMatch = true
+			break
+		}
+	}
+
+	res := cands[:0]
+	for _, c := range cands {
+		if !foundContentMatch || !c.fileName {
+			res = append(res, c)
+		}
+	}
+	cands = res
+
+	// merge adjacent candidates.
+	sort.Sort((sortByOffsetSlice)(cands))
+	res = cands[:0]
+	for i, c := range cands {
+		if i == 0 {
+			res = append(res, c)
+			continue
+		}
+		last := res[len(res)-1]
+		lastEnd := last.offset + last.matchSz
+		end := c.offset + c.matchSz
+		if lastEnd >= c.offset {
+			if end > lastEnd {
+				last.matchSz = end - last.offset
+			}
+			continue
+		}
+
+		res = append(res, c)
+	}
+
+	return res
+}
+
+func (d *indexData) gatherBranches(docID uint32, mt matchTree, known map[matchTree]bool) []string {
+	foundBranchQuery := false
+	var branches []string
+	visitMatches(mt, known, func(mt matchTree) {
+		bq, ok := mt.(*branchQueryMatchTree)
+		if ok {
+			foundBranchQuery = true
+			branches = append(branches,
+				d.branchNames[int(bq.mask)])
+		}
+	})
+
+	if !foundBranchQuery {
+		mask := d.fileBranchMasks[docID]
+		id := uint32(1)
+		for mask != 0 {
+			if mask&0x1 != 0 {
+				branches = append(branches, d.branchNames[int(id)])
+			}
+			id <<= 1
+			mask >>= 1
+		}
+	}
+	return branches
 }
