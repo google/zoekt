@@ -16,6 +16,7 @@ package zoekt
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
 	"log"
 )
@@ -31,6 +32,15 @@ func (r *reader) readTOC(toc *indexTOC) {
 	var tocSection simpleSection
 	tocSection.read(r)
 	_, r.err = r.r.Seek(int64(tocSection.off), 0)
+
+	var sz [4]byte
+	_, r.err = r.r.Read(sz[:])
+	sectionCount := binary.BigEndian.Uint32(sz[:])
+	secs := toc.sections()
+	if len(secs) != int(sectionCount) {
+		r.err = fmt.Errorf("section count mismatch: got %d want %d", len(secs), sectionCount)
+	}
+
 	for _, s := range toc.sections() {
 		s.read(r)
 	}
