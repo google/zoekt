@@ -37,6 +37,7 @@ type indexTOC struct {
 	nameNgramText simpleSection
 	namePostings  compoundSection
 	repoName      simpleSection
+	repoURL       simpleSection
 }
 
 func (t *indexTOC) sections() []section {
@@ -51,6 +52,7 @@ func (t *indexTOC) sections() []section {
 		&t.branchMasks,
 		&t.branchNames,
 		&t.repoName,
+		&t.repoURL,
 	}
 }
 
@@ -139,6 +141,10 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 	toc.repoName.start(w)
 	w.Write([]byte(b.repoName))
 	toc.repoName.end(w)
+
+	toc.repoURL.start(w)
+	w.Write([]byte(b.repoURL))
+	toc.repoURL.end(w)
 
 	var tocSection simpleSection
 

@@ -47,6 +47,9 @@ type Options struct {
 
 	// RepoName is name of the repository.
 	RepoName string
+
+	// RepoURL is the URL template for the repository.
+	RepoURL string
 }
 
 type entry struct {
@@ -141,6 +144,7 @@ func (b *Builder) buildShard(todo []entry, nextShardNum int) error {
 	}
 	shardBuilder := zoekt.NewIndexBuilder()
 	shardBuilder.SetName(b.opts.RepoName)
+	shardBuilder.SetRepoURL(b.opts.RepoURL)
 	for _, t := range todo {
 		shardBuilder.AddFileBranches(t.name, t.content, t.branches)
 	}

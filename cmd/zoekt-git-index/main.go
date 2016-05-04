@@ -48,6 +48,32 @@ func treeToFiles(tree *git.Tree) (map[string]git.Oid, error) {
 	return res, err
 }
 
+func guessRepoURL(repoDir string) (string, error) {
+	base, err := git.NewConfig()
+	if err != nil {
+		return "", err
+	}
+	cfg, err := git.OpenOndisk(base, filepath.Join(repoDir, "config"))
+	if err != nil {
+		return "", err
+	}
+
+	url, err := cfg.LookupString("remote.origin.url")
+	if err != nil {
+		return "", err
+	}
+
+	if strings.Contains(url, "googlesource.com/") {
+		/// eg. https://gerrit.googlesource.com/gitiles/+/master/.buckversion
+		return url + "/+/{{.Branch}}/{{.Path}}", nil
+	} else if strings.Contains(url, "github.com/") {
+		// eg. https://github.com/hanwen/go-fuse/blob/notify/genversion.sh
+		return url + "/blob/{{.Branch}}/{{.Path}}", nil
+	}
+
+	return "", fmt.Errorf("scheme unknown for URL %s", url)
+}
+
 func main() {
 	var sizeMax = flag.Int("file_limit", 128*1024, "maximum file size")
 	var shardLimit = flag.Int("shard_limit", 100<<20, "maximum corpus size for a shard")
@@ -79,6 +105,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
+
 		if err := indexGitRepo(opts, arg, *branchPrefix, branches); err != nil {
 			log.Fatal("indexGitRepo", err)
 		}
@@ -111,6 +138,13 @@ func getTreeID(repo *git.Repository, ref string) (*git.Oid, error) {
 func indexGitRepo(opts build.Options, repoDir, branchPrefix string, branches []string) error {
 	repoDir = filepath.Clean(repoDir)
 	opts.RepoName = filepath.Base(repoDir)
+	url, err := guessRepoURL(repoDir)
+	if err != nil {
+		log.Println("no repo URL: %s", err)
+	} else {
+		opts.RepoURL = url
+	}
+
 	if filepath.Base(repoDir) == ".git" {
 		opts.RepoName = filepath.Base(filepath.Dir(repoDir))
 	}

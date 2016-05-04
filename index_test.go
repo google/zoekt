@@ -706,3 +706,19 @@ func TestMergeMatches(t *testing.T) {
 		t.Fatalf("got %v, want 1 match", sres.Files)
 	}
 }
+
+func TestRepoURL(t *testing.T) {
+	b := NewIndexBuilder()
+
+	content := []byte("blablabla")
+	b.AddFile("f1", content)
+	b.SetName("name")
+	b.SetRepoURL("URL")
+	sres := searchForTest(t, b,
+		&query.Substring{Pattern: "bla"})
+
+	if sres.RepoURLs["name"] != "URL" {
+		t.Errorf("got URLs %v, want {name: URL}", sres.RepoURLs)
+	}
+
+}

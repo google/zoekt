@@ -97,6 +97,9 @@ func (s *Stats) Add(o Stats) {
 type SearchResult struct {
 	Stats
 	Files []FileMatch
+
+	// RepoURLs holds a repo => template string map.
+	RepoURLs map[string]string
 }
 
 type Searcher interface {

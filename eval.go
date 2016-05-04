@@ -577,6 +577,9 @@ nextFileMatch:
 		res.Stats.FileCount++
 	}
 	sortFilesByScore(res.Files)
+	res.RepoURLs = map[string]string{
+		d.repoName: d.repoURL,
+	}
 	return &res, nil
 }
 

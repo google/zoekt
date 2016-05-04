@@ -15,6 +15,7 @@
 package zoekt
 
 import (
+	"html/template"
 	"log"
 )
 
@@ -72,6 +73,9 @@ type IndexBuilder struct {
 
 	// The repository name
 	repoName string
+
+	// The repository URL
+	repoURL string
 }
 
 // ContentSize returns the number of content bytes so far ingested.
@@ -92,6 +96,17 @@ func NewIndexBuilder() *IndexBuilder {
 
 func (b *IndexBuilder) SetName(nm string) {
 	b.repoName = nm
+}
+
+// SetRepoURL sets the repository URL template for linking back to
+// files.
+func (b *IndexBuilder) SetRepoURL(url string) error {
+	_, err := template.New("url").Parse(url)
+	if err != nil {
+		return err
+	}
+	b.repoURL = url
+	return nil
 }
 
 // AddFile adds a file. This is the basic ordering for search results,

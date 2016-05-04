@@ -193,7 +193,9 @@ func (ss *shardedSearcher) Search(pat query.Q) (*SearchResult, error) {
 	}
 	ss.mu.Unlock()
 
-	var aggregate SearchResult
+	aggregate := SearchResult{
+		RepoURLs: map[string]string{},
+	}
 	for i := 0; i < shardCount; i++ {
 		r := <-all
 		if r.err != nil {
@@ -201,6 +203,9 @@ func (ss *shardedSearcher) Search(pat query.Q) (*SearchResult, error) {
 		}
 		aggregate.Files = append(aggregate.Files, r.sr.Files...)
 		aggregate.Stats.Add(r.sr.Stats)
+		for k, v := range r.sr.RepoURLs {
+			aggregate.RepoURLs[k] = v
+		}
 	}
 	sortFilesByScore(aggregate.Files)
 	aggregate.Duration = time.Now().Sub(start)

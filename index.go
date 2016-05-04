@@ -52,6 +52,7 @@ type indexData struct {
 	branchIDs       map[string]int
 
 	repoName string
+	repoURL  string
 }
 
 func (data *indexData) getDocIterator(q query.Q) (docIterator, error) {

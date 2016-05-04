@@ -110,6 +110,7 @@ func (r *reader) readIndexData(toc *indexTOC) *indexData {
 	d.fileNameCaseBitsIndex = toc.fileNames.caseBits.relativeIndex()
 	d.fileNameIndex = toc.fileNames.content.relativeIndex()
 	d.repoName = string(r.readSectionBlob(toc.repoName))
+	d.repoURL = string(r.readSectionBlob(toc.repoURL))
 	nameNgramText := r.readSectionBlob(toc.nameNgramText)
 	fileNamePostingsData := r.readSectionBlob(toc.namePostings.data)
 	fileNamePostingsIndex := toc.namePostings.relativeIndex()

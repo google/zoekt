@@ -29,6 +29,8 @@ import (
 	"github.com/google/zoekt/query"
 )
 
+// TODO - split this into a library.
+
 type httpServer struct {
 	searcher zoekt.Searcher
 }
@@ -123,6 +125,7 @@ type FileMatchData struct {
 	Repo     string
 	Branches []string
 	Matches  []MatchData
+	URL      string
 }
 
 type MatchData struct {
@@ -153,7 +156,9 @@ var resultTemplate = template.Must(template.New("page").Parse(`<html>
   in {{.Stats.Duration}}
   <p>
   {{range .FileMatches}}
-    <tt><b>{{.Repo}}</b>:<b>{{.FileName}}</b>:{{if .Branches}}<small>[{{range .Branches}}{{.}}, {{end}}]</small>{{end}} </tt>
+    {{if .URL}}<a href="{{.URL}}">{{end}}
+    <tt><b>{{.Repo}}</b>:<b>{{.FileName}}</b>{{if .URL}}</a>{{end}}:{{if .Branches}}<small>[{{range .Branches}}{{.}}, {{end}}]</small>{{end}} </tt>
+
       <div style="background: #eef;">
     {{range .Matches}}
         <pre>{{.LineNum}}: {{.Pre}}<b>{{.MatchText}}</b>{{.Post}}</pre>
@@ -199,11 +204,32 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 	}
 
 	for _, f := range result.Files {
+
 		fMatch := FileMatchData{
 			FileName: f.Name,
 			Repo:     f.Repo,
 			Branches: f.Branches,
 		}
+
+		if len(f.Branches) > 0 {
+			urlTemplate := result.RepoURLs[f.Repo]
+			t, err := template.New("url").Parse(urlTemplate)
+			if err != nil {
+				log.Println("url template: %v", err)
+			} else {
+				var buf bytes.Buffer
+				err := t.Execute(&buf, map[string]string{
+					"Branch": f.Branches[0],
+					"Path":   f.Name,
+				})
+				if err != nil {
+					log.Println("url template: %v", err)
+				} else {
+					fMatch.URL = buf.String()
+				}
+			}
+		}
+
 		for _, m := range f.Matches {
 			l := m.LineOff
 			e := l + m.MatchLength
