@@ -17,7 +17,6 @@ package zoekt
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"log"
 	"reflect"
 	"regexp/syntax"
@@ -70,39 +69,15 @@ func TestBasic(t *testing.T) {
 
 type memSeeker struct {
 	data []byte
-	off  int64
 }
 
-func (s *memSeeker) Close() error { return nil }
-func (s *memSeeker) Read(b []byte) (int, error) {
-	var err error
-	n := int64(len(b)) + s.off
-	if n > int64(len(s.data)) {
-		err = io.EOF
-		n = int64(len(s.data))
-	}
-
-	m := copy(b, s.data[s.off:n])
-	s.off = n
-	return m, err
+func (s *memSeeker) Close() {}
+func (s *memSeeker) Read(off, sz uint32) ([]byte, error) {
+	return s.data[off : off+sz], nil
 }
 
-func (s *memSeeker) Seek(off int64, whence int) (int64, error) {
-	var n int64
-	switch whence {
-	case 0:
-		n = off
-	case 1:
-		n = s.off + off
-	case 2:
-		n = int64(len(s.data)) + off
-	}
-
-	if n > int64(len(s.data)) || n < 0 {
-		return s.off, fmt.Errorf("out of range")
-	}
-	s.off = n
-	return s.off, nil
+func (s *memSeeker) Size() (uint32, error) {
+	return uint32(len(s.data)), nil
 }
 
 func TestNewlines(t *testing.T) {
@@ -132,54 +107,10 @@ func TestNewlines(t *testing.T) {
 	}
 }
 
-func TestCaseBits(t *testing.T) {
-	b := NewIndexBuilder()
-	b.AddFile("filename", []byte("abCDE"))
-
-	var buf bytes.Buffer
-	b.Write(&buf)
-	f := &memSeeker{buf.Bytes(), 0}
-
-	r := reader{r: f}
-
-	var toc indexTOC
-	r.readTOC(&toc)
-	if r.err != nil {
-		t.Errorf("got read error %v", r.err)
-	}
-	data := r.readIndexData(&toc)
-	got := r.readContents(data, 0)
-
-	if want := []byte("abcde"); bytes.Compare(got, want) != 0 {
-		t.Errorf("got %q, want %q", got, want)
-	}
-}
-
-func TestDelta(t *testing.T) {
-	b := NewIndexBuilder()
-
-	b.AddFile("f1", []byte("abc abc"))
-	// ---------------------0123456
-	var buf bytes.Buffer
-	b.Write(&buf)
-	f := &memSeeker{buf.Bytes(), 0}
-
-	r := reader{r: f}
-
-	var toc indexTOC
-	r.readTOC(&toc)
-	data := r.readIndexData(&toc)
-
-	got := fromDeltas(r.readSectionBlob(data.ngrams[stringToNGram("abc")]))
-	if want := []uint32{0, 4}; !reflect.DeepEqual(got, want) {
-		t.Errorf("got posting data %v, want %v", got, want)
-	}
-}
-
 func searchForTest(t *testing.T, b *IndexBuilder, q query.Q) *SearchResult {
 	var buf bytes.Buffer
 	b.Write(&buf)
-	f := &memSeeker{buf.Bytes(), 0}
+	f := &memSeeker{buf.Bytes()}
 
 	searcher, err := NewSearcher(f)
 	if err != nil {

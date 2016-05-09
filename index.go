@@ -28,7 +28,8 @@ var _ = log.Println
 // indexData holds the pattern-independent data that we have to have
 // in memory to search.
 type indexData struct {
-	reader *reader
+	file IndexFile
+	err  error
 
 	ngrams map[ngram]simpleSection
 
@@ -193,15 +194,15 @@ func (data *indexData) getContentDocIterator(query *query.Substring) (docIterato
 	input.leftPad = firstI
 	input.rightPad = uint32(len(str)-ngramSize) - lastI
 
-	input.first = fromDeltas(data.reader.readSectionBlob(first))
-	if data.reader.err != nil {
-		return nil, data.reader.err
+	input.first = fromDeltas(data.readSectionBlob(first))
+	if data.err != nil {
+		return nil, data.err
 	}
 
 	if firstI != lastI {
-		input.last = fromDeltas(data.reader.readSectionBlob(last))
-		if data.reader.err != nil {
-			return nil, data.reader.err
+		input.last = fromDeltas(data.readSectionBlob(last))
+		if data.err != nil {
+			return nil, data.err
 		}
 	} else {
 		input.last = input.first
@@ -220,6 +221,6 @@ func (d *indexData) fileName(i uint32) []byte {
 	return toOriginal(data, cb, 0, len(data))
 }
 
-func (s *indexData) Close() error {
-	return s.reader.r.Close()
+func (s *indexData) Close() {
+	s.file.Close()
 }

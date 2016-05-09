@@ -17,9 +17,31 @@ package zoekt
 import (
 	"encoding/binary"
 	"fmt"
-	"io"
 	"log"
+	"os"
 )
+
+// reader is a ReadSeekCloser that keeps track of errors
+type reader struct {
+	r   IndexFile
+	off uint32
+	err error
+}
+
+func (r *reader) seek(off uint32) {
+	r.off = off
+}
+
+func (r *reader) U32() uint32 {
+	if r.err != nil {
+		return 0
+	}
+
+	var b []byte
+	b, r.err = r.r.Read(r.off, 4)
+	r.off += 4
+	return binary.BigEndian.Uint32(b[:])
+}
 
 var _ = log.Println
 
@@ -28,14 +50,16 @@ func (r *reader) readTOC(toc *indexTOC) {
 		return
 	}
 
-	r.r.Seek(-8, 2)
+	var sz uint32
+	sz, r.err = r.r.Size()
+	r.off = sz - 8
+
 	var tocSection simpleSection
 	tocSection.read(r)
-	_, r.err = r.r.Seek(int64(tocSection.off), 0)
 
-	var sz [4]byte
-	_, r.err = r.r.Read(sz[:])
-	sectionCount := binary.BigEndian.Uint32(sz[:])
+	r.seek(tocSection.off)
+
+	sectionCount := r.U32()
 	secs := toc.sections()
 	if len(secs) != int(sectionCount) {
 		r.err = fmt.Errorf("section count mismatch: got %d want %d", len(secs), sectionCount)
@@ -46,16 +70,17 @@ func (r *reader) readTOC(toc *indexTOC) {
 	}
 }
 
-// TODO - mmap the file. We cycle through a lot of garbage to load
-// file contents.
-func (r *reader) readSectionBlob(sec simpleSection) []byte {
-	d := make([]byte, sec.sz)
-	r.r.Seek(int64(sec.off), 0)
-	_, r.err = r.r.Read(d)
-	return d
+func (r *indexData) readSectionBlob(sec simpleSection) []byte {
+	if r.err != nil {
+		return nil
+	}
+
+	var res []byte
+	res, r.err = r.file.Read(sec.off, sec.sz)
+	return res
 }
 
-func (r *reader) readSectionU32(sec simpleSection) []uint32 {
+func (r *indexData) readSectionU32(sec simpleSection) []uint32 {
 	if sec.sz%4 != 0 {
 		log.Panic("barf", sec.sz)
 	}
@@ -69,7 +94,7 @@ func (r *reader) readSectionU32(sec simpleSection) []uint32 {
 }
 
 type indexReader interface {
-	readIndex(*reader)
+	readIndex(*indexData)
 }
 
 func (r *reader) readIndexData(toc *indexTOC) *indexData {
@@ -77,24 +102,25 @@ func (r *reader) readIndexData(toc *indexTOC) *indexData {
 		return nil
 	}
 
-	for _, sec := range toc.sections() {
-		if ir, ok := sec.(indexReader); ok {
-			ir.readIndex(r)
-		}
-	}
-
 	d := indexData{
-		postingsIndex:  toc.postings.absoluteIndex(),
-		caseBitsIndex:  toc.fileContents.caseBits.absoluteIndex(),
-		boundaries:     toc.fileContents.content.absoluteIndex(),
-		newlinesIndex:  toc.newlines.absoluteIndex(),
+		file:           r.r,
 		ngrams:         map[ngram]simpleSection{},
 		fileNameNgrams: map[ngram][]uint32{},
 		branchNames:    map[int]string{},
 		branchIDs:      map[string]int{},
 	}
+	for _, sec := range toc.sections() {
+		if ir, ok := sec.(indexReader); ok {
+			ir.readIndex(&d)
+		}
+	}
 
-	textContent := r.readSectionBlob(toc.ngramText)
+	d.postingsIndex = toc.postings.absoluteIndex()
+	d.caseBitsIndex = toc.fileContents.caseBits.absoluteIndex()
+	d.boundaries = toc.fileContents.content.absoluteIndex()
+	d.newlinesIndex = toc.newlines.absoluteIndex()
+
+	textContent := d.readSectionBlob(toc.ngramText)
 	for i := 0; i < len(textContent); i += ngramSize {
 		j := i / ngramSize
 		d.ngrams[bytesToNGram(textContent[i:i+ngramSize])] = simpleSection{
@@ -104,15 +130,15 @@ func (r *reader) readIndexData(toc *indexTOC) *indexData {
 	}
 
 	d.fileEnds = toc.fileContents.content.relativeIndex()[1:]
-	d.fileBranchMasks = r.readSectionU32(toc.branchMasks)
-	d.fileNameContent = r.readSectionBlob(toc.fileNames.content.data)
-	d.fileNameCaseBits = r.readSectionBlob(toc.fileNames.caseBits.data)
+	d.fileBranchMasks = d.readSectionU32(toc.branchMasks)
+	d.fileNameContent = d.readSectionBlob(toc.fileNames.content.data)
+	d.fileNameCaseBits = d.readSectionBlob(toc.fileNames.caseBits.data)
 	d.fileNameCaseBitsIndex = toc.fileNames.caseBits.relativeIndex()
 	d.fileNameIndex = toc.fileNames.content.relativeIndex()
-	d.repoName = string(r.readSectionBlob(toc.repoName))
-	d.repoURL = string(r.readSectionBlob(toc.repoURL))
-	nameNgramText := r.readSectionBlob(toc.nameNgramText)
-	fileNamePostingsData := r.readSectionBlob(toc.namePostings.data)
+	d.repoName = string(d.readSectionBlob(toc.repoName))
+	d.repoURL = string(d.readSectionBlob(toc.repoURL))
+	nameNgramText := d.readSectionBlob(toc.nameNgramText)
+	fileNamePostingsData := d.readSectionBlob(toc.namePostings.data)
 	fileNamePostingsIndex := toc.namePostings.relativeIndex()
 	for i := 0; i < len(nameNgramText); i += ngramSize {
 		j := i / ngramSize
@@ -121,7 +147,7 @@ func (r *reader) readIndexData(toc *indexTOC) *indexData {
 		d.fileNameNgrams[bytesToNGram(nameNgramText[i:i+ngramSize])] = fromDeltas(fileNamePostingsData[off:end])
 	}
 
-	branchNameContent := r.readSectionBlob(toc.branchNames.data)
+	branchNameContent := d.readSectionBlob(toc.branchNames.data)
 	if branchNameIndex := toc.branchNames.relativeIndex(); len(branchNameIndex) > 0 {
 		var last uint32
 		for i, end := range branchNameIndex[1:] {
@@ -135,22 +161,22 @@ func (r *reader) readIndexData(toc *indexTOC) *indexData {
 	return &d
 }
 
-func (r *reader) readContents(d *indexData, i uint32) []byte {
-	return r.readSectionBlob(simpleSection{
+func (d *indexData) readContents(i uint32) []byte {
+	return d.readSectionBlob(simpleSection{
 		off: d.boundaries[i],
 		sz:  d.boundaries[i+1] - d.boundaries[i],
 	})
 }
 
-func (r *reader) readCaseBits(d *indexData, i uint32) []byte {
-	return r.readSectionBlob(simpleSection{
+func (d *indexData) readCaseBits(i uint32) []byte {
+	return d.readSectionBlob(simpleSection{
 		off: d.caseBitsIndex[i],
 		sz:  d.caseBitsIndex[i+1] - d.caseBitsIndex[i],
 	})
 }
 
-func (r *reader) readNewlines(d *indexData, i uint32) []uint32 {
-	blob := r.readSectionBlob(simpleSection{
+func (d *indexData) readNewlines(i uint32) []uint32 {
+	blob := d.readSectionBlob(simpleSection{
 		off: d.newlinesIndex[i],
 		sz:  d.newlinesIndex[i+1] - d.newlinesIndex[i],
 	})
@@ -158,12 +184,16 @@ func (r *reader) readNewlines(d *indexData, i uint32) []uint32 {
 	return fromDeltas(blob)
 }
 
-type ReadSeekCloser interface {
-	io.ReadSeeker
-	io.Closer
+// IndexFile is a file suitable for concurrent read access. For performance
+// reasons, it allows a mmap'd implementation.
+type IndexFile interface {
+	Read(off uint32, sz uint32) ([]byte, error)
+	Size() (uint32, error)
+	Close()
 }
 
-func NewSearcher(r ReadSeekCloser) (Searcher, error) {
+// NewSearcher creates a Searcher for a single index file.
+func NewSearcher(r IndexFile) (Searcher, error) {
 	rd := &reader{r: r}
 
 	var toc indexTOC
@@ -172,6 +202,40 @@ func NewSearcher(r ReadSeekCloser) (Searcher, error) {
 	if rd.err != nil {
 		return nil, rd.err
 	}
-	indexData.reader = rd
+	indexData.file = r
 	return indexData, nil
+}
+
+// NewIndexFile wraps a os.File to be an IndexFile.
+func NewIndexFile(f *os.File) IndexFile {
+	return &indexFileFromOS{f}
+}
+
+type indexFileFromOS struct {
+	f *os.File
+}
+
+func (f *indexFileFromOS) Read(off, sz uint32) ([]byte, error) {
+	r := make([]byte, sz)
+	_, err := f.f.ReadAt(r, int64(off))
+	return r, err
+}
+
+func (f indexFileFromOS) Size() (uint32, error) {
+	fi, err := f.f.Stat()
+	if err != nil {
+		return 0, err
+	}
+
+	sz := fi.Size()
+
+	if sz >= maxUInt32 {
+		return 0, fmt.Errorf("overflow")
+	}
+
+	return uint32(sz), nil
+}
+
+func (f indexFileFromOS) Close() {
+	f.f.Close()
 }

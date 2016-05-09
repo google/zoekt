@@ -120,6 +120,11 @@ func (b *Builder) flush() {
 	if b.buildError != nil {
 		return
 	}
+
+	if len(todo) == 0 {
+		return
+	}
+
 	shard := b.nextShardNum
 	b.nextShardNum++
 	b.building.Add(1)

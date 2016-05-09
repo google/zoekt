@@ -44,7 +44,7 @@ func loadShard(fn string) (*searchShard, error) {
 		return nil, err
 	}
 
-	s, err := NewSearcher(f)
+	s, err := NewSearcher(NewIndexFile(f))
 	if err != nil {
 		return nil, fmt.Errorf("NewSearcher(%s): %v", fn, err)
 	}
@@ -157,9 +157,9 @@ func NewShardedSearcher(dir string) (Searcher, error) {
 	return &ss, nil
 }
 
-func (ss *shardedSearcher) Close() error {
+func (ss *shardedSearcher) Close() {
 	if ss.quit == nil {
-		return nil
+		return
 	}
 
 	close(ss.quit)
@@ -169,8 +169,6 @@ func (ss *shardedSearcher) Close() error {
 		s.Close()
 	}
 	ss.mu.Unlock()
-
-	return nil
 }
 
 func (ss *shardedSearcher) Search(pat query.Q) (*SearchResult, error) {

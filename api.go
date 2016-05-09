@@ -104,5 +104,5 @@ type SearchResult struct {
 
 type Searcher interface {
 	Search(q query.Q) (*SearchResult, error)
-	Close() error
+	Close()
 }

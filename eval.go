@@ -492,7 +492,6 @@ nextFileMatch:
 			fileStart = d.fileEnds[nextDoc-1]
 		}
 		cp := contentProvider{
-			reader:   d.reader,
 			id:       d,
 			idx:      nextDoc,
 			stats:    &res.Stats,

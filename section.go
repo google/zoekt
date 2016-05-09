@@ -59,21 +59,6 @@ func (w *writer) Varint(n uint32) {
 	w.Write(enc[:m])
 }
 
-// reader is a ReadSeekCloser that keeps track of errors
-type reader struct {
-	r   ReadSeekCloser
-	err error
-}
-
-func (r *reader) U32() uint32 {
-	if r.err != nil {
-		return 0
-	}
-	var b [4]byte
-	_, r.err = r.r.Read(b[:])
-	return binary.BigEndian.Uint32(b[:])
-}
-
 func (s *simpleSection) start(w *writer) {
 	s.off = w.Off()
 }
@@ -142,7 +127,7 @@ func (s *compoundSection) read(r *reader) {
 	// cannot read items.
 }
 
-func (s *compoundSection) readIndex(r *reader) {
+func (s *compoundSection) readIndex(r *indexData) {
 	s.offsets = r.readSectionU32(s.index)
 }
 
@@ -167,7 +152,7 @@ func (s *compoundSection) relativeIndex() []uint32 {
 	return ri
 }
 
-func (s *compoundSection) readBlob(r *reader, i uint32) []byte {
+func (s *compoundSection) readBlob(r *indexData, i uint32) []byte {
 	return r.readSectionBlob(simpleSection{s.offsets[i], s.offsets[i+1] - s.offsets[i]})
 }
 
@@ -176,7 +161,7 @@ type contentSection struct {
 	caseBits compoundSection
 }
 
-func (s *contentSection) readIndex(r *reader) {
+func (s *contentSection) readIndex(r *indexData) {
 	s.content.readIndex(r)
 	s.caseBits.readIndex(r)
 }

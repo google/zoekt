@@ -25,7 +25,6 @@ var _ = log.Println
 // contentProvider is an abstraction to treat matches for names and
 // content with the same code.
 type contentProvider struct {
-	reader   *reader
 	id       *indexData
 	idx      uint32
 	stats    *Stats
@@ -37,7 +36,7 @@ type contentProvider struct {
 
 func (p *contentProvider) newlines() []uint32 {
 	if p._nl == nil {
-		p._nl = p.reader.readNewlines(p.id, p.idx)
+		p._nl = p.id.readNewlines(p.idx)
 	}
 	return p._nl
 }
@@ -48,7 +47,7 @@ func (p *contentProvider) data(fileName bool) []byte {
 	}
 
 	if p._data == nil {
-		p._data = p.reader.readContents(p.id, p.idx)
+		p._data = p.id.readContents(p.idx)
 		p.stats.FilesLoaded++
 		p.stats.BytesLoaded += int64(len(p._data))
 	}
@@ -61,7 +60,7 @@ func (p *contentProvider) caseBits(fileName bool) []byte {
 	}
 
 	if p._cb == nil {
-		p._cb = p.reader.readCaseBits(p.id, p.idx)
+		p._cb = p.id.readCaseBits(p.idx)
 	}
 	return p._cb
 }
@@ -122,13 +121,6 @@ func matchScore(m *Match) float64 {
 	startBoundary := m.LineOff < len(m.Line) && (m.LineOff == 0 || byteClass(m.Line[m.LineOff-1]) != byteClass(m.Line[m.LineOff]))
 
 	end := int(m.LineOff) + m.MatchLength
-	if end > len(m.Line) {
-		// I see an occasional out-of-bounds panic when
-		// computing endBoundary. Since the problem is not
-		// reproducible, try to gather some more data.
-		log.Panicf("end %d out of bounds (l %d), match: %#v", end, len(m.Line), m)
-	}
-
 	endBoundary := end > 0 && (end == len(m.Line) || byteClass(m.Line[end-1]) != byteClass(m.Line[end]))
 
 	if startBoundary && endBoundary {
