@@ -26,7 +26,6 @@ var _ = log.Println
 type indexTOC struct {
 	fileContents contentSection
 	fileNames    contentSection
-	caseBits     compoundSection
 	postings     compoundSection
 	newlines     compoundSection
 	ngramText    simpleSection
