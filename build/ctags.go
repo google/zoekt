@@ -29,7 +29,7 @@ import (
 
 func runCTags(bin string, inputs map[string][]byte) ([]*ctags.Entry, error) {
 	if len(inputs) == 0 {
-		return nil, fmt.Errorf("no inputs")
+		return nil, nil
 	}
 	dir, err := ioutil.TempDir("", "")
 	if err != nil {
@@ -74,6 +74,35 @@ func runCTags(bin string, inputs map[string][]byte) ([]*ctags.Entry, error) {
 	return entries, nil
 }
 
+func runCTagsChunked(bin string, in map[string][]byte) ([]*ctags.Entry, error) {
+	var res []*ctags.Entry
+
+	cur := map[string][]byte{}
+	sz := 0
+	for k, v := range in {
+		cur[k] = v
+		sz += len(k)
+
+		// 100k seems reasonable.
+		if sz > (100 << 10) {
+			r, err := runCTags(bin, cur)
+			if err != nil {
+				return nil, err
+			}
+			res = append(res, r...)
+
+			cur = map[string][]byte{}
+			sz = 0
+		}
+	}
+	r, err := runCTags(bin, cur)
+	if err != nil {
+		return nil, err
+	}
+	res = append(res, r...)
+	return res, nil
+}
+
 func ctagsAddSymbols(todo []*zoekt.Document, bin string) error {
 	pathIndices := map[string]int{}
 	contents := map[string][]byte{}
@@ -90,7 +119,8 @@ func ctagsAddSymbols(todo []*zoekt.Document, bin string) error {
 		pathIndices[t.Name] = i
 		contents[t.Name] = t.Content
 	}
-	entries, err := runCTags(bin, contents)
+
+	entries, err := runCTagsChunked(bin, contents)
 	if err != nil {
 		return err
 	}
@@ -115,6 +145,10 @@ func tagsToSections(content []byte, tags []*ctags.Entry) ([]zoekt.DocumentSectio
 	nls = append(nls, uint32(len(content)))
 	var symOffsets []zoekt.DocumentSection
 	for _, t := range tags {
+		if t.Line <= 0 {
+			// Observed this with a .JS file.
+			continue
+		}
 		lineIdx := t.Line - 1
 		if lineIdx >= len(nls) {
 			log.Println("nls", nls)
@@ -125,7 +159,9 @@ func tagsToSections(content []byte, tags []*ctags.Entry) ([]zoekt.DocumentSectio
 		if lineIdx > 0 {
 			lineOff = nls[lineIdx-1] + 1
 		}
-		line := content[lineOff:nls[lineIdx]]
+
+		end := nls[lineIdx]
+		line := content[lineOff:end]
 
 		intraOff := bytes.Index(line, []byte(t.Sym))
 		if intraOff < 0 {
