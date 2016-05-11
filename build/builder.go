@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sync"
 
@@ -50,6 +51,9 @@ type Options struct {
 
 	// RepoURL is the URL template for the repository.
 	RepoURL string
+
+	// Path to exuberant ctags binary to run
+	CTags string
 }
 
 // Builder manages (parallel) creation of uniformly sized shards.
@@ -58,13 +62,30 @@ type Builder struct {
 	throttle chan int
 
 	nextShardNum int
-	todo         []zoekt.Document
+	todo         []*zoekt.Document
 	size         int
 
 	building sync.WaitGroup
 
 	errMu      sync.Mutex
 	buildError error
+}
+
+// SetDefaults sets reasonable default options.
+func (o *Options) SetDefaults() {
+	if o.CTags == "" {
+		ctags, err := exec.LookPath("ctags-exuberant")
+		if err == nil {
+			o.CTags = ctags
+		}
+	}
+
+	if o.SizeMax == 0 {
+		o.SizeMax = 128 << 10
+	}
+	if o.ShardMax == 0 {
+		o.ShardMax = 128 << 20
+	}
 }
 
 // NewBuilder creates a new Builder instance.
@@ -87,7 +108,7 @@ func (b *Builder) Add(doc zoekt.Document) {
 		return
 	}
 
-	b.todo = append(b.todo, doc)
+	b.todo = append(b.todo, &doc)
 	b.size += len(doc.Name) + len(doc.Content)
 
 	if b.size > b.opts.ShardMax {
@@ -120,6 +141,12 @@ func (b *Builder) flush() {
 	b.building.Add(1)
 	go func() {
 		b.throttle <- 1
+		if b.opts.CTags != "" {
+			if err := ctagsAddSymbols(todo, b.opts.CTags); err != nil {
+				log.Printf("ignoring %s error: %v", b.opts.CTags, err)
+			}
+		}
+
 		err := b.buildShard(todo, shard)
 		<-b.throttle
 
@@ -132,16 +159,17 @@ func (b *Builder) flush() {
 	}()
 }
 
-func (b *Builder) buildShard(todo []zoekt.Document, nextShardNum int) error {
+func (b *Builder) buildShard(todo []*zoekt.Document, nextShardNum int) error {
 	name, err := shardName(b.opts.IndexDir, b.opts.RepoName, nextShardNum)
 	if err != nil {
 		return err
 	}
+
 	shardBuilder := zoekt.NewIndexBuilder()
 	shardBuilder.SetName(b.opts.RepoName)
 	shardBuilder.SetRepoURL(b.opts.RepoURL)
 	for _, t := range todo {
-		shardBuilder.Add(t)
+		shardBuilder.Add(*t)
 	}
 	return writeShard(name, shardBuilder)
 }

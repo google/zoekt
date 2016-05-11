@@ -114,7 +114,7 @@ func (b *IndexBuilder) SetRepoURL(url string) error {
 }
 
 type DocumentSection struct {
-	start, end uint32
+	Start, End uint32
 }
 
 // Document holds a document (file) to index.
@@ -130,7 +130,7 @@ type docSectionSlice []DocumentSection
 
 func (m docSectionSlice) Len() int           { return len(m) }
 func (m docSectionSlice) Swap(i, j int)      { m[i], m[j] = m[j], m[i] }
-func (m docSectionSlice) Less(i, j int) bool { return m[i].start < m[j].start }
+func (m docSectionSlice) Less(i, j int) bool { return m[i].Start < m[j].Start }
 
 // AddFile is a convenience wrapper for Add
 func (b *IndexBuilder) AddFile(name string, content []byte) {
@@ -160,7 +160,7 @@ func (b *IndexBuilder) Add(doc Document) error {
 	var last DocumentSection
 	for i, s := range doc.Symbols {
 		if i > 0 {
-			if last.end > s.start {
+			if last.End > s.Start {
 				return fmt.Errorf("sections overlap")
 			}
 		}

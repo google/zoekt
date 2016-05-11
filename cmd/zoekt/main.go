@@ -38,19 +38,19 @@ func displayMatches(files []zoekt.FileMatch, pat string) {
 
 func main() {
 	index := flag.String("index_dir",
-		filepath.Join(os.Getenv("HOME"), ".zoekt"), "index dir")
-	cpuProfile := flag.String("cpu_profile", "", "write cpu profile to file")
+		filepath.Join(os.Getenv("HOME"), ".zoekt"), "search for index files in `directory`")
+	cpuProfile := flag.String("cpu_profile", "", "write cpu profile to `file`")
 	verbose := flag.Bool("v", false, "print some background data")
 
 	flag.Usage = func() {
 		name := os.Args[0]
 		fmt.Fprintf(os.Stderr, "Usage:\n\n  %s [option] QUERY\n"+
-			`eg %s 'byte file:java -file:test'`, name, name)
+			`for example\n\n  %s 'byte file:java -file:test'`+"\n\n", name, name)
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\n")
 	}
-
 	flag.Parse()
+
 	if len(flag.Args()) == 0 {
 		fmt.Fprintf(os.Stderr, "Pattern is missing.\n")
 		flag.Usage()

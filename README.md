@@ -29,6 +29,8 @@ Starting the web interface
     go install github.com/google/zoekt/cmd/zoekt-webserver
     $GOPATH/bin/zoekt-webserver -listen :6070
 
+It is recommended to install exuberant CTags. If available, it will be
+used to improve ranking.
 
 
 BACKGROUND

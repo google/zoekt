@@ -129,14 +129,14 @@ const (
 
 func findSection(secs []DocumentSection, off, sz uint32) *DocumentSection {
 	j := sort.Search(len(secs), func(i int) bool {
-		return secs[i].end >= off+sz
+		return secs[i].End >= off+sz
 	})
 
 	if j == len(secs) {
 		return nil
 	}
 
-	if secs[j].start <= off && off+sz <= secs[j].end {
+	if secs[j].Start <= off && off+sz <= secs[j].End {
 		return &secs[j]
 	}
 	return nil

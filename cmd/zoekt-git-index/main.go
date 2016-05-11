@@ -92,6 +92,7 @@ func main() {
 		ShardMax:    *shardLimit,
 		IndexDir:    *indexDir,
 	}
+	opts.SetDefaults()
 
 	var branches []string
 	if *branchesStr != "" {

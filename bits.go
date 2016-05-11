@@ -163,7 +163,7 @@ func byteClass(c byte) int {
 func marshalDocSections(secs []DocumentSection) []byte {
 	ints := make([]uint32, 0, len(secs)*2)
 	for _, s := range secs {
-		ints = append(ints, uint32(s.start), uint32(s.end))
+		ints = append(ints, uint32(s.Start), uint32(s.End))
 	}
 
 	return toDeltas(ints)

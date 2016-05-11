@@ -56,6 +56,7 @@ func main() {
 		ShardMax:    *shardLimit,
 		IndexDir:    *indexDir,
 	}
+	opts.SetDefaults()
 
 	if *cpuProfile != "" {
 		f, err := os.Create(*cpuProfile)
