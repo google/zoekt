@@ -159,3 +159,22 @@ func byteClass(c byte) int {
 		return _classOther
 	}
 }
+
+func marshalDocSections(secs []DocumentSection) []byte {
+	ints := make([]uint32, 0, len(secs)*2)
+	for _, s := range secs {
+		ints = append(ints, uint32(s.start), uint32(s.end))
+	}
+
+	return toDeltas(ints)
+}
+
+func unmarshalDocSections(in []byte) (secs []DocumentSection) {
+	ints := fromDeltas(in)
+	res := make([]DocumentSection, 0, len(ints)/2)
+	for len(ints) > 0 {
+		res = append(res, DocumentSection{ints[0], ints[1]})
+		ints = ints[2:]
+	}
+	return res
+}

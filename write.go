@@ -26,6 +26,7 @@ var _ = log.Println
 type indexTOC struct {
 	fileContents contentSection
 	fileNames    contentSection
+	fileSections compoundSection
 	postings     compoundSection
 	newlines     compoundSection
 	ngramText    simpleSection
@@ -43,6 +44,7 @@ func (t *indexTOC) sections() []section {
 	return []section{
 		&t.fileContents,
 		&t.fileNames,
+		&t.fileSections,
 		&t.newlines,
 		&t.ngramText,
 		&t.postings,
@@ -83,6 +85,12 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 		w.U32(m)
 	}
 	toc.branchMasks.end(w)
+
+	toc.fileSections.start(w)
+	for _, s := range b.docSections {
+		toc.fileSections.addItem(w, marshalDocSections(s))
+	}
+	toc.fileSections.end(w)
 
 	var keys []string
 	for k := range b.contentPostings {

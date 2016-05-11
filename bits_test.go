@@ -83,3 +83,12 @@ func BenchmarkToOriginal(b *testing.B) {
 		result = append(result, toOriginal(lwr, cb, len(pre), len(line)+len(pre)))
 	}
 }
+
+func TestDocSection(t *testing.T) {
+	in := []DocumentSection{{1, 2}, {3, 4}}
+	serialized := marshalDocSections(in)
+	roundtrip := unmarshalDocSections(serialized)
+	if !reflect.DeepEqual(in, roundtrip) {
+		t.Errorf("got %v, want %v", roundtrip, in)
+	}
+}

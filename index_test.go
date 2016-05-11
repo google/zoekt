@@ -433,13 +433,19 @@ func TestWordBoundaryRanking(t *testing.T) {
 		Pattern: "byte",
 	})
 
-	if len(sres.Files) != 3 || sres.Files[0].Name != "f2" || len(sres.Files[0].Matches) != 3 {
-		t.Fatalf("got %#v, want 3 matches in files f2", sres.Files)
+	if len(sres.Files) != 3 {
+		t.Fatalf("got %#v, want 3 files", sres.Files)
 	}
-	if sres.Files[0].Matches[0].Offset != 13 {
+
+	file0 := sres.Files[0]
+	if file0.Name != "f2" || len(file0.Matches) != 3 {
+		t.Fatalf("got file %s, num matches %d (%#v), want 3 matches in file f2", file0.Name, len(file0.Matches), file0)
+	}
+
+	if file0.Matches[0].Offset != 13 {
 		t.Fatalf("got first match %#v, want full word match", sres.Files[0].Matches[0])
 	}
-	if sres.Files[0].Matches[1].Offset != 7 {
+	if file0.Matches[1].Offset != 7 {
 		t.Fatalf("got second match %#v, want partial word match", sres.Files[0].Matches[0])
 	}
 }
@@ -667,5 +673,37 @@ func TestCaseRegexp(t *testing.T) {
 
 	if len(res.Files) > 0 {
 		t.Fatalf("got %v, want no matches", res.Files)
+	}
+}
+
+func TestSymbolRank(t *testing.T) {
+	b := NewIndexBuilder()
+
+	content := []byte("func bla() blub")
+	// ----------------012345678901234
+	b.Add(Document{
+		Name:    "f1",
+		Content: content,
+	})
+	b.Add(Document{
+		Name:    "f2",
+		Content: content,
+		Symbols: []DocumentSection{{5, 8}},
+	})
+	b.Add(Document{
+		Name:    "f3",
+		Content: content,
+	})
+
+	res := searchForTest(t, b,
+		&query.Substring{
+			Pattern: "bla",
+		})
+
+	if len(res.Files) != 3 {
+		t.Errorf("got %#v, want 3 files", res.Files)
+	}
+	if res.Files[0].Name != "f2" {
+		t.Errorf("got %#v, want 'f2' as top match", res.Files[0])
 	}
 }

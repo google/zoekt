@@ -31,7 +31,15 @@ type contentProvider struct {
 	_cb      []byte
 	_data    []byte
 	_nl      []uint32
+	_sects   []DocumentSection
 	fileSize uint32
+}
+
+func (p *contentProvider) docSections() []DocumentSection {
+	if p._sects == nil {
+		p._sects = p.id.readDocSections(p.idx)
+	}
+	return p._sects
 }
 
 func (p *contentProvider) newlines() []uint32 {
@@ -106,30 +114,53 @@ func (p *contentProvider) fillMatch(m *candidateMatch) Match {
 		finalMatch.Line = toOriginal(p.data(false), p.caseBits(false), start, end)
 	}
 
-	finalMatch.Score = matchScore(&finalMatch)
+	sects := p.docSections()
+	finalMatch.Score = matchScore(sects, &finalMatch)
 
 	return finalMatch
 }
 
 const (
 	// TODO - how to scale this relative to rank?
-	scorePartialWordMatch = 5000.0
-	scoreWordMatch        = 50000.0
+	scorePartialWordMatch = 50.0
+	scoreWordMatch        = 500.0
+	scoreSymbol           = 5000.0
 )
 
-func matchScore(m *Match) float64 {
+func findSection(secs []DocumentSection, off, sz uint32) *DocumentSection {
+	j := sort.Search(len(secs), func(i int) bool {
+		return secs[i].end >= off+sz
+	})
+
+	if j == len(secs) {
+		return nil
+	}
+
+	if secs[j].start <= off && off+sz <= secs[j].end {
+		return &secs[j]
+	}
+	return nil
+}
+
+func matchScore(secs []DocumentSection, m *Match) float64 {
+
 	startBoundary := m.LineOff < len(m.Line) && (m.LineOff == 0 || byteClass(m.Line[m.LineOff-1]) != byteClass(m.Line[m.LineOff]))
 
 	end := int(m.LineOff) + m.MatchLength
 	endBoundary := end > 0 && (end == len(m.Line) || byteClass(m.Line[end-1]) != byteClass(m.Line[end]))
 
+	score := 0.0
 	if startBoundary && endBoundary {
-		return scoreWordMatch
+		score = scoreWordMatch
 	} else if startBoundary || endBoundary {
-		return scorePartialWordMatch
+		score = scorePartialWordMatch
 	}
 
-	return 0.0
+	sec := findSection(secs, m.Offset, uint32(m.MatchLength))
+	if sec != nil {
+		score += scoreSymbol
+	}
+	return score
 }
 
 type matchScoreSlice []Match

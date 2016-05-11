@@ -119,6 +119,7 @@ func (r *reader) readIndexData(toc *indexTOC) *indexData {
 	d.caseBitsIndex = toc.fileContents.caseBits.absoluteIndex()
 	d.boundaries = toc.fileContents.content.absoluteIndex()
 	d.newlinesIndex = toc.newlines.absoluteIndex()
+	d.docSectionsIndex = toc.fileSections.absoluteIndex()
 
 	textContent := d.readSectionBlob(toc.ngramText)
 	for i := 0; i < len(textContent); i += ngramSize {
@@ -182,6 +183,15 @@ func (d *indexData) readNewlines(i uint32) []uint32 {
 	})
 
 	return fromDeltas(blob)
+}
+
+func (d *indexData) readDocSections(i uint32) []DocumentSection {
+	blob := d.readSectionBlob(simpleSection{
+		off: d.docSectionsIndex[i],
+		sz:  d.docSectionsIndex[i+1] - d.docSectionsIndex[i],
+	})
+
+	return unmarshalDocSections(blob)
 }
 
 // IndexFile is a file suitable for concurrent read access. For performance

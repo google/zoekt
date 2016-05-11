@@ -15,8 +15,10 @@
 package zoekt
 
 import (
+	"fmt"
 	"html/template"
 	"log"
+	"sort"
 )
 
 var _ = log.Println
@@ -60,6 +62,8 @@ type IndexBuilder struct {
 
 	files       []*searchableString
 	fileNames   []*searchableString
+	docSections [][]DocumentSection
+
 	branchMasks []uint32
 
 	// ngram => posting.
@@ -109,12 +113,24 @@ func (b *IndexBuilder) SetRepoURL(url string) error {
 	return nil
 }
 
+type DocumentSection struct {
+	start, end uint32
+}
+
 // Document holds a document (file) to index.
 type Document struct {
 	Name     string
 	Content  []byte
 	Branches []string
+
+	Symbols []DocumentSection
 }
+
+type docSectionSlice []DocumentSection
+
+func (m docSectionSlice) Len() int           { return len(m) }
+func (m docSectionSlice) Swap(i, j int)      { m[i], m[j] = m[j], m[i] }
+func (m docSectionSlice) Less(i, j int) bool { return m[i].start < m[j].start }
 
 // AddFile is a convenience wrapper for Add
 func (b *IndexBuilder) AddFile(name string, content []byte) {
@@ -138,9 +154,22 @@ func (b *IndexBuilder) AddBranch(branch string) {
 }
 
 // Add a file which only occurs in certain branches.
-func (b *IndexBuilder) Add(doc Document) {
+func (b *IndexBuilder) Add(doc Document) error {
+	sort.Sort(docSectionSlice(doc.Symbols))
+
+	var last DocumentSection
+	for i, s := range doc.Symbols {
+		if i > 0 {
+			if last.end > s.start {
+				return fmt.Errorf("sections overlap")
+			}
+		}
+		last = s
+	}
+
 	b.files = append(b.files, newSearchableString(doc.Content, b.contentEnd, b.contentPostings))
 	b.fileNames = append(b.fileNames, newSearchableString([]byte(doc.Name), b.nameEnd, b.namePostings))
+	b.docSections = append(b.docSections, doc.Symbols)
 	b.contentEnd += uint32(len(doc.Content))
 	b.nameEnd += uint32(len(doc.Name))
 
@@ -150,4 +179,5 @@ func (b *IndexBuilder) Add(doc Document) {
 	}
 
 	b.branchMasks = append(b.branchMasks, mask)
+	return nil
 }

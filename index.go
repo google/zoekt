@@ -33,9 +33,10 @@ type indexData struct {
 
 	ngrams map[ngram]simpleSection
 
-	postingsIndex []uint32
-	newlinesIndex []uint32
-	caseBitsIndex []uint32
+	postingsIndex    []uint32
+	newlinesIndex    []uint32
+	docSectionsIndex []uint32
+	caseBitsIndex    []uint32
 
 	// offsets of file contents. Includes end of last file.
 	boundaries []uint32
