@@ -25,14 +25,32 @@ var _ = log.Println
 // contentProvider is an abstraction to treat matches for names and
 // content with the same code.
 type contentProvider struct {
-	id       *indexData
+	id    *indexData
+	stats *Stats
+
+	// mutable
 	idx      uint32
-	stats    *Stats
 	_cb      []byte
 	_data    []byte
 	_nl      []uint32
+	_nlBuf   []uint32
 	_sects   []DocumentSection
 	fileSize uint32
+}
+
+func (p *contentProvider) setDocument(docID uint32) {
+	var fileStart uint32
+	if docID > 0 {
+		fileStart = p.id.fileEnds[docID-1]
+	}
+
+	p.idx = docID
+	p.fileSize = p.id.fileEnds[docID] - fileStart
+
+	p._nl = nil
+	p._sects = nil
+	p._data = nil
+	p._cb = nil
 }
 
 func (p *contentProvider) docSections() []DocumentSection {
@@ -44,7 +62,8 @@ func (p *contentProvider) docSections() []DocumentSection {
 
 func (p *contentProvider) newlines() []uint32 {
 	if p._nl == nil {
-		p._nl = p.id.readNewlines(p.idx)
+		p._nl = p.id.readNewlines(p.idx, p._nlBuf)
+		p._nlBuf = p._nl
 	}
 	return p._nl
 }

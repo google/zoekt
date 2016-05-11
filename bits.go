@@ -170,7 +170,7 @@ func marshalDocSections(secs []DocumentSection) []byte {
 }
 
 func unmarshalDocSections(in []byte) (secs []DocumentSection) {
-	ints := fromDeltas(in)
+	ints := fromDeltas(in, nil)
 	res := make([]DocumentSection, 0, len(ints)/2)
 	for len(ints) > 0 {
 		res = append(res, DocumentSection{ints[0], ints[1]})

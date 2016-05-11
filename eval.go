@@ -490,6 +490,11 @@ func (d *indexData) Search(q query.Q) (*SearchResult, error) {
 		}
 	}
 
+	cp := contentProvider{
+		id:    d,
+		stats: &res.Stats,
+	}
+
 nextFileMatch:
 	for {
 		var nextDoc uint32
@@ -515,16 +520,7 @@ nextFileMatch:
 			continue
 		}
 
-		var fileStart uint32
-		if nextDoc > 0 {
-			fileStart = d.fileEnds[nextDoc-1]
-		}
-		cp := contentProvider{
-			id:       d,
-			idx:      nextDoc,
-			stats:    &res.Stats,
-			fileSize: d.fileEnds[nextDoc] - fileStart,
-		}
+		cp.setDocument(nextDoc)
 
 		known := make(map[matchTree]bool)
 		if v, ok := evalMatchTree(known, mt); ok && !v {

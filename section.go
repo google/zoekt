@@ -203,9 +203,14 @@ func toDeltas(offsets []uint32) []byte {
 	return deltas
 }
 
-func fromDeltas(data []byte) []uint32 {
+func fromDeltas(data []byte, ps []uint32) []uint32 {
 	var last uint32
-	ps := make([]uint32, 0, len(data)/2)
+	if cap(ps) < len(data)/2 {
+		ps = make([]uint32, 0, len(data)/2)
+	} else {
+		ps = ps[:0]
+	}
+
 	for len(data) > 0 {
 		delta, m := binary.Uvarint(data)
 		offset := last + uint32(delta)

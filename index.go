@@ -195,13 +195,13 @@ func (data *indexData) getContentDocIterator(query *query.Substring) (docIterato
 	input.leftPad = firstI
 	input.rightPad = uint32(len(str)-ngramSize) - lastI
 
-	input.first = fromDeltas(data.readSectionBlob(first))
+	input.first = fromDeltas(data.readSectionBlob(first), nil)
 	if data.err != nil {
 		return nil, data.err
 	}
 
 	if firstI != lastI {
-		input.last = fromDeltas(data.readSectionBlob(last))
+		input.last = fromDeltas(data.readSectionBlob(last), nil)
 		if data.err != nil {
 			return nil, data.err
 		}

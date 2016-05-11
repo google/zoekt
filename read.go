@@ -145,7 +145,7 @@ func (r *reader) readIndexData(toc *indexTOC) *indexData {
 		j := i / ngramSize
 		off := fileNamePostingsIndex[j]
 		end := fileNamePostingsIndex[j+1]
-		d.fileNameNgrams[bytesToNGram(nameNgramText[i:i+ngramSize])] = fromDeltas(fileNamePostingsData[off:end])
+		d.fileNameNgrams[bytesToNGram(nameNgramText[i:i+ngramSize])] = fromDeltas(fileNamePostingsData[off:end], nil)
 	}
 
 	branchNameContent := d.readSectionBlob(toc.branchNames.data)
@@ -176,13 +176,13 @@ func (d *indexData) readCaseBits(i uint32) []byte {
 	})
 }
 
-func (d *indexData) readNewlines(i uint32) []uint32 {
+func (d *indexData) readNewlines(i uint32, buf []uint32) []uint32 {
 	blob := d.readSectionBlob(simpleSection{
 		off: d.newlinesIndex[i],
 		sz:  d.newlinesIndex[i+1] - d.newlinesIndex[i],
 	})
 
-	return fromDeltas(blob)
+	return fromDeltas(blob, buf)
 }
 
 func (d *indexData) readDocSections(i uint32) []DocumentSection {
