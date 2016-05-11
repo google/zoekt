@@ -31,14 +31,18 @@ type Q interface {
 
 // RegexpQuery is a query looking for regular expressions matches.
 type Regexp struct {
-	Regexp   *syntax.Regexp
-	FileName bool
+	Regexp        *syntax.Regexp
+	FileName      bool
+	CaseSensitive bool
 }
 
 func (q *Regexp) String() string {
 	pref := ""
 	if q.FileName {
 		pref = "file_"
+	}
+	if q.CaseSensitive {
+		pref = "case_" + pref
 	}
 	return fmt.Sprintf("%sregex:%q", pref, q.Regexp.String())
 }

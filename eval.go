@@ -50,14 +50,19 @@ type notMatchTree struct {
 }
 
 type regexpMatchTree struct {
-	query    *query.Regexp
-	regexp   *regexp.Regexp
+	query  *query.Regexp
+	regexp *regexp.Regexp
+
+	// If non-nil, must evaluate this on the final content too.
+	caseRegexp *regexp.Regexp
+
 	child    matchTree
 	fileName bool
 
 	// mutable
-	reEvaluated bool
-	found       []*candidateMatch
+	reEvaluated   bool
+	caseEvaluated bool
+	found         []*candidateMatch
 }
 
 type substrMatchTree struct {
@@ -90,6 +95,7 @@ func (t *andMatchTree) prepare(doc uint32) {
 func (t *regexpMatchTree) prepare(doc uint32) {
 	t.found = t.found[:0]
 	t.reEvaluated = false
+	t.caseEvaluated = t.caseRegexp == nil
 	t.child.prepare(doc)
 }
 
@@ -243,6 +249,23 @@ func (p *contentProvider) evalRegexpMatches(s *regexpMatchTree) {
 	s.reEvaluated = true
 }
 
+func (p *contentProvider) evalRegexpMatchesCase(s *regexpMatchTree) {
+	if s.caseEvaluated {
+		return
+	}
+
+	trimmed := s.found[:0]
+	for _, c := range s.found {
+		orig := toOriginal(p.data(s.fileName), p.caseBits(s.fileName), int(c.offset),
+			int(c.offset+c.matchSz))
+		if s.caseRegexp.Match(orig) {
+			trimmed = append(trimmed, c)
+		}
+	}
+	s.found = trimmed
+	s.caseEvaluated = true
+}
+
 func (p *contentProvider) evalCaseMatches(s *substrMatchTree) {
 	if s.caseSensitive {
 		pruned := s.current[:0]
@@ -296,7 +319,7 @@ func (t *regexpMatchTree) matches(known map[matchTree]bool) (bool, bool) {
 		return false, true
 	}
 
-	if !t.reEvaluated {
+	if !t.reEvaluated || !t.caseEvaluated {
 		return false, false
 	}
 
@@ -341,6 +364,7 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*query.Substring]*substrMatch
 		subQ = query.Map(subQ, func(q query.Q) query.Q {
 			if sub, ok := q.(*query.Substring); ok {
 				sub.FileName = s.FileName
+				sub.CaseSensitive = s.CaseSensitive
 			}
 			return q
 		})
@@ -349,11 +373,15 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*query.Substring]*substrMatch
 		if err != nil {
 			return nil, err
 		}
-		return &regexpMatchTree{
-			regexp:   regexp.MustCompile(s.Regexp.String()),
+		tr := &regexpMatchTree{
+			regexp:   regexp.MustCompile(query.LowerRegexp(s.Regexp).String()),
 			child:    subMT,
 			fileName: s.FileName,
-		}, nil
+		}
+		if s.CaseSensitive {
+			tr.caseRegexp = regexp.MustCompile(s.Regexp.String())
+		}
+		return tr, nil
 	case *query.And:
 		var r []matchTree
 		for _, ch := range s.Children {
@@ -534,6 +562,14 @@ nextFileMatch:
 
 			for _, re := range regexpAtoms {
 				cp.evalRegexpMatches(re)
+			}
+
+			if v, ok := evalMatchTree(known, mt); ok && !v {
+				continue nextFileMatch
+			}
+
+			for _, re := range regexpAtoms {
+				cp.evalRegexpMatchesCase(re)
 			}
 		}
 

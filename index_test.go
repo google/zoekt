@@ -653,3 +653,19 @@ func TestRepoURL(t *testing.T) {
 	}
 
 }
+
+func TestCaseRegexp(t *testing.T) {
+	b := NewIndexBuilder()
+
+	content := []byte("BLABLABLA")
+	b.AddFile("f1", content)
+	res := searchForTest(t, b,
+		&query.Regexp{
+			Regexp:        mustParseRE("[xb][xl][xa]"),
+			CaseSensitive: true,
+		})
+
+	if len(res.Files) > 0 {
+		t.Fatalf("got %v, want no matches", res.Files)
+	}
+}

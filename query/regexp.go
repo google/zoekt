@@ -25,13 +25,17 @@ func LowerRegexp(r *syntax.Regexp) *syntax.Regexp {
 	newRE := *r
 	switch r.Op {
 	case syntax.OpLiteral, syntax.OpCharClass:
-		for i, r := range newRE.Rune {
-			if r >= 'A' && r <= 'Z' {
-				newRE.Rune[i] = r + 'a' - 'A'
+		newRE.Rune = make([]rune, len(r.Rune))
+		for i, c := range r.Rune {
+			if c >= 'A' && c <= 'Z' {
+				newRE.Rune[i] = c + 'a' - 'A'
+			} else {
+				newRE.Rune[i] = c
 			}
 		}
 	default:
-		for i, s := range newRE.Sub {
+		newRE.Sub = make([]*syntax.Regexp, len(newRE.Sub))
+		for i, s := range r.Sub {
 			newRE.Sub[i] = LowerRegexp(s)
 		}
 	}

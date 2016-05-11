@@ -285,7 +285,7 @@ func parseExprList(in []byte) ([]Q, int, error) {
 		b = b[n:]
 	}
 
-	setCase := ""
+	setCase := "auto"
 	newQS := qs[:0]
 	for _, q := range qs {
 		if sc, ok := q.(*Case); ok {
@@ -296,7 +296,7 @@ func parseExprList(in []byte) ([]Q, int, error) {
 	}
 	qs = newQS
 	for _, q := range qs {
-		if sq, ok := q.(*Substring); ok && setCase != "" {
+		if sq, ok := q.(*Substring); ok {
 			// TODO - this should just generate a
 			// brute-force query.
 			if len(sq.Pattern) < 3 {
@@ -314,8 +314,19 @@ func parseExprList(in []byte) ([]Q, int, error) {
 				sq.CaseSensitive = (sq.Pattern != string(toLower([]byte(sq.Pattern))))
 			}
 		}
-	}
 
+		if sq, ok := q.(*Regexp); ok && setCase != "" {
+			switch setCase {
+
+			case "yes":
+				sq.CaseSensitive = true
+			case "no":
+				sq.CaseSensitive = false
+			case "auto":
+				sq.CaseSensitive = (sq.Regexp.String() != LowerRegexp(sq.Regexp).String())
+			}
+		}
+	}
 	return qs, len(in) - len(b), nil
 }
 

@@ -47,6 +47,7 @@ func TestParseQuery(t *testing.T) {
 		{"(abc)(de)", &Regexp{Regexp: mustParseRE("(abc)(de)")}, false},
 		{"sub-pixel", &Substring{Pattern: "sub-pixel"}, false},
 		{"abc", &Substring{Pattern: "abc"}, false},
+		{"ABC", &Substring{Pattern: "ABC", CaseSensitive: true}, false},
 		{"\"abc bcd\"", &Substring{Pattern: "abc bcd"}, false},
 		{"abc bcd", &And{[]Q{
 			&Substring{Pattern: "abc"},
@@ -67,6 +68,8 @@ func TestParseQuery(t *testing.T) {
 		}}, false},
 		{"(abc def", nil, true},
 		{"regex:abc[p-q]", &Regexp{Regexp: mustParseRE("abc[p-q]")}, false},
+		{"aBc[p-q]", &Regexp{Regexp: mustParseRE("aBc[p-q]"), CaseSensitive: true}, false},
+		{"aBc[p-q] case:auto", &Regexp{Regexp: mustParseRE("aBc[p-q]"), CaseSensitive: true}, false},
 		{"repo:go", &Repo{"go"}, false},
 
 		{"file:\"\"", &Const{true}, false},

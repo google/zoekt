@@ -92,9 +92,14 @@ func TestRegexpParse(t *testing.T) {
 func TestLowerRegexp(t *testing.T) {
 	in := "[a-zA-Z]fooBAR"
 	re := mustParseRE(in)
+	in = re.String()
 	got := LowerRegexp(re)
 	want := "[a-za-z]foobar"
 	if got.String() != want {
 		t.Errorf("got %s, want %s", got, want)
+	}
+
+	if re.String() != in {
+		t.Errorf("got mutated original %s want %s", re.String(), in)
 	}
 }
