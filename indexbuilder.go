@@ -109,10 +109,16 @@ func (b *IndexBuilder) SetRepoURL(url string) error {
 	return nil
 }
 
-// AddFile adds a file. This is the basic ordering for search results,
-// so if possible the most important files should be added last.
+// Document holds a document (file) to index.
+type Document struct {
+	Name     string
+	Content  []byte
+	Branches []string
+}
+
+// AddFile is a convenience wrapper for Add
 func (b *IndexBuilder) AddFile(name string, content []byte) {
-	b.AddFileBranches(name, content, nil)
+	b.Add(Document{Name: name, Content: content})
 }
 
 func (b *IndexBuilder) addBranch(br string) int {
@@ -132,14 +138,14 @@ func (b *IndexBuilder) AddBranch(branch string) {
 }
 
 // Add a file which only occurs in certain branches.
-func (b *IndexBuilder) AddFileBranches(name string, content []byte, branches []string) {
-	b.files = append(b.files, newSearchableString(content, b.contentEnd, b.contentPostings))
-	b.fileNames = append(b.fileNames, newSearchableString([]byte(name), b.nameEnd, b.namePostings))
-	b.contentEnd += uint32(len(content))
-	b.nameEnd += uint32(len(name))
+func (b *IndexBuilder) Add(doc Document) {
+	b.files = append(b.files, newSearchableString(doc.Content, b.contentEnd, b.contentPostings))
+	b.fileNames = append(b.fileNames, newSearchableString([]byte(doc.Name), b.nameEnd, b.namePostings))
+	b.contentEnd += uint32(len(doc.Content))
+	b.nameEnd += uint32(len(doc.Name))
 
 	var mask uint32
-	for _, br := range branches {
+	for _, br := range doc.Branches {
 		mask |= uint32(b.addBranch(br))
 	}
 

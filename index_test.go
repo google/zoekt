@@ -446,8 +446,8 @@ func TestWordBoundaryRanking(t *testing.T) {
 
 func TestBranchMask(t *testing.T) {
 	b := NewIndexBuilder()
-	b.AddFileBranches("f1", []byte("needle"), []string{"master"})
-	b.AddFileBranches("f2", []byte("needle"), []string{"stable", "master"})
+	b.Add(Document{Name: "f1", Content: []byte("needle"), Branches: []string{"master"}})
+	b.Add(Document{Name: "f2", Content: []byte("needle"), Branches: []string{"stable", "master"}})
 
 	sres := searchForTest(t, b, &query.And{[]query.Q{
 		&query.Substring{
@@ -471,7 +471,7 @@ func TestBranchReport(t *testing.T) {
 	b := NewIndexBuilder()
 
 	branches := []string{"stable", "master"}
-	b.AddFileBranches("f2", []byte("needle"), branches)
+	b.Add(Document{Name: "f2", Content: []byte("needle"), Branches: branches})
 	sres := searchForTest(t, b, &query.Substring{
 		Pattern: "needle",
 	})
@@ -489,7 +489,7 @@ func TestCoversContent(t *testing.T) {
 	b := NewIndexBuilder()
 
 	branches := []string{"stable", "master"}
-	b.AddFileBranches("f1", []byte("needle the bla"), branches)
+	b.Add(Document{Name: "f1", Content: []byte("needle the bla"), Branches: branches})
 
 	sres := searchForTest(t, b,
 		&query.And{

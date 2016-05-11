@@ -52,19 +52,13 @@ type Options struct {
 	RepoURL string
 }
 
-type entry struct {
-	name     string
-	content  []byte
-	branches []string
-}
-
 // Builder manages (parallel) creation of uniformly sized shards.
 type Builder struct {
 	opts     Options
 	throttle chan int
 
 	nextShardNum int
-	todo         []entry
+	todo         []zoekt.Document
 	size         int
 
 	building sync.WaitGroup
@@ -82,23 +76,19 @@ func NewBuilder(opt Options) (*Builder, error) {
 }
 
 func (b *Builder) AddFile(name string, content []byte) {
-	b.AddFileBranches(name, content, nil)
+	b.Add(zoekt.Document{Name: name, Content: content})
 }
 
-// TODO - this should be an Add(content []byte, FileOptions) where
-// FileOptions contains filename, branches, offsets of interesting
-// sections (symbols, comments etc.)
-
-func (b *Builder) AddFileBranches(name string, content []byte, branches []string) {
-	if len(content) > b.opts.SizeMax {
+func (b *Builder) Add(doc zoekt.Document) {
+	if len(doc.Content) > b.opts.SizeMax {
 		return
 	}
-	if bytes.IndexByte(content, 0) != -1 {
+	if bytes.IndexByte(doc.Content, 0) != -1 {
 		return
 	}
 
-	b.todo = append(b.todo, entry{name, content, branches})
-	b.size += len(name) + len(content)
+	b.todo = append(b.todo, doc)
+	b.size += len(doc.Name) + len(doc.Content)
 
 	if b.size > b.opts.ShardMax {
 		b.flush()
@@ -142,7 +132,7 @@ func (b *Builder) flush() {
 	}()
 }
 
-func (b *Builder) buildShard(todo []entry, nextShardNum int) error {
+func (b *Builder) buildShard(todo []zoekt.Document, nextShardNum int) error {
 	name, err := shardName(b.opts.IndexDir, b.opts.RepoName, nextShardNum)
 	if err != nil {
 		return err
@@ -151,7 +141,7 @@ func (b *Builder) buildShard(todo []entry, nextShardNum int) error {
 	shardBuilder.SetName(b.opts.RepoName)
 	shardBuilder.SetRepoURL(b.opts.RepoURL)
 	for _, t := range todo {
-		shardBuilder.AddFileBranches(t.name, t.content, t.branches)
+		shardBuilder.Add(t)
 	}
 	return writeShard(name, shardBuilder)
 }

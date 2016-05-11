@@ -23,6 +23,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
 	git "github.com/libgit2/git2go"
 )
@@ -211,7 +212,11 @@ func indexGitRepo(opts build.Options, repoDir, branchPrefix string, branches []s
 				continue
 			}
 
-			builder.AddFileBranches(n, blob.Contents(), branches)
+			builder.Add(zoekt.Document{
+				Name:     n,
+				Content:  blob.Contents(),
+				Branches: branches,
+			})
 		}
 	}
 	builder.Finish()
