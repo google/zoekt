@@ -707,3 +707,22 @@ func TestSymbolRank(t *testing.T) {
 		t.Errorf("got %#v, want 'f2' as top match", res.Files[0])
 	}
 }
+
+func TestNegativeRepo(t *testing.T) {
+	b := NewIndexBuilder()
+
+	content := []byte("bla the needle")
+	// ----------------01234567890123
+	b.AddFile("f1", content)
+	b.SetName("bla")
+
+	sres := searchForTest(t, b,
+		&query.And{[]query.Q{
+			&query.Substring{Pattern: "needle"},
+			&query.Not{&query.Repo{Name: "bla"}},
+		}})
+
+	if len(sres.Files) != 0 {
+		t.Fatalf("got %v, want 0 matches", sres.Files)
+	}
+}

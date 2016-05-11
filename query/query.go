@@ -193,7 +193,7 @@ func flatten(q Q) (Q, bool) {
 func mapQueryList(qs []Q, f func(Q) Q) []Q {
 	var neg []Q
 	for _, sub := range qs {
-		neg = append(neg, f(sub))
+		neg = append(neg, Map(sub, f))
 	}
 	return neg
 }
@@ -273,11 +273,11 @@ func Simplify(q Q) Q {
 func Map(q Q, f func(q Q) Q) Q {
 	switch s := q.(type) {
 	case *And:
-		return &And{Children: mapQueryList(s.Children, f)}
+		q = &And{Children: mapQueryList(s.Children, f)}
 	case *Or:
-		return &Or{Children: mapQueryList(s.Children, f)}
+		q = &Or{Children: mapQueryList(s.Children, f)}
 	case *Not:
-		return &Not{Child: f(s.Child)}
+		q = &Not{Child: Map(s.Child, f)}
 	}
 	return f(q)
 }

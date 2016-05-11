@@ -77,3 +77,19 @@ func TestSimplify(t *testing.T) {
 		}
 	}
 }
+
+func TestMap(t *testing.T) {
+	in := &And{[]Q{&Substring{Pattern: "bla"}, &Not{&Repo{"foo"}}}}
+	out := &And{[]Q{&Substring{Pattern: "bla"}, &Not{&Const{false}}}}
+
+	f := func(q Q) Q {
+		if _, ok := q.(*Repo); ok {
+			return &Const{false}
+		}
+		return q
+	}
+	got := Map(in, f)
+	if !reflect.DeepEqual(got, out) {
+		t.Errorf("got %v, want %v", got, out)
+	}
+}
