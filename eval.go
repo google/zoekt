@@ -353,7 +353,7 @@ func (t *substrMatchTree) matches(known map[matchTree]bool) (bool, bool) {
 	return true, sure
 }
 
-func (d *indexData) newMatchTree(q query.Q, sq map[*query.Substring]*substrMatchTree) (matchTree, error) {
+func (d *indexData) newMatchTree(q query.Q, sq map[*substrMatchTree]struct{}) (matchTree, error) {
 	switch s := q.(type) {
 	case *query.Regexp:
 		sz := ngramSize
@@ -417,7 +417,7 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*query.Substring]*substrMatch
 			coversContent: iter.coversContent(),
 			cands:         iter.next(),
 		}
-		sq[s] = st
+		sq[st] = struct{}{}
 		return st, nil
 
 	case *query.Branch:
@@ -464,13 +464,13 @@ func (d *indexData) Search(q query.Q) (*SearchResult, error) {
 		return &res, nil
 	}
 
-	atoms := map[*query.Substring]*substrMatchTree{}
+	atoms := map[*substrMatchTree]struct{}{}
 	mt, err := d.newMatchTree(q, atoms)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, st := range atoms {
+	for st := range atoms {
 		res.Stats.NgramMatches += len(st.cands)
 	}
 
@@ -484,7 +484,7 @@ func (d *indexData) Search(q query.Q) (*SearchResult, error) {
 		regexpAtoms = append(regexpAtoms, re)
 	})
 
-	for _, st := range atoms {
+	for st := range atoms {
 		if st.fileName {
 			fileAtoms = append(fileAtoms, st)
 		}
@@ -542,7 +542,7 @@ nextFileMatch:
 			}
 		}
 
-		for _, st := range atoms {
+		for st := range atoms {
 			cp.evalCaseMatches(st)
 		}
 
@@ -550,7 +550,7 @@ nextFileMatch:
 			continue nextFileMatch
 		}
 
-		for _, st := range atoms {
+		for st := range atoms {
 			// TODO - this may evaluate too much.
 			cp.evalContentMatches(st)
 		}
