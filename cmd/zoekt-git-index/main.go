@@ -30,25 +30,6 @@ import (
 
 var _ = log.Println
 
-func treeToFiles(tree *git.Tree) (map[string]git.Oid, error) {
-	res := map[string]git.Oid{}
-	err := tree.Walk(func(n string, e *git.TreeEntry) int {
-		switch e.Filemode {
-		case git.FilemodeBlob, git.FilemodeBlobExecutable:
-		default:
-			return 0
-		}
-
-		if e.Type != git.ObjectBlob {
-			return 0
-		}
-		res[filepath.Join(n, e.Name)] = *e.Id
-		return 0
-	})
-
-	return res, err
-}
-
 func guessRepoURL(repoDir string) (string, error) {
 	base, err := git.NewConfig()
 	if err != nil {
@@ -79,7 +60,7 @@ func main() {
 	var sizeMax = flag.Int("file_limit", 128*1024, "maximum file size")
 	var shardLimit = flag.Int("shard_limit", 100<<20, "maximum corpus size for a shard")
 	var parallelism = flag.Int("parallelism", 4, "maximum number of parallel indexing processes.")
-
+	submodules := flag.Bool("submodules", true, "if set to false, do not recurse into submodules")
 	branchesStr := flag.String("branches", "master", "git branches to index. If set, arguments should be bare git repositories.")
 	branchPrefix := flag.String("prefix", "refs/heads/", "prefix for branch names")
 
@@ -108,42 +89,19 @@ func main() {
 			log.Fatal(err)
 		}
 
-		if err := indexGitRepo(opts, arg, *branchPrefix, branches); err != nil {
-			log.Fatal("indexGitRepo", err)
+		if err := indexGitRepo(opts, arg, *branchPrefix, branches, *submodules); err != nil {
+			log.Fatalf("indexGitRepo: %v", err)
 		}
 	}
 }
 
-func getTreeID(repo *git.Repository, ref string) (*git.Oid, error) {
-	obj, err := repo.RevparseSingle(ref)
-	if err != nil {
-		return nil, err
-	}
-	defer obj.Free()
-
-	var treeId *git.Oid
-	switch obj.Type() {
-	case git.ObjectCommit:
-		commit, err := repo.LookupCommit(obj.Id())
-		if err != nil {
-			return nil, err
-		}
-		treeId = commit.TreeId()
-	case git.ObjectTree:
-		treeId = obj.Id()
-	default:
-		return nil, fmt.Errorf("unsupported object type %d", obj.Type())
-	}
-	return treeId, nil
-}
-
-func indexGitRepo(opts build.Options, repoDir, branchPrefix string, branches []string) error {
+func indexGitRepo(opts build.Options, repoDir, branchPrefix string, branches []string, submodules bool) error {
 	repoDir = filepath.Clean(repoDir)
 	opts.RepoName = filepath.Base(repoDir)
 	opts.RepoDir = repoDir
 	url, err := guessRepoURL(repoDir)
 	if err != nil {
-		log.Println("no repo URL: %s", err)
+		log.Printf("no repo URL: %s", err)
 	} else {
 		opts.RepoURL = url
 	}
@@ -170,21 +128,19 @@ func indexGitRepo(opts build.Options, repoDir, branchPrefix string, branches []s
 
 	// branch => name => sha1
 	data := map[string]map[string]git.Oid{}
-
+	repos := map[git.Oid]*git.Repository{}
 	for _, b := range branches {
-		treeID, err := getTreeID(repo, filepath.Join(branchPrefix, b))
+		tree, err := getTree(repo, filepath.Join(branchPrefix, b))
 		if err != nil {
 			return err
 		}
 
-		tree, err := repo.LookupTree(treeID)
+		fs, subRepos, err := treeToFiles(repo, tree, submodules)
 		if err != nil {
 			return err
 		}
-
-		fs, err := treeToFiles(tree)
-		if err != nil {
-			return err
+		for k, v := range subRepos {
+			repos[k] = v
 		}
 
 		for f := range fs {
@@ -205,7 +161,11 @@ func indexGitRepo(opts build.Options, repoDir, branchPrefix string, branches []s
 		}
 
 		for sha, branches := range shas {
-			blob, err := repo.LookupBlob(&sha)
+			r := repos[sha]
+			if r == nil {
+				return fmt.Errorf("no repo found for %s (%s)", n, branches)
+			}
+			blob, err := r.LookupBlob(&sha)
 			if err != nil {
 				return err
 			}
