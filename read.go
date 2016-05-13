@@ -18,10 +18,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log"
-	"os"
 )
 
-// reader is a ReadSeekCloser that keeps track of errors
+// reader is a stateful file that keeps track of errors.
 type reader struct {
 	r   IndexFile
 	off uint32
@@ -214,38 +213,4 @@ func NewSearcher(r IndexFile) (Searcher, error) {
 	}
 	indexData.file = r
 	return indexData, nil
-}
-
-// NewIndexFile wraps a os.File to be an IndexFile.
-func NewIndexFile(f *os.File) IndexFile {
-	return &indexFileFromOS{f}
-}
-
-type indexFileFromOS struct {
-	f *os.File
-}
-
-func (f *indexFileFromOS) Read(off, sz uint32) ([]byte, error) {
-	r := make([]byte, sz)
-	_, err := f.f.ReadAt(r, int64(off))
-	return r, err
-}
-
-func (f indexFileFromOS) Size() (uint32, error) {
-	fi, err := f.f.Stat()
-	if err != nil {
-		return 0, err
-	}
-
-	sz := fi.Size()
-
-	if sz >= maxUInt32 {
-		return 0, fmt.Errorf("overflow")
-	}
-
-	return uint32(sz), nil
-}
-
-func (f indexFileFromOS) Close() {
-	f.f.Close()
 }
