@@ -91,6 +91,14 @@ func (s *shardedSearcher) scan() error {
 			todo = append(todo, k)
 		}
 	}
+
+	// Unload deleted shards.
+	for k := range s.shards {
+		if _, ok := ts[k]; !ok {
+			log.Printf("unloading: %s", k)
+			s.replace(k, nil)
+		}
+	}
 	s.mu.Unlock()
 
 	for _, t := range todo {
@@ -102,7 +110,6 @@ func (s *shardedSearcher) scan() error {
 		s.replace(t, shard)
 	}
 
-	// TODO - unload deleted shards?
 	return nil
 }
 
@@ -112,7 +119,11 @@ func (s *shardedSearcher) replace(key string, shard *searchShard) {
 	if old != nil {
 		old.Close()
 	}
-	s.shards[key] = shard
+	if shard != nil {
+		s.shards[key] = shard
+	} else {
+		delete(s.shards, key)
+	}
 	s.mu.Unlock()
 }
 
