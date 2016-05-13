@@ -184,7 +184,7 @@ func parseExpr(in []byte) (Q, int, error) {
 		default:
 			return nil, 0, fmt.Errorf("unknown case argument %q, want {yes,no,auto}", text)
 		}
-		expr = &Case{text}
+		expr = &caseQ{text}
 	case tokRepo:
 		expr = &Repo{Name: text}
 	case tokBranch:
@@ -288,7 +288,7 @@ func parseExprList(in []byte) ([]Q, int, error) {
 	setCase := "auto"
 	newQS := qs[:0]
 	for _, q := range qs {
-		if sc, ok := q.(*Case); ok {
+		if sc, ok := q.(*caseQ); ok {
 			setCase = sc.Flavor
 		} else {
 			newQS = append(newQS, q)

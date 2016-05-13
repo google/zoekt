@@ -47,11 +47,11 @@ func (q *Regexp) String() string {
 	return fmt.Sprintf("%sregex:%q", pref, q.Regexp.String())
 }
 
-type Case struct {
+type caseQ struct {
 	Flavor string
 }
 
-func (c *Case) String() string {
+func (c *caseQ) String() string {
 	return "case:" + c.Flavor
 }
 
