@@ -175,7 +175,7 @@ func (ss *shardedSearcher) Close() {
 	ss.mu.Unlock()
 }
 
-func (ss *shardedSearcher) Search(pat query.Q) (*SearchResult, error) {
+func (ss *shardedSearcher) Search(pat query.Q, opts *SearchOptions) (*SearchResult, error) {
 	start := time.Now()
 	type res struct {
 		sr  *SearchResult
@@ -189,7 +189,7 @@ func (ss *shardedSearcher) Search(pat query.Q) (*SearchResult, error) {
 	all := make(chan res, shardCount)
 	for _, s := range ss.shards {
 		go func(s Searcher) {
-			ms, err := s.Search(pat)
+			ms, err := s.Search(pat, opts)
 			all <- res{ms, err}
 		}(s)
 	}

@@ -117,7 +117,8 @@ func searchForTest(t *testing.T, b *IndexBuilder, q query.Q) *SearchResult {
 		t.Fatalf("NewSearcher: %v", err)
 	}
 
-	res, err := searcher.Search(q)
+	var opts SearchOptions
+	res, err := searcher.Search(q, &opts)
 	if err != nil {
 		t.Fatalf("Search(%s): %v", q, err)
 	}

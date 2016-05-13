@@ -29,6 +29,9 @@ type FileMatch struct {
 	Repo     string
 	Branches []string
 	Matches  []Match
+
+	// Only set if requested
+	Content []byte
 }
 
 // Match is a match for a single atomic query within a file.
@@ -103,6 +106,11 @@ type SearchResult struct {
 }
 
 type Searcher interface {
-	Search(q query.Q) (*SearchResult, error)
+	Search(q query.Q, opts *SearchOptions) (*SearchResult, error)
 	Close()
+}
+
+type SearchOptions struct {
+	// Return the whole file.
+	Whole bool
 }

@@ -456,7 +456,7 @@ func (d *indexData) simplify(in query.Q) query.Q {
 // crash the machine.
 const maxMatchCount = 100000
 
-func (d *indexData) Search(q query.Q) (*SearchResult, error) {
+func (d *indexData) Search(q query.Q, opts *SearchOptions) (*SearchResult, error) {
 	var res SearchResult
 
 	q = d.simplify(q)
@@ -603,6 +603,10 @@ nextFileMatch:
 		fileMatch.Branches = d.gatherBranches(nextDoc, mt, known)
 
 		sortMatchesByScore(fileMatch.Matches)
+		if opts.Whole {
+			fileMatch.Content = toOriginal(cp.data(false), cp.caseBits(false), 0, int(cp.fileSize))
+		}
+
 		res.Files = append(res.Files, fileMatch)
 		res.Stats.MatchCount += len(fileMatch.Matches)
 		res.Stats.FileCount++

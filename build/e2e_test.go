@@ -66,7 +66,9 @@ func TestBasic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Parse(111): %v", err)
 	}
-	result, err := ss.Search(q)
+
+	var sOpts zoekt.SearchOptions
+	result, err := ss.Search(q, &sOpts)
 	if err != nil {
 		t.Fatalf("Parse(111): %v", err)
 	}
@@ -75,5 +77,4 @@ func TestBasic(t *testing.T) {
 		t.Errorf("got %v, want 1 file.", result.Files)
 	}
 	defer ss.Close()
-
 }

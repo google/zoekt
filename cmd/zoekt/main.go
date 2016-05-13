@@ -71,7 +71,8 @@ func main() {
 		log.Println("query:", query)
 	}
 
-	sres, err := searcher.Search(query)
+	var sOpts zoekt.SearchOptions
+	sres, err := searcher.Search(query, &sOpts)
 	if *cpuProfile != "" {
 		// If profiling, do it another time so we measure with
 		// warm caches.
@@ -83,7 +84,7 @@ func main() {
 		log.Println("Displaying matches...")
 		pprof.StartCPUProfile(f)
 		for i := 0; i < 10; i++ {
-			sres, err = searcher.Search(query)
+			sres, err = searcher.Search(query, &sOpts)
 		}
 		pprof.StopCPUProfile()
 	}

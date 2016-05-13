@@ -21,6 +21,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -32,7 +33,8 @@ import (
 // TODO - split this into a library.
 
 type httpServer struct {
-	searcher zoekt.Searcher
+	searcher   zoekt.Searcher
+	localPrint bool
 }
 
 var didYouMeanTemplate = template.Must(template.New("didyoumean").Parse(`<html>
@@ -58,6 +60,13 @@ func (s *httpServer) serveSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusTeapot)
+	}
+}
+
+func (s *httpServer) servePrint(w http.ResponseWriter, r *http.Request) {
+	err := s.servePrintErr(w, r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusTeapot)
 	}
@@ -189,7 +198,9 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 		num = 50
 	}
 
-	result, err := s.searcher.Search(q)
+	sOpts := zoekt.SearchOptions{}
+
+	result, err := s.searcher.Search(q, &sOpts)
 	if err != nil {
 		return err
 	}
@@ -204,14 +215,21 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 	}
 
 	for _, f := range result.Files {
-
 		fMatch := FileMatchData{
 			FileName: f.Name,
 			Repo:     f.Repo,
 			Branches: f.Branches,
 		}
 
-		if len(f.Branches) > 0 {
+		if s.localPrint {
+			v := make(url.Values)
+			v.Add("r", f.Repo)
+			v.Add("f", f.Name)
+			if len(f.Branches) > 0 {
+				v.Add("b", f.Branches[0])
+			}
+			fMatch.URL = "print?" + v.Encode()
+		} else if len(f.Branches) > 0 {
 			urlTemplate := result.RepoURLs[f.Repo]
 			t, err := template.New("url").Parse(urlTemplate)
 			if err != nil {
@@ -257,9 +275,65 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 	return nil
 }
 
+var printTemplate = template.Must(template.New("print").Parse(`
+  <head>
+    <title>{{.Repo}}:{{.Name}}</title>
+  </head>
+<body>` + searchBox +
+	`  <hr>
+
+<pre>{{.Content}}
+</pre>`))
+
+func (s *httpServer) servePrintErr(w http.ResponseWriter, r *http.Request) error {
+	qvals := r.URL.Query()
+	fileStr := qvals.Get("f")
+	repoStr := qvals.Get("r")
+	branchStr := qvals.Get("b")
+
+	q := &query.And{[]query.Q{
+		&query.Substring{Pattern: fileStr, FileName: true},
+		&query.Repo{Name: repoStr},
+		&query.Branch{Name: branchStr},
+	}}
+
+	sOpts := zoekt.SearchOptions{
+		Whole: true,
+	}
+
+	result, err := s.searcher.Search(q, &sOpts)
+	if err != nil {
+		return err
+	}
+
+	if len(result.Files) != 1 {
+		return fmt.Errorf("got %d matches, want 1", len(result.Files))
+	}
+
+	f := result.Files[0]
+	type fData struct {
+		Repo, Name, Content string
+	}
+
+	d := fData{
+		Name:    f.Name,
+		Repo:    f.Repo,
+		Content: string(f.Content),
+	}
+
+	var buf bytes.Buffer
+	if err := printTemplate.Execute(&buf, d); err != nil {
+		return err
+	}
+
+	w.Write(buf.Bytes())
+	return nil
+}
+
 func main() {
 	listen := flag.String("listen", ":6070", "address to listen on.")
 	index := flag.String("index", build.DefaultDir, "index file glob to use")
+	print := flag.Bool("print", false, "local result URLs")
 	flag.Parse()
 
 	searcher, err := zoekt.NewShardedSearcher(*index)
@@ -268,11 +342,16 @@ func main() {
 	}
 
 	serv := httpServer{
-		searcher: searcher,
+		searcher:   searcher,
+		localPrint: *print,
 	}
 
 	http.HandleFunc("/search", serv.serveSearch)
 	http.HandleFunc("/", serv.serveSearchBox)
+	if *print {
+		http.HandleFunc("/print", serv.servePrint)
+	}
+
 	log.Printf("serving on %s", *listen)
 	err = http.ListenAndServe(*listen, nil)
 	log.Printf("ListenAndServe: %v", err)
