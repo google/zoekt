@@ -15,7 +15,6 @@
 package zoekt
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/google/zoekt/query"
@@ -69,23 +68,6 @@ type Stats struct {
 	FilesSkipped    int
 }
 
-func (s Stats) HumanBytesLoaded() string {
-	suffix := ""
-	b := s.BytesLoaded
-	if s.BytesLoaded > (1 << 30) {
-		suffix = "G"
-		b = s.BytesLoaded / (1 << 30)
-	} else if s.BytesLoaded > (1 << 20) {
-		suffix = "M"
-		b = s.BytesLoaded / (1 << 20)
-	} else if s.BytesLoaded > (1 << 10) {
-		suffix = "K"
-		b = s.BytesLoaded / (1 << 10)
-	}
-
-	return fmt.Sprintf("%d%s", b, suffix)
-}
-
 func (s *Stats) Add(o Stats) {
 	s.NgramMatches += o.NgramMatches
 	s.FilesLoaded += o.FilesLoaded
@@ -107,7 +89,20 @@ type SearchResult struct {
 
 type Searcher interface {
 	Search(q query.Q, opts *SearchOptions) (*SearchResult, error)
+	Stats() (*RepoStats, error)
 	Close()
+}
+
+type RepoStats struct {
+	Repos        []string
+	IndexBytes   int64
+	ContentBytes int64
+}
+
+func (s *RepoStats) Add(o *RepoStats) {
+	s.Repos = append(s.Repos, o.Repos...)
+	s.IndexBytes += o.IndexBytes
+	s.ContentBytes += o.ContentBytes
 }
 
 type SearchOptions struct {

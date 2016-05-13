@@ -30,6 +30,24 @@ import (
 	"github.com/google/zoekt/query"
 )
 
+var funcmap = template.FuncMap{
+	"HumanUnit": func(orig int64) string {
+		b := orig
+		suffix := ""
+		if orig > 10*(1<<30) {
+			suffix = "G"
+			b = orig / (1 << 30)
+		} else if orig > 10*(1<<20) {
+			suffix = "M"
+			b = orig / (1 << 20)
+		} else if orig > 10*(1<<10) {
+			suffix = "K"
+			b = orig / (1 << 10)
+		}
+
+		return fmt.Sprintf("%d%s", b, suffix)
+	}}
+
 // TODO - split this into a library.
 
 type httpServer struct {
@@ -37,7 +55,7 @@ type httpServer struct {
 	localPrint bool
 }
 
-var didYouMeanTemplate = template.Must(template.New("didyoumean").Parse(`<html>
+var didYouMeanTemplate = template.Must(template.New("didyoumean").Funcs(funcmap).Parse(`<html>
   <head>
     <title>Error</title>
   </head>
@@ -78,7 +96,7 @@ const searchBox = `
   </form>
 `
 
-var searchBoxTemplate = template.Must(template.New("box").Parse(
+var searchBoxTemplate = template.Must(template.New("box").Funcs(funcmap).Parse(
 	`<html>
 <head>
 <style>
@@ -92,43 +110,80 @@ dt {
 ` + searchBox + `
 </div>
 
-Examples:
-<div style="margin-left: 4em;">
-<dl>
-  <dt>needle</dt><dd>search for "needle"
-</dd>
-  <dt>class needle</dt><dd>search for files containing both "class" and "needle"
-</dd>
-  <dt>class Needle</dt><dd>search for files containing both "class" (case insensitive) and "Needle" (case sensitive)
-</dd>
-  <dt>class Needle case:yes</dt><dd>search for files containing "class" and "Needle", both case sensitively
-</dd>
-  <dt>"class Needle"</dt><dd>search for files with the phrase "class Needle"
-</dd>
-  <dt>needle -hay</dt><dd>search for files with the word "needle" but not the word "hay"
-</dd>
-  <dt>path file:java</dt><dd>search for the word "path" in files whose name contains "java"
-</dd>
-  <dt>f:\.c$</dt><dd>search for files whose name ends with ".c"
-</dd>
-  <dt>path -file:java</dt><dd>search for the word "path" excluding files whose name contains "java"</dd>
-  <dt>foo.*bar</dt><dd>search for the regular expression "foo.*bar"</dd>
-  <dt>-(Path File) Stream</dt><dd>search "Stream", but exclude files containing both "Path" and "File"</dd>
-  <dt>-Path\ File Stream</dt><dd>search "Stream", but exclude files containing "Path File"</dd>
-  <dt>repo:android</dt><dd>restrict to the "android" repository</dd>
-  <dt>branch:master</dt><dd>for Git repos, only look for files in the "master" branch.</dd>
-</dl>
+<div style="display: flex; justify-content: space-around; flex-direction: row;">
+
+<div>
+  Examples:
+  <div style="margin-left: 4em;">
+  <dl>
+    <dt>needle</dt><dd>search for "needle"
+  </dd>
+    <dt>class needle</dt><dd>search for files containing both "class" and "needle"
+  </dd>
+    <dt>class Needle</dt><dd>search for files containing both "class" (case insensitive) and "Needle" (case sensitive)
+  </dd>
+    <dt>class Needle case:yes</dt><dd>search for files containing "class" and "Needle", both case sensitively
+  </dd>
+    <dt>"class Needle"</dt><dd>search for files with the phrase "class Needle"
+  </dd>
+    <dt>needle -hay</dt><dd>search for files with the word "needle" but not the word "hay"
+  </dd>
+    <dt>path file:java</dt><dd>search for the word "path" in files whose name contains "java"
+  </dd>
+    <dt>f:\.c$</dt><dd>search for files whose name ends with ".c"
+  </dd>
+    <dt>path -file:java</dt><dd>search for the word "path" excluding files whose name contains "java"</dd>
+    <dt>foo.*bar</dt><dd>search for the regular expression "foo.*bar"</dd>
+    <dt>-(Path File) Stream</dt><dd>search "Stream", but exclude files containing both "Path" and "File"</dd>
+    <dt>-Path\ File Stream</dt><dd>search "Stream", but exclude files containing "Path File"</dd>
+    <dt>repo:android</dt><dd>restrict to the "android" repository</dd>
+    <dt>branch:master</dt><dd>for Git repos, only look for files in the "master" branch.</dd>
+  </dl>
+  </div>
+</div>
+
+<div>
+<p>
+Used {{HumanUnit .Stats.IndexBytes}} memory for {{HumanUnit .Stats.ContentBytes}} indexed data in these repos:
+</p>
+<p>
+<ul>
+{{range .Stats.Repos}}
+  <li>{{.}}</li>
+{{end}}
+</ul>
+</p>
 </div>
 </body>
 </html>
 `))
 
-func (s *httpServer) serveSearchBox(w http.ResponseWriter, r *http.Request) {
+func (s *httpServer) serveSearchBoxErr(w http.ResponseWriter, r *http.Request) error {
+	stats, err := s.searcher.Stats()
+	if err != nil {
+		return err
+	}
 	var buf bytes.Buffer
-	if err := searchBoxTemplate.Execute(&buf, map[string]string{"LastQuery": ""}); err != nil {
+
+	type data struct {
+		LastQuery string
+		Stats     *zoekt.RepoStats
+	}
+
+	d := data{
+		LastQuery: "",
+		Stats:     stats,
+	}
+	if err := searchBoxTemplate.Execute(&buf, d); err != nil {
+		return err
+	}
+	w.Write(buf.Bytes())
+	return nil
+}
+
+func (s *httpServer) serveSearchBox(w http.ResponseWriter, r *http.Request) {
+	if err := s.serveSearchBoxErr(w, r); err != nil {
 		http.Error(w, err.Error(), http.StatusTeapot)
-	} else {
-		w.Write(buf.Bytes())
 	}
 }
 
@@ -161,14 +216,14 @@ type ResultsPage struct {
 	FileMatches []FileMatchData
 }
 
-var resultTemplate = template.Must(template.New("page").Parse(`<html>
+var resultTemplate = template.Must(template.New("page").Funcs(funcmap).Parse(`<html>
   <head>
     <title>Search results</title>
   </head>
 <body>` + searchBox +
 	`  <hr>
   Found {{.Stats.MatchCount}} results in {{.Stats.FileCount}} files ({{.Stats.NgramMatches}} ngram matches,
-    {{.Stats.FilesConsidered}} docs considered, {{.Stats.FilesLoaded}} docs ({{.Stats.HumanBytesLoaded}}B) loaded,
+    {{.Stats.FilesConsidered}} docs considered, {{.Stats.FilesLoaded}} docs ({{HumanUnit .Stats.BytesLoaded}}B) loaded,
     {{.Stats.FilesSkipped}} docs skipped): for
   <pre style="background: #ffc;">{{.Query}}</pre>
   in {{.Stats.Duration}}

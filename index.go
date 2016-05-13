@@ -26,7 +26,8 @@ import (
 var _ = log.Println
 
 // indexData holds the pattern-independent data that we have to have
-// in memory to search.
+// in memory to search. Most of the memory is taken up by the ngram =>
+// offset index.
 type indexData struct {
 	file IndexFile
 	err  error
@@ -55,6 +56,31 @@ type indexData struct {
 
 	repoName string
 	repoURL  string
+}
+
+func (d *indexData) memoryUse() int {
+	sz := 0
+	for _, a := range [][]uint32{
+		d.postingsIndex, d.newlinesIndex, d.docSectionsIndex, d.caseBitsIndex,
+		d.fileEnds, d.fileNameCaseBitsIndex, d.fileNameIndex, d.fileBranchMasks,
+	} {
+		sz += 4 * len(a)
+	}
+	sz += 12 * len(d.ngrams)
+	for _, v := range d.fileNameNgrams {
+		sz += 4*len(v) + 4
+	}
+	return sz
+}
+
+func (d *indexData) Stats() (*RepoStats, error) {
+	last := d.boundaries[len(d.boundaries)-1]
+	lastFN := d.fileNameIndex[len(d.fileNameIndex)-1]
+	return &RepoStats{
+		Repos:        []string{d.repoName},
+		IndexBytes:   int64(d.memoryUse()),
+		ContentBytes: int64(int(last) + int(lastFN)),
+	}, nil
 }
 
 func (data *indexData) getDocIterator(q query.Q) (docIterator, error) {

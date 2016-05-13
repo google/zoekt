@@ -175,6 +175,18 @@ func (ss *shardedSearcher) Close() {
 	ss.mu.Unlock()
 }
 
+func (ss *shardedSearcher) Stats() (*RepoStats, error) {
+	var r RepoStats
+	for _, s := range ss.shards {
+		s, err := s.Stats()
+		if err != nil {
+			return nil, err
+		}
+		r.Add(s)
+	}
+	return &r, nil
+}
+
 func (ss *shardedSearcher) Search(pat query.Q, opts *SearchOptions) (*SearchResult, error) {
 	start := time.Now()
 	type res struct {
