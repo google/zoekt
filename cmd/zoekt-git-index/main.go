@@ -147,9 +147,10 @@ func indexGitRepo(opts build.Options, repoDir, branchPrefix string, branches []s
 		opts.RepoURL = url
 	}
 
-	if filepath.Base(repoDir) == ".git" {
+	if opts.RepoName == ".git" {
 		opts.RepoName = filepath.Base(filepath.Dir(repoDir))
 	}
+	opts.RepoName = strings.TrimSuffix(opts.RepoName, ".git")
 
 	builder, err := build.NewBuilder(opts)
 	if err != nil {
