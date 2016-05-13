@@ -22,6 +22,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"time"
 
@@ -170,6 +171,16 @@ func (s *httpServer) serveSearchBoxErr(w http.ResponseWriter, r *http.Request) e
 		Stats     *zoekt.RepoStats
 	}
 
+	uniq := map[string]struct{}{}
+	for _, r := range stats.Repos {
+		uniq[r] = struct{}{}
+	}
+
+	stats.Repos = stats.Repos[:0]
+	for k := range uniq {
+		stats.Repos = append(stats.Repos, k)
+	}
+	sort.Strings(stats.Repos)
 	d := data{
 		LastQuery: "",
 		Stats:     stats,
