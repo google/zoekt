@@ -74,12 +74,12 @@ func (s *httpServer) servePrint(w http.ResponseWriter, r *http.Request) {
 
 const searchBox = `
   <form action="search">
-    Search some code: <input type="text" name="q"> Max results:  <input style="width: 5em;" type="text" name="num" value="50"> <input type="submit" value="Search">
+    Search some code: <input {{if .LastQuery}}value={{.LastQuery}} {{end}} type="text" name="q"> Max results:  <input style="width: 5em;" type="text" name="num" value="50"> <input type="submit" value="Search">
   </form>
 `
 
-func (s *httpServer) serveSearchBox(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte(`<html>
+var searchBoxTemplate = template.Must(template.New("box").Parse(
+	`<html>
 <head>
 <style>
 dt {
@@ -122,6 +122,14 @@ Examples:
 </body>
 </html>
 `))
+
+func (s *httpServer) serveSearchBox(w http.ResponseWriter, r *http.Request) {
+	var buf bytes.Buffer
+	if err := searchBoxTemplate.Execute(&buf, map[string]string{"LastQuery": ""}); err != nil {
+		http.Error(w, err.Error(), http.StatusTeapot)
+	} else {
+		w.Write(buf.Bytes())
+	}
 }
 
 type MatchLine struct {
@@ -146,6 +154,7 @@ type MatchData struct {
 }
 
 type ResultsPage struct {
+	LastQuery   string
 	Query       string
 	Stats       zoekt.Stats
 	Duration    time.Duration
@@ -206,8 +215,9 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 	}
 
 	res := ResultsPage{
-		Stats: result.Stats,
-		Query: q.String(),
+		LastQuery: queryStr,
+		Stats:     result.Stats,
+		Query:     q.String(),
 	}
 
 	if len(result.Files) > num {
@@ -225,6 +235,7 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 			v := make(url.Values)
 			v.Add("r", f.Repo)
 			v.Add("f", f.Name)
+			v.Add("q", queryStr)
 			if len(f.Branches) > 0 {
 				v.Add("b", f.Branches[0])
 			}
@@ -290,6 +301,7 @@ func (s *httpServer) servePrintErr(w http.ResponseWriter, r *http.Request) error
 	fileStr := qvals.Get("f")
 	repoStr := qvals.Get("r")
 	branchStr := qvals.Get("b")
+	queryStr := qvals.Get("q")
 
 	q := &query.And{[]query.Q{
 		&query.Substring{Pattern: fileStr, FileName: true},
@@ -313,12 +325,14 @@ func (s *httpServer) servePrintErr(w http.ResponseWriter, r *http.Request) error
 	f := result.Files[0]
 	type fData struct {
 		Repo, Name, Content string
+		LastQuery           string
 	}
 
 	d := fData{
-		Name:    f.Name,
-		Repo:    f.Repo,
-		Content: string(f.Content),
+		Name:      f.Name,
+		Repo:      f.Repo,
+		Content:   string(f.Content),
+		LastQuery: queryStr,
 	}
 
 	var buf bytes.Buffer
