@@ -153,8 +153,22 @@ func (b *IndexBuilder) AddBranch(branch string) {
 	b.addBranch(branch)
 }
 
+const maxTrigramCount = 20000
+
 // Add a file which only occurs in certain branches.
 func (b *IndexBuilder) Add(doc Document) error {
+	if len(doc.Content) >= ngramSize {
+		trigrams := map[ngram]struct{}{}
+		for i := ngramSize; i < len(doc.Content); i++ {
+			trigrams[bytesToNGram(doc.Content[i-3:i])] = struct{}{}
+
+			if len(trigrams) > maxTrigramCount {
+				// probably not text.
+				return nil
+			}
+		}
+	}
+
 	sort.Sort(docSectionSlice(doc.Symbols))
 
 	var last DocumentSection
