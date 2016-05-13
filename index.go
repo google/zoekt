@@ -34,7 +34,6 @@ type indexData struct {
 
 	ngrams map[ngram]simpleSection
 
-	postingsIndex    []uint32
 	newlinesIndex    []uint32
 	docSectionsIndex []uint32
 	caseBitsIndex    []uint32
@@ -61,7 +60,7 @@ type indexData struct {
 func (d *indexData) memoryUse() int {
 	sz := 0
 	for _, a := range [][]uint32{
-		d.postingsIndex, d.newlinesIndex, d.docSectionsIndex, d.caseBitsIndex,
+		d.newlinesIndex, d.docSectionsIndex, d.caseBitsIndex,
 		d.fileEnds, d.fileNameCaseBitsIndex, d.fileNameIndex, d.fileBranchMasks,
 	} {
 		sz += 4 * len(a)

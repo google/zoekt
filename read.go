@@ -114,7 +114,7 @@ func (r *reader) readIndexData(toc *indexTOC) *indexData {
 		}
 	}
 
-	d.postingsIndex = toc.postings.absoluteIndex()
+	postingsIndex := toc.postings.absoluteIndex()
 	d.caseBitsIndex = toc.fileContents.caseBits.absoluteIndex()
 	d.boundaries = toc.fileContents.content.absoluteIndex()
 	d.newlinesIndex = toc.newlines.absoluteIndex()
@@ -124,8 +124,8 @@ func (r *reader) readIndexData(toc *indexTOC) *indexData {
 	for i := 0; i < len(textContent); i += ngramSize {
 		j := i / ngramSize
 		d.ngrams[bytesToNGram(textContent[i:i+ngramSize])] = simpleSection{
-			d.postingsIndex[j],
-			d.postingsIndex[j+1] - d.postingsIndex[j],
+			postingsIndex[j],
+			postingsIndex[j+1] - postingsIndex[j],
 		}
 	}
 
