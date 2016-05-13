@@ -68,6 +68,12 @@ func TestSimplify(t *testing.T) {
 		{in: &And{[]Q{&Const{true}, &Const{false}}}, want: &Const{false}},
 		{in: &Or{[]Q{&Const{false}, &Const{true}}}, want: &Const{true}},
 		{in: &Not{&Const{true}}, want: &Const{false}},
+		{in: &And{[]Q{
+			&Substring{Pattern: "byte"},
+			&Not{&And{[]Q{&Substring{Pattern: "byte"}}}}}},
+			want: &And{[]Q{
+				&Substring{Pattern: "byte"},
+				&Not{&Substring{Pattern: "byte"}}}}},
 	}
 
 	for _, c := range cases {

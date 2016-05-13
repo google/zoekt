@@ -185,6 +185,9 @@ func flatten(q Q) (Q, bool) {
 		}
 		flatChildren, changed := flattenAndOr(s.Children, s)
 		return &Or{flatChildren}, changed
+	case *Not:
+		child, changed := flatten(s.Child)
+		return &Not{child}, changed
 	default:
 		return q, false
 	}
