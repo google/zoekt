@@ -18,13 +18,13 @@ package build
 
 import (
 	"bytes"
-	"crypto/md5"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/google/zoekt"
@@ -48,6 +48,9 @@ type Options struct {
 
 	// RepoName is name of the repository.
 	RepoName string
+
+	// RepoDir is the path to the repository
+	RepoDir string
 
 	// RepoURL is the URL template for the repository.
 	RepoURL string
@@ -160,7 +163,7 @@ func (b *Builder) flush() {
 }
 
 func (b *Builder) buildShard(todo []*zoekt.Document, nextShardNum int) error {
-	name, err := shardName(b.opts.IndexDir, b.opts.RepoName, nextShardNum)
+	name, err := shardName(b.opts.IndexDir, b.opts.RepoDir, nextShardNum)
 	if err != nil {
 		return err
 	}
@@ -174,15 +177,14 @@ func (b *Builder) buildShard(todo []*zoekt.Document, nextShardNum int) error {
 	return writeShard(name, shardBuilder)
 }
 
-func shardName(dir string, repo string, shardNum int) (string, error) {
-	abs, err := filepath.Abs(repo)
+func shardName(dir string, repoDir string, shardNum int) (string, error) {
+	abs, err := filepath.Abs(repoDir)
 	if err != nil {
 		return "", err
 	}
-	fp := stableHash(filepath.Dir(abs))
 
 	return filepath.Join(dir,
-		fmt.Sprintf("%s.%s.%05d.zoekt", filepath.Base(abs), fp, shardNum)), nil
+		fmt.Sprintf("%s.%05d.zoekt", strings.Replace(abs, "/", "_", -1), shardNum)), nil
 }
 
 func writeShard(fn string, b *zoekt.IndexBuilder) error {
@@ -214,10 +216,4 @@ func writeShard(fn string, b *zoekt.IndexBuilder) error {
 	log.Printf("wrote %s: %d index bytes (overhead %3.1f)", fn, fi.Size(),
 		float64(fi.Size())/float64(b.ContentSize()+1))
 	return nil
-}
-
-func stableHash(in string) string {
-	h := md5.New()
-	h.Write([]byte(in))
-	return fmt.Sprintf("%x", h.Sum(nil)[:6])
 }

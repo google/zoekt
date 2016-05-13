@@ -140,6 +140,7 @@ func getTreeID(repo *git.Repository, ref string) (*git.Oid, error) {
 func indexGitRepo(opts build.Options, repoDir, branchPrefix string, branches []string) error {
 	repoDir = filepath.Clean(repoDir)
 	opts.RepoName = filepath.Base(repoDir)
+	opts.RepoDir = repoDir
 	url, err := guessRepoURL(repoDir)
 	if err != nil {
 		log.Println("no repo URL: %s", err)
