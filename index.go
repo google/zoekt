@@ -244,7 +244,7 @@ func (d *indexData) fileName(i uint32) []byte {
 	data := d.fileNameContent[d.fileNameIndex[i]:d.fileNameIndex[i+1]]
 	cb := d.fileNameCaseBits[d.fileNameCaseBitsIndex[i]:d.fileNameCaseBitsIndex[i+1]]
 
-	return toOriginal(data, cb, 0, len(data))
+	return toOriginal(make([]byte, len(data)+8), data, cb, 0, len(data))
 }
 
 func (s *indexData) Close() {

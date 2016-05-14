@@ -30,9 +30,8 @@ func toLower(in []byte) []byte {
 	return out
 }
 
-func toOriginal(in []byte, caseBits []byte, start, end int) []byte {
-	out := make([]byte, end-start)
-
+// toOriginalPortable undoes case folding.
+func toOriginalPortable(out, in []byte, caseBits []byte, start, end int) []byte {
 	rounded := start - (start % 8)
 	var b byte
 	for i := rounded; i < end; i++ {
@@ -49,7 +48,7 @@ func toOriginal(in []byte, caseBits []byte, start, end int) []byte {
 		}
 		b >>= 1
 	}
-	return out
+	return out[:end-start]
 }
 
 func diffBits(a, b []byte) []byte {

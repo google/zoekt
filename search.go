@@ -130,7 +130,8 @@ func (p *contentProvider) fillMatch(m *candidateMatch) Match {
 			LineOff:     int(m.offset) - start,
 			MatchLength: int(m.matchSz),
 		}
-		finalMatch.Line = toOriginal(p.data(false), p.caseBits(false), start, end)
+		out := make([]byte, end-start+8)
+		finalMatch.Line = toOriginal(out, p.data(false), p.caseBits(false), start, end)
 	}
 
 	sects := p.docSections()

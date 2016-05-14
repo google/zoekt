@@ -255,8 +255,13 @@ func (p *contentProvider) evalRegexpMatchesCase(s *regexpMatchTree) {
 	}
 
 	trimmed := s.found[:0]
+
+	buf := make([]byte, 200)
 	for _, c := range s.found {
-		orig := toOriginal(p.data(s.fileName), p.caseBits(s.fileName), int(c.offset),
+		if cap(buf) < int(c.matchSz+8) {
+			buf = make([]byte, int(c.matchSz+8))
+		}
+		orig := toOriginal(buf, p.data(s.fileName), p.caseBits(s.fileName), int(c.offset),
 			int(c.offset+c.matchSz))
 		if s.caseRegexp.Match(orig) {
 			trimmed = append(trimmed, c)
@@ -604,7 +609,8 @@ nextFileMatch:
 
 		sortMatchesByScore(fileMatch.Matches)
 		if opts.Whole {
-			fileMatch.Content = toOriginal(cp.data(false), cp.caseBits(false), 0, int(cp.fileSize))
+			c := make([]byte, cp.fileSize+8)
+			fileMatch.Content = toOriginal(c, cp.data(false), cp.caseBits(false), 0, int(cp.fileSize))
 		}
 
 		res.Files = append(res.Files, fileMatch)

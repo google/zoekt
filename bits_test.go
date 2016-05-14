@@ -17,25 +17,38 @@ package zoekt
 import (
 	"log"
 	"reflect"
+	"strings"
 	"testing"
 )
 
 var _ = log.Println
 
+func TestToOriginal(t *testing.T) {
+	in := "AbBcDeFggHiJkLLmNoPQ"
+
+	out := make([]byte, len(in)+8)
+	for i := 0; i < len(in); i++ {
+		for j := i; j < len(in); j++ {
+			orig := []byte(in)
+
+			lowered, bits := splitCase(orig)
+			roundtrip := toOriginal(out, lowered, bits, i, j)
+			if want := orig[i:j]; !reflect.DeepEqual(roundtrip, want) {
+				t.Fatalf("%d,%d: got roundtrip %q (%d), want %q (%d)", i, j, roundtrip, len(roundtrip), want, len(want))
+			}
+		}
+	}
+}
+
 func TestBitFunctions(t *testing.T) {
 	orig := []byte("abCDef")
-
 	lowered, bits := splitCase(orig)
 	if want := []byte{1<<2 | 1<<3}; !reflect.DeepEqual(bits, want) {
 		t.Errorf("got bits %v, want %v", bits, want)
 	}
 
-	if want := "abcdef"; want != string(lowered) {
+	if want := strings.ToLower("abcdef"); want != string(lowered) {
 		t.Errorf("got lowercase %q, want %q", lowered, want)
-	}
-	roundtrip := toOriginal(lowered, bits, 1, 4)
-	if want := orig[1:4]; !reflect.DeepEqual(roundtrip, want) {
-		t.Errorf("got roundtrip %q, want %q", roundtrip, want)
 	}
 }
 
@@ -65,12 +78,15 @@ func TestNgram(t *testing.T) {
 	}
 }
 
-func BenchmarkToOriginal(b *testing.B) {
+func benchmarkToOriginal(b *testing.B, sz int, portable bool) {
 	b.StopTimer()
 	line := `  if ((size == kSignedByte || size == kUnsignedByte) && !IsByteRegister(rl_src.reg)) {`
 	pre := "xX\n"
 	post := "\nbla"
 
+	for i := 0; i < sz; i++ {
+		line = line + line
+	}
 	content := []byte(pre + line + post)
 	lwr, cb := splitCase(content)
 
@@ -78,10 +94,32 @@ func BenchmarkToOriginal(b *testing.B) {
 
 	b.SetBytes(int64(len(line)))
 
+	out := make([]byte, len(line)+20)
 	b.StartTimer()
+
 	for i := 0; i < b.N; i++ {
-		result = append(result, toOriginal(lwr, cb, len(pre), len(line)+len(pre)))
+		if portable {
+			result = append(result, toOriginalPortable(out, lwr, cb, len(pre), len(line)+len(pre)))
+		} else {
+			result = append(result, toOriginal(out, lwr, cb, len(pre), len(line)+len(pre)))
+		}
 	}
+}
+
+func BenchmarkToOriginalPortableSmall(b *testing.B) {
+	benchmarkToOriginal(b, 0, true)
+}
+
+func BenchmarkToOriginalSmall(b *testing.B) {
+	benchmarkToOriginal(b, 0, false)
+}
+
+func BenchmarkToOriginalPortableBig(b *testing.B) {
+	benchmarkToOriginal(b, 10, true)
+}
+
+func BenchmarkToOriginalBig(b *testing.B) {
+	benchmarkToOriginal(b, 10, false)
 }
 
 func TestDocSection(t *testing.T) {
