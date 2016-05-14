@@ -191,12 +191,18 @@ func (s *contentSection) write(w *writer) {
 }
 
 func toDeltas(offsets []uint32) []byte {
+	var enc [8]byte
+
 	deltas := make([]byte, 0, len(offsets)*2)
+
+	m := binary.PutUvarint(enc[:], uint64(len(offsets)))
+	deltas = append(deltas, enc[:m]...)
+
 	var last uint32
 	for _, p := range offsets {
 		delta := p - last
 		last = p
-		var enc [8]byte
+
 		m := binary.PutUvarint(enc[:], uint64(delta))
 		deltas = append(deltas, enc[:m]...)
 	}
@@ -204,13 +210,16 @@ func toDeltas(offsets []uint32) []byte {
 }
 
 func fromDeltas(data []byte, ps []uint32) []uint32 {
-	var last uint32
-	if cap(ps) < len(data)/2 {
-		ps = make([]uint32, 0, len(data)/2)
+	sz, m := binary.Uvarint(data)
+	data = data[m:]
+
+	if cap(ps) < int(sz) {
+		ps = make([]uint32, 0, sz)
 	} else {
 		ps = ps[:0]
 	}
 
+	var last uint32
 	for len(data) > 0 {
 		delta, m := binary.Uvarint(data)
 		offset := last + uint32(delta)
