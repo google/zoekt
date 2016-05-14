@@ -82,7 +82,9 @@ func (o *Options) SetDefaults() {
 			o.CTags = ctags
 		}
 	}
-
+	if o.Parallelism == 0 {
+		o.Parallelism = 1
+	}
 	if o.SizeMax == 0 {
 		o.SizeMax = 128 << 10
 	}
