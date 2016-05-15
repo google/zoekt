@@ -97,10 +97,6 @@ func readSectionU32(f IndexFile, sec simpleSection) ([]uint32, error) {
 	return arr, nil
 }
 
-type indexReader interface {
-	readIndex(*indexData) error
-}
-
 func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 	d := indexData{
 		file:           r.r,
@@ -108,13 +104,6 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 		fileNameNgrams: map[ngram][]uint32{},
 		branchNames:    map[int]string{},
 		branchIDs:      map[string]int{},
-	}
-	for _, sec := range toc.sections() {
-		if ir, ok := sec.(indexReader); ok {
-			if err := ir.readIndex(&d); err != nil {
-				return nil, err
-			}
-		}
 	}
 	d.caseBitsIndex = toc.fileContents.caseBits.absoluteIndex()
 	d.boundaries = toc.fileContents.content.absoluteIndex()

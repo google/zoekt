@@ -136,13 +136,8 @@ func (s *compoundSection) read(r *reader) error {
 	if err := s.index.read(r); err != nil {
 		return err
 	}
-	// cannot read items.
-	return nil
-}
-
-func (s *compoundSection) readIndex(r *indexData) error {
 	var err error
-	s.offsets, err = r.readSectionU32(s.index)
+	s.offsets, err = readSectionU32(r.r, s.index)
 	return err
 }
 
@@ -174,13 +169,6 @@ func (s *compoundSection) readBlob(r *indexData, i uint32) ([]byte, error) {
 type contentSection struct {
 	content  compoundSection
 	caseBits compoundSection
-}
-
-func (s *contentSection) readIndex(r *indexData) error {
-	if err := s.content.readIndex(r); err != nil {
-		return err
-	}
-	return s.caseBits.readIndex(r)
 }
 
 func (s *contentSection) writeStrings(w *writer, strs []*searchableString) {
