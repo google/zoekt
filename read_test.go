@@ -34,16 +34,19 @@ func TestReadWrite(t *testing.T) {
 	r := reader{r: f}
 
 	var toc indexTOC
-	r.readTOC(&toc)
+	err := r.readTOC(&toc)
 
-	if r.err != nil {
-		t.Errorf("got read error %v", r.err)
+	if err != nil {
+		t.Errorf("got read error %v", err)
 	}
 	if toc.fileContents.content.data.sz != 5 {
 		t.Errorf("got contents size %d, want 5", toc.fileContents.content.data.sz)
 	}
 
-	data := r.readIndexData(&toc)
+	data, err := r.readIndexData(&toc)
+	if err != nil {
+		t.Fatalf("readIndexData: %v", err)
+	}
 	if got := data.fileName(0); string(got) != "filename" {
 		t.Errorf("got filename %q, want %q", got, "filename")
 	}
@@ -72,15 +75,17 @@ func TestReadWriteNames(t *testing.T) {
 	r := reader{r: f}
 
 	var toc indexTOC
-	r.readTOC(&toc)
-	if r.err != nil {
-		t.Errorf("got read error %v", r.err)
+	if err := r.readTOC(&toc); err != nil {
+		t.Errorf("got read error %v", err)
 	}
 	if toc.fileNames.content.data.sz != 4 {
 		t.Errorf("got contents size %d, want 4", toc.fileNames.content.data.sz)
 	}
 
-	data := r.readIndexData(&toc)
+	data, err := r.readIndexData(&toc)
+	if err != nil {
+		t.Fatalf("readIndexData: %v", err)
+	}
 	if !reflect.DeepEqual([]byte{0x4}, data.fileNameCaseBits) {
 		t.Errorf("got case bits %v, want {0x4}", data.fileNameCaseBits)
 	}

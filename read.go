@@ -20,87 +20,88 @@ import (
 	"log"
 )
 
-// reader is a stateful file that keeps track of errors.
+// reader is a stateful file
 type reader struct {
 	r   IndexFile
 	off uint32
-	err error
 }
 
 func (r *reader) seek(off uint32) {
 	r.off = off
 }
 
-func (r *reader) U32() uint32 {
-	if r.err != nil {
-		return 0
-	}
-
-	var b []byte
-	b, r.err = r.r.Read(r.off, 4)
+func (r *reader) U32() (uint32, error) {
+	b, err := r.r.Read(r.off, 4)
 	r.off += 4
-	return binary.BigEndian.Uint32(b[:])
+	if err != nil {
+		return 0, err
+	}
+	return binary.BigEndian.Uint32(b), nil
 }
 
 var _ = log.Println
 
-func (r *reader) readTOC(toc *indexTOC) {
-	if r.err != nil {
-		return
+func (r *reader) readTOC(toc *indexTOC) error {
+	sz, err := r.r.Size()
+	if err != nil {
+		return err
 	}
-
-	var sz uint32
-	sz, r.err = r.r.Size()
 	r.off = sz - 8
 
 	var tocSection simpleSection
-	tocSection.read(r)
+	if err := tocSection.read(r); err != nil {
+		return err
+	}
 
 	r.seek(tocSection.off)
 
-	sectionCount := r.U32()
+	sectionCount, err := r.U32()
+	if err != nil {
+		return err
+	}
+
 	secs := toc.sections()
 	if len(secs) != int(sectionCount) {
-		r.err = fmt.Errorf("section count mismatch: got %d want %d", len(secs), sectionCount)
+		return fmt.Errorf("section count mismatch: got %d want %d", len(secs), sectionCount)
 	}
 
 	for _, s := range toc.sections() {
-		s.read(r)
+		if err := s.read(r); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
-func (r *indexData) readSectionBlob(sec simpleSection) []byte {
-	if r.err != nil {
-		return nil
-	}
-
-	var res []byte
-	res, r.err = r.file.Read(sec.off, sec.sz)
-	return res
+func (r *indexData) readSectionBlob(sec simpleSection) ([]byte, error) {
+	return r.file.Read(sec.off, sec.sz)
 }
 
-func (r *indexData) readSectionU32(sec simpleSection) []uint32 {
+func (r *indexData) readSectionU32(sec simpleSection) ([]uint32, error) {
+	return readSectionU32(r.file, sec)
+}
+
+func readSectionU32(f IndexFile, sec simpleSection) ([]uint32, error) {
 	if sec.sz%4 != 0 {
 		log.Panic("barf", sec.sz)
 	}
-	blob := r.readSectionBlob(sec)
+	blob, err := f.Read(sec.off, sec.sz)
+	if err != nil {
+		return nil, err
+	}
 	arr := make([]uint32, 0, len(blob)/4)
 	for len(blob) > 0 {
 		arr = append(arr, binary.BigEndian.Uint32(blob))
 		blob = blob[4:]
 	}
-	return arr
+	return arr, nil
 }
 
 type indexReader interface {
-	readIndex(*indexData)
+	readIndex(*indexData) error
 }
 
-func (r *reader) readIndexData(toc *indexTOC) *indexData {
-	if r.err != nil {
-		return nil
-	}
-
+func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 	d := indexData{
 		file:           r.r,
 		ngrams:         map[ngram]simpleSection{},
@@ -110,17 +111,22 @@ func (r *reader) readIndexData(toc *indexTOC) *indexData {
 	}
 	for _, sec := range toc.sections() {
 		if ir, ok := sec.(indexReader); ok {
-			ir.readIndex(&d)
+			if err := ir.readIndex(&d); err != nil {
+				return nil, err
+			}
 		}
 	}
-
-	postingsIndex := toc.postings.absoluteIndex()
 	d.caseBitsIndex = toc.fileContents.caseBits.absoluteIndex()
 	d.boundaries = toc.fileContents.content.absoluteIndex()
 	d.newlinesIndex = toc.newlines.absoluteIndex()
 	d.docSectionsIndex = toc.fileSections.absoluteIndex()
 
-	textContent := d.readSectionBlob(toc.ngramText)
+	textContent, err := d.readSectionBlob(toc.ngramText)
+	if err != nil {
+		return nil, err
+	}
+	postingsIndex := toc.postings.absoluteIndex()
+
 	for i := 0; i < len(textContent); i += ngramSize {
 		j := i / ngramSize
 		d.ngrams[bytesToNGram(textContent[i:i+ngramSize])] = simpleSection{
@@ -130,15 +136,45 @@ func (r *reader) readIndexData(toc *indexTOC) *indexData {
 	}
 
 	d.fileEnds = toc.fileContents.content.relativeIndex()[1:]
-	d.fileBranchMasks = d.readSectionU32(toc.branchMasks)
-	d.fileNameContent = d.readSectionBlob(toc.fileNames.content.data)
-	d.fileNameCaseBits = d.readSectionBlob(toc.fileNames.caseBits.data)
+	d.fileBranchMasks, err = d.readSectionU32(toc.branchMasks)
+	if err != nil {
+		return nil, err
+	}
+
+	d.fileNameContent, err = d.readSectionBlob(toc.fileNames.content.data)
+	if err != nil {
+		return nil, err
+	}
+
+	d.fileNameCaseBits, err = d.readSectionBlob(toc.fileNames.caseBits.data)
+	if err != nil {
+		return nil, err
+	}
+
 	d.fileNameCaseBitsIndex = toc.fileNames.caseBits.relativeIndex()
 	d.fileNameIndex = toc.fileNames.content.relativeIndex()
-	d.repoName = string(d.readSectionBlob(toc.repoName))
-	d.repoURL = string(d.readSectionBlob(toc.repoURL))
-	nameNgramText := d.readSectionBlob(toc.nameNgramText)
-	fileNamePostingsData := d.readSectionBlob(toc.namePostings.data)
+
+	blob, err := d.readSectionBlob(toc.repoName)
+	if err != nil {
+		return nil, err
+	}
+	d.repoName = string(blob)
+	blob, err = d.readSectionBlob(toc.repoURL)
+	if err != nil {
+		return nil, err
+	}
+	d.repoURL = string(blob)
+
+	nameNgramText, err := d.readSectionBlob(toc.nameNgramText)
+	if err != nil {
+		return nil, err
+	}
+
+	fileNamePostingsData, err := d.readSectionBlob(toc.namePostings.data)
+	if err != nil {
+		return nil, err
+	}
+
 	fileNamePostingsIndex := toc.namePostings.relativeIndex()
 	for i := 0; i < len(nameNgramText); i += ngramSize {
 		j := i / ngramSize
@@ -147,7 +183,11 @@ func (r *reader) readIndexData(toc *indexTOC) *indexData {
 		d.fileNameNgrams[bytesToNGram(nameNgramText[i:i+ngramSize])] = fromDeltas(fileNamePostingsData[off:end], nil)
 	}
 
-	branchNameContent := d.readSectionBlob(toc.branchNames.data)
+	branchNameContent, err := d.readSectionBlob(toc.branchNames.data)
+	if err != nil {
+		return nil, err
+	}
+
 	if branchNameIndex := toc.branchNames.relativeIndex(); len(branchNameIndex) > 0 {
 		var last uint32
 		for i, end := range branchNameIndex[1:] {
@@ -158,39 +198,45 @@ func (r *reader) readIndexData(toc *indexTOC) *indexData {
 			last = end
 		}
 	}
-	return &d
+	return &d, nil
 }
 
-func (d *indexData) readContents(i uint32) []byte {
+func (d *indexData) readContents(i uint32) ([]byte, error) {
 	return d.readSectionBlob(simpleSection{
 		off: d.boundaries[i],
 		sz:  d.boundaries[i+1] - d.boundaries[i],
 	})
 }
 
-func (d *indexData) readCaseBits(i uint32) []byte {
+func (d *indexData) readCaseBits(i uint32) ([]byte, error) {
 	return d.readSectionBlob(simpleSection{
 		off: d.caseBitsIndex[i],
 		sz:  d.caseBitsIndex[i+1] - d.caseBitsIndex[i],
 	})
 }
 
-func (d *indexData) readNewlines(i uint32, buf []uint32) []uint32 {
-	blob := d.readSectionBlob(simpleSection{
+func (d *indexData) readNewlines(i uint32, buf []uint32) ([]uint32, error) {
+	blob, err := d.readSectionBlob(simpleSection{
 		off: d.newlinesIndex[i],
 		sz:  d.newlinesIndex[i+1] - d.newlinesIndex[i],
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	return fromDeltas(blob, buf)
+	return fromDeltas(blob, buf), nil
 }
 
-func (d *indexData) readDocSections(i uint32) []DocumentSection {
-	blob := d.readSectionBlob(simpleSection{
+func (d *indexData) readDocSections(i uint32) ([]DocumentSection, error) {
+	blob, err := d.readSectionBlob(simpleSection{
 		off: d.docSectionsIndex[i],
 		sz:  d.docSectionsIndex[i+1] - d.docSectionsIndex[i],
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	return unmarshalDocSections(blob)
+	return unmarshalDocSections(blob), nil
 }
 
 // IndexFile is a file suitable for concurrent read access. For performance
@@ -207,9 +253,9 @@ func NewSearcher(r IndexFile) (Searcher, error) {
 
 	var toc indexTOC
 	rd.readTOC(&toc)
-	indexData := rd.readIndexData(&toc)
-	if rd.err != nil {
-		return nil, rd.err
+	indexData, err := rd.readIndexData(&toc)
+	if err != nil {
+		return nil, err
 	}
 	indexData.file = r
 	return indexData, nil

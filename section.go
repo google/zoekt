@@ -69,7 +69,7 @@ func (s *simpleSection) end(w *writer) {
 
 // section is a range of bytes in the index file.
 type section interface {
-	read(*reader)
+	read(*reader) error
 	write(*writer)
 }
 
@@ -79,9 +79,17 @@ type simpleSection struct {
 	sz  uint32
 }
 
-func (s *simpleSection) read(r *reader) {
-	s.off = r.U32()
-	s.sz = r.U32()
+func (s *simpleSection) read(r *reader) error {
+	var err error
+	s.off, err = r.U32()
+	if err != nil {
+		return err
+	}
+	s.sz, err = r.U32()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *simpleSection) write(w *writer) {
@@ -121,14 +129,21 @@ func (s *compoundSection) write(w *writer) {
 	s.index.write(w)
 }
 
-func (s *compoundSection) read(r *reader) {
-	s.data.read(r)
-	s.index.read(r)
+func (s *compoundSection) read(r *reader) error {
+	if err := s.data.read(r); err != nil {
+		return err
+	}
+	if err := s.index.read(r); err != nil {
+		return err
+	}
 	// cannot read items.
+	return nil
 }
 
-func (s *compoundSection) readIndex(r *indexData) {
-	s.offsets = r.readSectionU32(s.index)
+func (s *compoundSection) readIndex(r *indexData) error {
+	var err error
+	s.offsets, err = r.readSectionU32(s.index)
+	return err
 }
 
 // absoluteIndex returns the offsets of items, plus a final marking the end of the
@@ -152,7 +167,7 @@ func (s *compoundSection) relativeIndex() []uint32 {
 	return ri
 }
 
-func (s *compoundSection) readBlob(r *indexData, i uint32) []byte {
+func (s *compoundSection) readBlob(r *indexData, i uint32) ([]byte, error) {
 	return r.readSectionBlob(simpleSection{s.offsets[i], s.offsets[i+1] - s.offsets[i]})
 }
 
@@ -161,9 +176,11 @@ type contentSection struct {
 	caseBits compoundSection
 }
 
-func (s *contentSection) readIndex(r *indexData) {
-	s.content.readIndex(r)
-	s.caseBits.readIndex(r)
+func (s *contentSection) readIndex(r *indexData) error {
+	if err := s.content.readIndex(r); err != nil {
+		return err
+	}
+	return s.caseBits.readIndex(r)
 }
 
 func (s *contentSection) writeStrings(w *writer, strs []*searchableString) {
@@ -180,9 +197,11 @@ func (s *contentSection) writeStrings(w *writer, strs []*searchableString) {
 	s.caseBits.end(w)
 }
 
-func (s *contentSection) read(r *reader) {
-	s.content.read(r)
-	s.caseBits.read(r)
+func (s *contentSection) read(r *reader) error {
+	if err := s.content.read(r); err != nil {
+		return err
+	}
+	return s.caseBits.read(r)
 }
 
 func (s *contentSection) write(w *writer) {

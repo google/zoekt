@@ -30,7 +30,6 @@ var _ = log.Println
 // offset index.
 type indexData struct {
 	file IndexFile
-	err  error
 
 	ngrams map[ngram]simpleSection
 
@@ -220,16 +219,18 @@ func (data *indexData) getContentDocIterator(query *query.Substring) (docIterato
 	input.leftPad = firstI
 	input.rightPad = uint32(len(str)-ngramSize) - lastI
 
-	input.first = fromDeltas(data.readSectionBlob(first), nil)
-	if data.err != nil {
-		return nil, data.err
+	blob, err := data.readSectionBlob(first)
+	if err != nil {
+		return nil, err
 	}
+	input.first = fromDeltas(blob, nil)
 
 	if firstI != lastI {
-		input.last = fromDeltas(data.readSectionBlob(last), nil)
-		if data.err != nil {
-			return nil, data.err
+		blob, err = data.readSectionBlob(last)
+		if err != nil {
+			return nil, err
 		}
+		input.last = fromDeltas(blob, nil)
 	} else {
 		input.last = input.first
 	}

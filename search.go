@@ -29,6 +29,7 @@ type contentProvider struct {
 	stats *Stats
 
 	// mutable
+	err      error
 	idx      uint32
 	_cb      []byte
 	_data    []byte
@@ -55,14 +56,14 @@ func (p *contentProvider) setDocument(docID uint32) {
 
 func (p *contentProvider) docSections() []DocumentSection {
 	if p._sects == nil {
-		p._sects = p.id.readDocSections(p.idx)
+		p._sects, p.err = p.id.readDocSections(p.idx)
 	}
 	return p._sects
 }
 
 func (p *contentProvider) newlines() []uint32 {
 	if p._nl == nil {
-		p._nl = p.id.readNewlines(p.idx, p._nlBuf)
+		p._nl, p.err = p.id.readNewlines(p.idx, p._nlBuf)
 		p._nlBuf = p._nl
 	}
 	return p._nl
@@ -74,7 +75,7 @@ func (p *contentProvider) data(fileName bool) []byte {
 	}
 
 	if p._data == nil {
-		p._data = p.id.readContents(p.idx)
+		p._data, p.err = p.id.readContents(p.idx)
 		p.stats.FilesLoaded++
 		p.stats.BytesLoaded += int64(len(p._data))
 	}
@@ -87,7 +88,7 @@ func (p *contentProvider) caseBits(fileName bool) []byte {
 	}
 
 	if p._cb == nil {
-		p._cb = p.id.readCaseBits(p.idx)
+		p._cb, p.err = p.id.readCaseBits(p.idx)
 	}
 	return p._cb
 }
