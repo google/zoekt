@@ -297,9 +297,7 @@ func parseExprList(in []byte) ([]Q, int, error) {
 	qs = newQS
 	for _, q := range qs {
 		if sq, ok := q.(*Substring); ok {
-			// TODO - this should just generate a
-			// brute-force query.
-			if len(sq.Pattern) < 3 {
+			if len(sq.Pattern) < 3 && !sq.FileName && len(qs) > 1 {
 				return nil, 0, &SuggestQueryError{
 					fmt.Sprintf("pattern %q too short", sq.Pattern),
 					fmt.Sprintf("%q", in),
