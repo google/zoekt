@@ -23,7 +23,7 @@ import (
 
 // NewIndexFile wraps a os.File to be an IndexFile.
 func NewIndexFile(f *os.File) (IndexFile, error) {
-	return &indexFileFromOS{f}
+	return &indexFileFromOS{f}, nil
 }
 
 type indexFileFromOS struct {
