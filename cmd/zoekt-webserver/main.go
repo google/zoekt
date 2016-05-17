@@ -106,6 +106,7 @@ dt {
 }
 </style>
 </head>
+<title>Zoekt, en gij zult spinazie eten</title>
 <body>
 <div style="margin: 3em; padding 3em; position: center;">
 ` + searchBox + `
@@ -221,6 +222,7 @@ type MatchData struct {
 
 type ResultsPage struct {
 	LastQuery   string
+	QueryStr    string
 	Query       string
 	Stats       zoekt.Stats
 	Duration    time.Duration
@@ -229,7 +231,7 @@ type ResultsPage struct {
 
 var resultTemplate = template.Must(template.New("page").Funcs(funcmap).Parse(`<html>
   <head>
-    <title>Search results</title>
+    <title>Results for {{.QueryStr}}</title>
   </head>
 <body>` + searchBox +
 	`  <hr>
@@ -284,6 +286,7 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 		LastQuery: queryStr,
 		Stats:     result.Stats,
 		Query:     q.String(),
+		QueryStr:  queryStr,
 	}
 
 	if len(result.Files) > num {
