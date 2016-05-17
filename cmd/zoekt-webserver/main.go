@@ -366,14 +366,18 @@ func (s *httpServer) servePrintErr(w http.ResponseWriter, r *http.Request) error
 	qvals := r.URL.Query()
 	fileStr := qvals.Get("f")
 	repoStr := qvals.Get("r")
-	branchStr := qvals.Get("b")
 	queryStr := qvals.Get("q")
 
-	q := &query.And{[]query.Q{
+	qs := []query.Q{
 		&query.Substring{Pattern: fileStr, FileName: true},
 		&query.Repo{Name: repoStr},
-		&query.Branch{Name: branchStr},
-	}}
+	}
+
+	if branchStr := qvals.Get("b"); branchStr != "" {
+		qs = append(qs, &query.Branch{Name: branchStr})
+	}
+
+	q := &query.And{qs}
 
 	sOpts := zoekt.SearchOptions{
 		Whole: true,
