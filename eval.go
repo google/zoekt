@@ -19,6 +19,7 @@ import (
 	"log"
 	"regexp"
 	"sort"
+	"strings"
 
 	"github.com/google/zoekt/query"
 )
@@ -426,8 +427,14 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*substrMatchTree]struct{}) (m
 		return st, nil
 
 	case *query.Branch:
+		mask := uint32(0)
+		for nm, m := range d.branchIDs {
+			if strings.Contains(nm, s.Pattern) {
+				mask |= uint32(m)
+			}
+		}
 		return &branchQueryMatchTree{
-			mask:      uint32(d.branchIDs[s.Name]),
+			mask:      mask,
 			fileMasks: d.fileBranchMasks,
 		}, nil
 	case *query.Const:

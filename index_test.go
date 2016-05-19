@@ -461,7 +461,7 @@ func TestBranchMask(t *testing.T) {
 			Pattern: "needle",
 		},
 		&query.Branch{
-			Name: "stable",
+			Pattern: "table",
 		},
 	}})
 

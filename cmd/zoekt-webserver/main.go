@@ -139,7 +139,7 @@ dt {
     <dt>-(Path File) Stream</dt><dd>search "Stream", but exclude files containing both "Path" and "File"</dd>
     <dt>-Path\ File Stream</dt><dd>search "Stream", but exclude files containing "Path File"</dd>
     <dt>repo:android</dt><dd>restrict to the "android" repository</dd>
-    <dt>branch:master</dt><dd>for Git repos, only look for files in the "master" branch.</dd>
+    <dt>branch:aster</dt><dd>for Git repos, only look for files in branches whose name contains "aster".</dd>
   </dl>
   </div>
 </div>
@@ -377,7 +377,7 @@ func (s *httpServer) servePrintErr(w http.ResponseWriter, r *http.Request) error
 	}
 
 	if branchStr := qvals.Get("b"); branchStr != "" {
-		qs = append(qs, &query.Branch{Name: branchStr})
+		qs = append(qs, &query.Branch{Pattern: branchStr})
 	}
 
 	q := &query.And{qs}

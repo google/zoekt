@@ -188,7 +188,7 @@ func parseExpr(in []byte) (Q, int, error) {
 	case tokRepo:
 		expr = &Repo{Name: text}
 	case tokBranch:
-		expr = &Branch{Name: text}
+		expr = &Branch{Pattern: text}
 	case tokText, tokRegex:
 		q, err := regexpQuery(text, false)
 		if err != nil {

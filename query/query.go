@@ -133,11 +133,11 @@ func (q *And) String() string {
 
 // Branch limits search to a specific branch.
 type Branch struct {
-	Name string
+	Pattern string
 }
 
 func (q *Branch) String() string {
-	return fmt.Sprintf("branch:%q", q.Name)
+	return fmt.Sprintf("branch:%q", q.Pattern)
 }
 
 func queryChildren(q Q) []Q {
