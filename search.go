@@ -145,7 +145,8 @@ const (
 	// TODO - how to scale this relative to rank?
 	scorePartialWordMatch = 50.0
 	scoreWordMatch        = 500.0
-	scoreSymbol           = 5000.0
+	scorePartialSymbol    = 4000.0
+	scoreSymbol           = 7000.0
 )
 
 func findSection(secs []DocumentSection, off, sz uint32) *DocumentSection {
@@ -164,7 +165,6 @@ func findSection(secs []DocumentSection, off, sz uint32) *DocumentSection {
 }
 
 func matchScore(secs []DocumentSection, m *Match) float64 {
-
 	startBoundary := m.LineOff < len(m.Line) && (m.LineOff == 0 || byteClass(m.Line[m.LineOff-1]) != byteClass(m.Line[m.LineOff]))
 
 	end := int(m.LineOff) + m.MatchLength
@@ -179,7 +179,15 @@ func matchScore(secs []DocumentSection, m *Match) float64 {
 
 	sec := findSection(secs, m.Offset, uint32(m.MatchLength))
 	if sec != nil {
-		score += scoreSymbol
+		startMatch := sec.Start == m.Offset
+		endMatch := sec.End == m.Offset+uint32(m.MatchLength)
+		if startMatch && endMatch {
+			score += scoreSymbol
+		} else if startMatch || endMatch {
+			score += (scoreSymbol + scorePartialSymbol) / 2
+		} else {
+			score += scorePartialSymbol
+		}
 	}
 	return score
 }

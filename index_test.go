@@ -709,6 +709,40 @@ func TestSymbolRank(t *testing.T) {
 	}
 }
 
+func TestPartialSymbolRank(t *testing.T) {
+	b := NewIndexBuilder()
+
+	content := []byte("func bla() blub")
+	// ----------------012345678901234
+	b.Add(Document{
+		Name:    "f1",
+		Content: content,
+		Symbols: []DocumentSection{{4, 9}},
+	})
+	b.Add(Document{
+		Name:    "f2",
+		Content: content,
+		Symbols: []DocumentSection{{4, 8}},
+	})
+	b.Add(Document{
+		Name:    "f3",
+		Content: content,
+		Symbols: []DocumentSection{{4, 9}},
+	})
+
+	res := searchForTest(t, b,
+		&query.Substring{
+			Pattern: "bla",
+		})
+
+	if len(res.Files) != 3 {
+		t.Errorf("got %#v, want 3 files", res.Files)
+	}
+	if res.Files[0].Name != "f2" {
+		t.Errorf("got %#v, want 'f2' as top match", res.Files[0])
+	}
+}
+
 func TestNegativeRepo(t *testing.T) {
 	b := NewIndexBuilder()
 
