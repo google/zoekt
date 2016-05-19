@@ -67,11 +67,11 @@ func (q *Const) String() string {
 }
 
 type Repo struct {
-	Name string
+	Pattern string
 }
 
 func (q *Repo) String() string {
-	return fmt.Sprintf("repo:%s", q.Name)
+	return fmt.Sprintf("repo:%s", q.Pattern)
 }
 
 // Substring is the most basic query: a query for a substring.

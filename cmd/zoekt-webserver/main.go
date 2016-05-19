@@ -138,7 +138,8 @@ dt {
     <dt>foo.*bar</dt><dd>search for the regular expression "foo.*bar"</dd>
     <dt>-(Path File) Stream</dt><dd>search "Stream", but exclude files containing both "Path" and "File"</dd>
     <dt>-Path\ File Stream</dt><dd>search "Stream", but exclude files containing "Path File"</dd>
-    <dt>repo:android</dt><dd>restrict to the "android" repository</dd>
+    <dt>repo:droid</dt><dd>restrict to repositories whose name contains "droid"</dd>
+    <dt>r:droid</dt><dd>restrict to repositories whose name contains "droid"</dd>
     <dt>branch:aster</dt><dd>for Git repos, only look for files in branches whose name contains "aster".</dd>
   </dl>
   </div>
@@ -373,7 +374,7 @@ func (s *httpServer) servePrintErr(w http.ResponseWriter, r *http.Request) error
 
 	qs := []query.Q{
 		&query.Substring{Pattern: fileStr, FileName: true},
-		&query.Repo{Name: repoStr},
+		&query.Repo{Pattern: repoStr},
 	}
 
 	if branchStr := qvals.Get("b"); branchStr != "" {

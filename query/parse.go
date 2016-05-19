@@ -186,7 +186,7 @@ func parseExpr(in []byte) (Q, int, error) {
 		}
 		expr = &caseQ{text}
 	case tokRepo:
-		expr = &Repo{Name: text}
+		expr = &Repo{Pattern: text}
 	case tokBranch:
 		expr = &Branch{Pattern: text}
 	case tokText, tokRegex:
@@ -367,6 +367,7 @@ var tokNames = map[int]string{
 var prefixes = map[string]int{
 	"file:":   tokFile,
 	"f:":      tokFile,
+	"r:":      tokRepo,
 	"repo:":   tokRepo,
 	"case:":   tokCase,
 	"branch:": tokBranch,

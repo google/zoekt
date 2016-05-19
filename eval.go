@@ -457,7 +457,7 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*substrMatchTree]struct{}) (m
 func (d *indexData) simplify(in query.Q) query.Q {
 	eval := query.Map(in, func(q query.Q) query.Q {
 		if r, ok := q.(*query.Repo); ok {
-			return &query.Const{r.Name == d.repoName}
+			return &query.Const{strings.Contains(d.repoName, r.Pattern)}
 		}
 		return q
 	})

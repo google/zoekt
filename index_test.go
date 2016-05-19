@@ -612,7 +612,7 @@ func TestRepoName(t *testing.T) {
 	sres := searchForTest(t, b,
 		&query.And{[]query.Q{
 			&query.Substring{Pattern: "needle"},
-			&query.Repo{Name: "foo"},
+			&query.Repo{Pattern: "foo"},
 		}})
 
 	if len(sres.Files) != 0 {
@@ -626,7 +626,7 @@ func TestRepoName(t *testing.T) {
 	sres = searchForTest(t, b,
 		&query.And{[]query.Q{
 			&query.Substring{Pattern: "needle"},
-			&query.Repo{Name: "bla"},
+			&query.Repo{Pattern: "bla"},
 		}})
 	if len(sres.Files) != 1 {
 		t.Fatalf("got %v, want 1 match", sres.Files)
@@ -754,7 +754,7 @@ func TestNegativeRepo(t *testing.T) {
 	sres := searchForTest(t, b,
 		&query.And{[]query.Q{
 			&query.Substring{Pattern: "needle"},
-			&query.Not{&query.Repo{Name: "bla"}},
+			&query.Not{&query.Repo{Pattern: "bla"}},
 		}})
 
 	if len(sres.Files) != 0 {
