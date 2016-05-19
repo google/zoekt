@@ -93,7 +93,7 @@ func (s *httpServer) servePrint(w http.ResponseWriter, r *http.Request) {
 
 const searchBox = `
   <form action="search">
-    Search some code: <input {{if .LastQuery}}value={{.LastQuery}} {{end}} type="text" name="q"> Max results:  <input style="width: 5em;" type="text" name="num" value="50"> <input type="submit" value="Search">
+    Search some code: <input autofocus {{if .LastQuery}}value={{.LastQuery}} {{end}} type="text" name="q"> Max results:  <input style="width: 5em;" type="text" name="num" value="50"> <input type="submit" value="Search">
   </form>
 `
 
