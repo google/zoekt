@@ -102,8 +102,8 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 		file:           r.r,
 		ngrams:         map[ngram]simpleSection{},
 		fileNameNgrams: map[ngram][]uint32{},
-		branchNames:    map[int]string{},
-		branchIDs:      map[string]int{},
+		branchNames:    map[uint]string{},
+		branchIDs:      map[string]uint{},
 	}
 	d.caseBitsIndex = toc.fileContents.caseBits.absoluteIndex()
 	d.boundaries = toc.fileContents.content.absoluteIndex()
@@ -179,11 +179,12 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 
 	if branchNameIndex := toc.branchNames.relativeIndex(); len(branchNameIndex) > 0 {
 		var last uint32
-		for i, end := range branchNameIndex[1:] {
+		id := uint(1)
+		for _, end := range branchNameIndex[1:] {
 			n := string(branchNameContent[last:end])
-			id := i + 1
 			d.branchIDs[n] = id
 			d.branchNames[id] = n
+			id <<= 1
 			last = end
 		}
 	}

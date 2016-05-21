@@ -455,6 +455,8 @@ func TestBranchMask(t *testing.T) {
 	b := NewIndexBuilder()
 	b.Add(Document{Name: "f1", Content: []byte("needle"), Branches: []string{"master"}})
 	b.Add(Document{Name: "f2", Content: []byte("needle"), Branches: []string{"stable", "master"}})
+	b.Add(Document{Name: "f3", Content: []byte("needle"), Branches: []string{"stable", "master"}})
+	b.Add(Document{Name: "f4", Content: []byte("needle"), Branches: []string{"bonzai"}})
 
 	sres := searchForTest(t, b, &query.And{[]query.Q{
 		&query.Substring{
@@ -465,7 +467,7 @@ func TestBranchMask(t *testing.T) {
 		},
 	}})
 
-	if len(sres.Files) != 1 || sres.Files[0].Name != "f2" {
+	if len(sres.Files) != 2 || sres.Files[0].Name != "f3" || sres.Files[1].Name != "f2" {
 		t.Fatalf("got %v, want 1 result from f2", sres.Files)
 	}
 
@@ -759,5 +761,42 @@ func TestNegativeRepo(t *testing.T) {
 
 	if len(sres.Files) != 0 {
 		t.Fatalf("got %v, want 0 matches", sres.Files)
+	}
+}
+
+func TestOr(t *testing.T) {
+	b := NewIndexBuilder()
+
+	b.Add(Document{Name: "f1", Content: []byte("needle")})
+	b.Add(Document{Name: "f2", Content: []byte("banana")})
+	sres := searchForTest(t, b,
+		&query.Or{[]query.Q{
+			&query.Substring{Pattern: "needle"},
+			&query.Substring{Pattern: "banana"}}})
+
+	if len(sres.Files) != 2 {
+		t.Fatalf("got %v, want 2 files", sres.Files)
+	}
+}
+
+func TestAtomCountScore(t *testing.T) {
+	b := NewIndexBuilder()
+
+	b.Add(Document{Name: "f1", Content: []byte("needle the bla"), Branches: []string{"branches"}})
+	b.Add(Document{Name: "needle-file-branch", Content: []byte("needle content"), Branches: []string{"needle"}})
+	b.Add(Document{Name: "needle-file", Content: []byte("needle content"), Branches: []string{"branches"}})
+	sres := searchForTest(t, b,
+		&query.Or{[]query.Q{
+			&query.Substring{Pattern: "needle"},
+			&query.Substring{Pattern: "needle", FileName: true},
+			&query.Branch{Pattern: "needle"},
+		}})
+	var got []string
+	for _, f := range sres.Files {
+		got = append(got, f.Name)
+	}
+	want := []string{"needle-file-branch", "needle-file", "f1"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
 	}
 }

@@ -49,8 +49,8 @@ type indexData struct {
 	fileNameNgrams        map[ngram][]uint32
 
 	fileBranchMasks []uint32
-	branchNames     map[int]string
-	branchIDs       map[string]int
+	branchNames     map[uint]string
+	branchIDs       map[string]uint
 
 	repoName string
 	repoURL  string

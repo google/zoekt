@@ -147,6 +147,7 @@ const (
 	scoreWordMatch        = 500.0
 	scorePartialSymbol    = 4000.0
 	scoreSymbol           = 7000.0
+	scoreFactorAtomMatch  = 400.0
 )
 
 func findSection(secs []DocumentSection, off, sz uint32) *DocumentSection {

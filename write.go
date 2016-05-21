@@ -132,16 +132,16 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 	toc.namePostings.end(w)
 
 	var intKeys []int
-	inv := map[int]string{}
+	inv := map[uint]string{}
 	for k, v := range b.branches {
 		inv[v] = k
-		intKeys = append(intKeys, v)
+		intKeys = append(intKeys, int(v))
 	}
 	sort.Ints(intKeys)
 
 	toc.branchNames.start(w)
 	for _, k := range intKeys {
-		toc.branchNames.addItem(w, []byte(inv[k]))
+		toc.branchNames.addItem(w, []byte(inv[uint(k)]))
 	}
 	toc.branchNames.end(w)
 

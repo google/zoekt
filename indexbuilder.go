@@ -73,7 +73,7 @@ type IndexBuilder struct {
 	namePostings map[ngram][]uint32
 
 	// Branch name => ID
-	branches map[string]int
+	branches map[string]uint
 
 	// The repository name
 	repoName string
@@ -94,7 +94,7 @@ func NewIndexBuilder() *IndexBuilder {
 	return &IndexBuilder{
 		contentPostings: make(map[ngram][]uint32),
 		namePostings:    make(map[ngram][]uint32),
-		branches:        make(map[string]int),
+		branches:        make(map[string]uint),
 	}
 }
 
@@ -137,10 +137,10 @@ func (b *IndexBuilder) AddFile(name string, content []byte) {
 	b.Add(Document{Name: name, Content: content})
 }
 
-func (b *IndexBuilder) addBranch(br string) int {
+func (b *IndexBuilder) addBranch(br string) uint {
 	id, ok := b.branches[br]
 	if !ok {
-		id = len(b.branches) + 1
+		id = uint(1) << uint(len(b.branches))
 		b.branches[br] = id
 	}
 

@@ -146,11 +146,31 @@ func (t *notMatchTree) String() string {
 }
 
 func (t *substrMatchTree) String() string {
-	return fmt.Sprintf("substr(%v)", t.current)
+	f := ""
+	if t.fileName {
+		f = "f"
+	}
+
+	return fmt.Sprintf("%ssubstr(%v)", f, t.current)
 }
 
 func (t *branchQueryMatchTree) String() string {
 	return fmt.Sprintf("branch(%x)", t.mask)
+}
+
+func collectAtoms(t matchTree, f func(matchTree)) {
+	switch s := t.(type) {
+	case *andMatchTree:
+		for _, ch := range s.children {
+			collectAtoms(ch, f)
+		}
+	case *orMatchTree:
+		for _, ch := range s.children {
+			collectAtoms(ch, f)
+		}
+	default:
+		f(t)
+	}
 }
 
 func collectPositiveSubstrings(t matchTree, f func(*substrMatchTree)) {
@@ -301,18 +321,20 @@ func (t *andMatchTree) matches(known map[matchTree]bool) (bool, bool) {
 }
 
 func (t *orMatchTree) matches(known map[matchTree]bool) (bool, bool) {
+	matches := false
 	sure := true
 	for _, ch := range t.children {
 		v, ok := evalMatchTree(known, ch)
 		if ok {
-			if v {
-				return true, true
-			}
+			// we could short-circuit, but we want to use
+			// the other possibilities as a ranking
+			// signal.
+			matches = matches || v
 		} else {
 			sure = false
 		}
 	}
-	return false, sure
+	return matches, sure
 }
 
 func (t *branchQueryMatchTree) matches(known map[matchTree]bool) (bool, bool) {
@@ -407,7 +429,7 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*substrMatchTree]struct{}) (m
 			}
 			r = append(r, ct)
 		}
-		return &andMatchTree{r}, nil
+		return &orMatchTree{r}, nil
 	case *query.Not:
 		ct, err := d.newMatchTree(s.Child, sq)
 		return &notMatchTree{
@@ -433,6 +455,7 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*substrMatchTree]struct{}) (m
 				mask |= uint32(m)
 			}
 		}
+
 		return &branchQueryMatchTree{
 			mask:      mask,
 			fileMasks: d.fileBranchMasks,
@@ -507,6 +530,9 @@ func (d *indexData) Search(q query.Q, opts *SearchOptions) (*SearchResult, error
 		stats: &res.Stats,
 	}
 
+	totalAtomCount := 0
+	collectAtoms(mt, func(t matchTree) { totalAtomCount++ })
+
 nextFileMatch:
 	for {
 		var nextDoc uint32
@@ -520,7 +546,6 @@ nextFileMatch:
 		if nextDoc == maxUInt32 {
 			break
 		}
-
 		res.Stats.FilesConsidered++
 		mt.prepare(nextDoc)
 		if res.Stats.MatchCount > maxMatchCount {
@@ -596,6 +621,11 @@ nextFileMatch:
 			Score: 10 * float64(nextDoc) / float64(len(d.boundaries)),
 		}
 
+		atomMatchCount := 0
+		visitMatches(mt, known, func(mt matchTree) {
+			atomMatchCount++
+		})
+		fileMatch.Score += float64(atomMatchCount) / float64(totalAtomCount) * scoreFactorAtomMatch
 		finalCands := gatherMatches(mt, known)
 		for _, c := range finalCands {
 			fileMatch.Matches = append(fileMatch.Matches, cp.fillMatch(c))
@@ -605,6 +635,7 @@ nextFileMatch:
 		for i := range fileMatch.Matches {
 			if maxFileScore < fileMatch.Matches[i].Score {
 				maxFileScore = fileMatch.Matches[i].Score
+
 			}
 
 			// Order by ordering in file.
@@ -715,7 +746,7 @@ func (d *indexData) gatherBranches(docID uint32, mt matchTree, known map[matchTr
 		if ok {
 			foundBranchQuery = true
 			branches = append(branches,
-				d.branchNames[int(bq.mask)])
+				d.branchNames[uint(bq.mask)])
 		}
 	})
 
@@ -724,7 +755,7 @@ func (d *indexData) gatherBranches(docID uint32, mt matchTree, known map[matchTr
 		id := uint32(1)
 		for mask != 0 {
 			if mask&0x1 != 0 {
-				branches = append(branches, d.branchNames[int(id)])
+				branches = append(branches, d.branchNames[uint(id)])
 			}
 			id <<= 1
 			mask >>= 1
