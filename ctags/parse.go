@@ -39,6 +39,10 @@ func Parse(in string) (*Entry, error) {
 	fields := strings.Split(in, "\t")
 	e := Entry{}
 
+	if len(fields) < 3 {
+		return nil, fmt.Errorf("too few fields: %q", in)
+	}
+
 	e.Sym = fields[0]
 	e.Path = fields[1]
 
