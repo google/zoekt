@@ -133,8 +133,7 @@ func findGitRepos(arg string) (map[string]string, error) {
 	var dirs []string
 	gitDirs := map[string]string{}
 	if err := filepath.Walk(arg, func(name string, fi os.FileInfo, err error) error {
-		fi, err = os.Lstat(filepath.Join(name, ".git"))
-		if err == nil && fi.IsDir() {
+		if fi, err := os.Lstat(filepath.Join(name, ".git")); err == nil && fi.IsDir() {
 			dirs = append(dirs, filepath.Join(name, ".git"))
 			return filepath.SkipDir
 		}
