@@ -60,6 +60,7 @@ func main() {
 	var sizeMax = flag.Int("file_limit", 128*1024, "maximum file size")
 	var shardLimit = flag.Int("shard_limit", 100<<20, "maximum corpus size for a shard")
 	var parallelism = flag.Int("parallelism", 4, "maximum number of parallel indexing processes.")
+	var recursive = flag.Bool("recursive", false, "recurse into directories to index all git repos")
 	submodules := flag.Bool("submodules", true, "if set to false, do not recurse into submodules")
 	branchesStr := flag.String("branches", "master", "git branches to index. If set, arguments should be bare git repositories.")
 	branchPrefix := flag.String("prefix", "refs/heads/", "prefix for branch names")
@@ -80,45 +81,106 @@ func main() {
 		branches = strings.Split(*branchesStr, ",")
 	}
 
-	for _, arg := range flag.Args() {
-		if _, err := os.Lstat(filepath.Join(arg, ".git")); err == nil {
-			arg = filepath.Join(arg, ".git")
+	gitRepos := map[string]string{}
+	if *recursive {
+		for _, arg := range flag.Args() {
+			repos, err := findGitRepos(arg)
+			if err != nil {
+				log.Fatal(err)
+			}
+			for k, v := range repos {
+				gitRepos[k] = v
+			}
 		}
-		arg, err := filepath.Abs(arg)
-		if err != nil {
-			log.Fatal(err)
-		}
+	} else {
+		for _, repoDir := range flag.Args() {
+			if _, err := os.Lstat(filepath.Join(repoDir, ".git")); err == nil {
+				repoDir = filepath.Join(repoDir, ".git")
+			}
+			repoDir, err := filepath.Abs(repoDir)
+			if err != nil {
+				log.Fatal(err)
+			}
 
-		if err := indexGitRepo(opts, arg, *branchPrefix, branches, *submodules); err != nil {
-			log.Fatalf("indexGitRepo: %v", err)
+			name := filepath.Base(repoDir)
+			if name == ".git" {
+				name = filepath.Base(filepath.Dir(repoDir))
+			}
+			name = strings.TrimSuffix(name, ".git")
+
+			gitRepos[repoDir] = name
 		}
 	}
+	exitStatus := 0
+	for dir, name := range gitRepos {
+		opts.RepoName = name
+		opts.RepoDir = filepath.Clean(dir)
+		log.Printf("indexing %s (%s)", dir, name)
+		if err := indexGitRepo(opts, *branchPrefix, branches, *submodules); err != nil {
+			log.Printf("indexGitRepo(%s): %v", dir, err)
+			exitStatus = 1
+		}
+	}
+	os.Exit(exitStatus)
 }
 
-func indexGitRepo(opts build.Options, repoDir, branchPrefix string, branches []string, submodules bool) error {
-	repoDir = filepath.Clean(repoDir)
-	opts.RepoName = filepath.Base(repoDir)
-	opts.RepoDir = repoDir
-	url, err := guessRepoURL(repoDir)
+// findGitRepos finds git repositories and returns repodir => name map.
+func findGitRepos(arg string) (map[string]string, error) {
+	arg, err := filepath.Abs(arg)
 	if err != nil {
-		log.Printf("no repo URL: %s", err)
-	} else {
-		opts.RepoURL = url
+		return nil, err
+	}
+	var dirs []string
+	gitDirs := map[string]string{}
+	if err := filepath.Walk(arg, func(name string, fi os.FileInfo, err error) error {
+		fi, err = os.Lstat(filepath.Join(name, ".git"))
+		if err == nil && fi.IsDir() {
+			dirs = append(dirs, filepath.Join(name, ".git"))
+			return filepath.SkipDir
+		}
+
+		if !strings.HasSuffix(name, ".git") || !fi.IsDir() {
+			return nil
+		}
+
+		fi, err = os.Lstat(filepath.Join(name, "objects"))
+		if err != nil && !fi.IsDir() {
+			return nil
+		}
+
+		dirs = append(dirs, name)
+		return filepath.SkipDir
+	}); err != nil {
+		return nil, err
 	}
 
-	if opts.RepoName == ".git" {
-		opts.RepoName = filepath.Base(filepath.Dir(repoDir))
+	for _, dir := range dirs {
+		name := strings.TrimSuffix(dir, ".git")
+		name = strings.TrimSuffix(name, "/")
+		name = strings.TrimPrefix(name, arg)
+		name = strings.TrimPrefix(name, "/")
+		gitDirs[dir] = name
 	}
-	opts.RepoName = strings.TrimSuffix(opts.RepoName, ".git")
 
+	return gitDirs, nil
+}
+
+func indexGitRepo(opts build.Options, branchPrefix string, branches []string, submodules bool) error {
 	builder, err := build.NewBuilder(opts)
 	if err != nil {
 		return err
 	}
 
-	repo, err := git.OpenRepository(repoDir)
+	repo, err := git.OpenRepository(opts.RepoDir)
 	if err != nil {
 		return err
+	}
+
+	url, err := guessRepoURL(opts.RepoDir)
+	if err != nil {
+		log.Printf("guessRepoURL(%s): %s", opts.RepoDir, err)
+	} else {
+		opts.RepoURL = url
 	}
 
 	// name => branch
