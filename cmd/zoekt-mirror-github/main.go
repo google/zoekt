@@ -36,6 +36,7 @@ func main() {
 	org := flag.String("org", "", "organization to mirror")
 	user := flag.String("user", "", "user to mirror")
 	token := flag.String("token", "", "file holding API token.")
+	forks := flag.Bool("forks", false, "also mirror forks.")
 	flag.Parse()
 
 	if *dest == "" {
@@ -73,6 +74,16 @@ func main() {
 	}
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if !*forks {
+		trimmed := repos[:0]
+		for _, r := range repos {
+			if r.Fork == nil || !*r.Fork {
+				trimmed = append(trimmed, r)
+			}
+		}
+		repos = trimmed
 	}
 
 	if err := cloneRepos(destDir, repos); err != nil {
