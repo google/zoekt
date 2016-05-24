@@ -95,7 +95,7 @@ func getOrgRepos(client *github.Client, org string) ([]github.Repository, error)
 		for _, r := range repos {
 			names = append(names, *r.Name)
 		}
-		log.Println(strings.Join(names))
+		log.Println(strings.Join(names, " "))
 
 		opt.Page = resp.NextPage
 		allRepos = append(allRepos, repos...)
@@ -122,7 +122,7 @@ func getUserRepos(client *github.Client, user string) ([]github.Repository, erro
 		for _, r := range repos {
 			names = append(names, *r.Name)
 		}
-		log.Println(strings.Join(names))
+		log.Println(strings.Join(names, " "))
 
 		opt.Page = resp.NextPage
 		allRepos = append(allRepos, repos...)
