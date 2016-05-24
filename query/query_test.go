@@ -99,3 +99,15 @@ func TestMap(t *testing.T) {
 		t.Errorf("got %v, want %v", got, out)
 	}
 }
+
+func TestVisitAtoms(t *testing.T) {
+	in := &And{[]Q{&Substring{}, &Repo{},
+		&Not{&Const{}}}}
+	count := 0
+	VisitAtoms(in, func(q Q) {
+		count++
+	})
+	if count != 3 {
+		t.Errorf("got %d, want 3", count)
+	}
+}

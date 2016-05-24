@@ -284,3 +284,17 @@ func Map(q Q, f func(q Q) Q) Q {
 	}
 	return f(q)
 }
+
+// VisitAtoms runs `v` on all atom queries within `q`.
+func VisitAtoms(q Q, v func(q Q)) {
+	Map(q, func(iQ Q) Q {
+		switch iQ.(type) {
+		case *And:
+		case *Or:
+		case *Not:
+		default:
+			v(iQ)
+		}
+		return iQ
+	})
+}

@@ -87,8 +87,16 @@ type SearchResult struct {
 	RepoURLs map[string]string
 }
 
+type RepoList struct {
+	Repos []string
+}
+
 type Searcher interface {
 	Search(q query.Q, opts *SearchOptions) (*SearchResult, error)
+
+	// List lists repositories. The query `q` can only contain
+	// query.Repo atoms.
+	List(q query.Q) (*RepoList, error)
 	Stats() (*RepoStats, error)
 	Close()
 }

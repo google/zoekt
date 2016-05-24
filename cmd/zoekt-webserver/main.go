@@ -115,7 +115,7 @@ dt {
 <div style="display: flex; justify-content: space-around; flex-direction: row;">
 
 <div>
-  Examples:
+  Search examples:
   <div style="margin-left: 4em;">
   <dl>
     <dt>needle</dt><dd>search for "needle"
@@ -138,23 +138,26 @@ dt {
     <dt>foo.*bar</dt><dd>search for the regular expression "foo.*bar"</dd>
     <dt>-(Path File) Stream</dt><dd>search "Stream", but exclude files containing both "Path" and "File"</dd>
     <dt>-Path\ File Stream</dt><dd>search "Stream", but exclude files containing "Path File"</dd>
-    <dt>repo:droid</dt><dd>restrict to repositories whose name contains "droid"</dd>
-    <dt>r:droid</dt><dd>restrict to repositories whose name contains "droid"</dd>
-    <dt>branch:aster</dt><dd>for Git repos, only look for files in branches whose name contains "aster".</dd>
+    <dt>phone repo:droid</dt><dd>search for "phone" in repositories whose name contains "droid"</dd>
+    <dt>phone r:droid</dt><dd>search for "phone" to repositories whose name contains "droid"</dd>
+    <dt>r:droid</dt><dd>list repositories whose name contains "droid"</dd>
+    <dt>phone branch:aster</dt><dd>for Git repos, find "phone" in files in branches whose name contains "aster".</dd>
   </dl>
   </div>
 </div>
 
 <div>
 <p>
-Used {{HumanUnit .Stats.IndexBytes}} memory for {{HumanUnit .Stats.ContentBytes}} indexed data in these repos:
-</p>
+Used {{HumanUnit .Stats.IndexBytes}} memory for {{HumanUnit .Stats.ContentBytes}} indexed data from {{len .Stats.Repos}} repositories.
+
 <p>
-<ul>
-{{range .Stats.Repos}}
-  <li>{{.}}</li>
-{{end}}
-</ul>
+To list repositories, try:
+  <div style="margin-left: 4em;">
+  <dl>
+    <dt>r:droid</dt><dd>list repositories whose name contains "droid".</dd>
+    <dt>r:go -r:google</dt><dd>list repositories whose name contains "go" but not "google".</dd>
+  </dl>
+  </div>
 </p>
 </div>
 </body>
@@ -269,6 +272,15 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 		return err
 	}
 
+	repoOnly := true
+	query.VisitAtoms(q, func(q query.Q) {
+		_, ok := q.(*query.Repo)
+		repoOnly = repoOnly && ok
+	})
+	if repoOnly {
+		return s.serveListReposErr(q, queryStr, w, r)
+	}
+
 	numStr := qvals.Get("num")
 
 	num, err := strconv.Atoi(numStr)
@@ -349,6 +361,51 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 
 	var buf bytes.Buffer
 	if err := resultTemplate.Execute(&buf, res); err != nil {
+		return err
+	}
+
+	w.Write(buf.Bytes())
+	return nil
+}
+
+var repoListTemplate = template.Must(template.New("repolist").Funcs(funcmap).Parse(`<html>
+  <head>
+    <title>Repo search result for {{.LastQuery}}</title>
+  </head>
+<body>` + searchBox +
+	`  <hr>
+  Found {{.RepoCount}} repositories:
+  <p>
+  {{range .Repo}}
+    <li><tt>{{.}}</tt></li>
+  {{end}}
+  </ul>
+</body>
+</html>
+`))
+
+func (s *httpServer) serveListReposErr(q query.Q, qStr string, w http.ResponseWriter, r *http.Request) error {
+	repos, err := s.searcher.List(q)
+	if err != nil {
+		return err
+	}
+
+	type resultData struct {
+		LastQuery string
+		QueryStr  string
+		RepoCount int
+		Repo      []string
+	}
+
+	res := resultData{
+		LastQuery: qStr,
+		QueryStr:  qStr,
+		RepoCount: len(repos.Repos),
+		Repo:      repos.Repos,
+	}
+
+	var buf bytes.Buffer
+	if err := repoListTemplate.Execute(&buf, res); err != nil {
 		return err
 	}
 

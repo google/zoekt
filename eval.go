@@ -763,3 +763,18 @@ func (d *indexData) gatherBranches(docID uint32, mt matchTree, known map[matchTr
 	}
 	return branches
 }
+
+func (d *indexData) List(q query.Q) (*RepoList, error) {
+	q = d.simplify(q)
+	c, ok := q.(*query.Const)
+
+	if !ok {
+		return nil, fmt.Errorf("List should receive Repo-only query.")
+	}
+
+	l := &RepoList{}
+	if c.Value {
+		l.Repos = append(l.Repos, d.repoName)
+	}
+	return l, nil
+}

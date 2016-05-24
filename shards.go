@@ -19,6 +19,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
@@ -207,8 +208,8 @@ func (ss *shardedSearcher) Search(pat query.Q, opts *SearchOptions) (*SearchResu
 
 	// This critical section is large, but we don't want to deal with
 	// searches on a shards that have just been closed.
-	shardCount := len(ss.shards)
 	ss.mu.Lock()
+	shardCount := len(ss.shards)
 	all := make(chan res, shardCount)
 	for _, s := range ss.shards {
 		go func(s Searcher) {
@@ -235,4 +236,40 @@ func (ss *shardedSearcher) Search(pat query.Q, opts *SearchOptions) (*SearchResu
 	sortFilesByScore(aggregate.Files)
 	aggregate.Duration = time.Now().Sub(start)
 	return &aggregate, nil
+}
+
+func (ss *shardedSearcher) List(r query.Q) (*RepoList, error) {
+	type res struct {
+		rl  *RepoList
+		err error
+	}
+
+	ss.mu.Lock()
+	shardCount := len(ss.shards)
+	all := make(chan res, shardCount)
+	for _, s := range ss.shards {
+		go func(s Searcher) {
+			ms, err := s.List(r)
+			all <- res{ms, err}
+		}(s)
+	}
+	ss.mu.Unlock()
+
+	uniq := map[string]struct{}{}
+	for i := 0; i < shardCount; i++ {
+		r := <-all
+		if r.err != nil {
+			return nil, r.err
+		}
+		for _, r := range r.rl.Repos {
+			uniq[r] = struct{}{}
+		}
+	}
+	var aggregate []string
+	for k := range uniq {
+		aggregate = append(aggregate, k)
+	}
+
+	sort.Strings(aggregate)
+	return &RepoList{aggregate}, nil
 }

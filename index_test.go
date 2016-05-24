@@ -108,6 +108,17 @@ func TestNewlines(t *testing.T) {
 }
 
 func searchForTest(t *testing.T, b *IndexBuilder, q query.Q) *SearchResult {
+	searcher := searcherForTest(t, b)
+	var opts SearchOptions
+	res, err := searcher.Search(q, &opts)
+	if err != nil {
+		t.Fatalf("Search(%s): %v", q, err)
+	}
+	clearScores(res)
+	return res
+}
+
+func searcherForTest(t *testing.T, b *IndexBuilder) Searcher {
 	var buf bytes.Buffer
 	b.Write(&buf)
 	f := &memSeeker{buf.Bytes()}
@@ -117,13 +128,7 @@ func searchForTest(t *testing.T, b *IndexBuilder, q query.Q) *SearchResult {
 		t.Fatalf("NewSearcher: %v", err)
 	}
 
-	var opts SearchOptions
-	res, err := searcher.Search(q, &opts)
-	if err != nil {
-		t.Fatalf("Search(%s): %v", q, err)
-	}
-	clearScores(res)
-	return res
+	return searcher
 }
 
 func TestFileBasedSearch(t *testing.T) {
@@ -761,6 +766,34 @@ func TestNegativeRepo(t *testing.T) {
 
 	if len(sres.Files) != 0 {
 		t.Fatalf("got %v, want 0 matches", sres.Files)
+	}
+}
+
+func TestListRepos(t *testing.T) {
+	b := NewIndexBuilder()
+
+	content := []byte("bla the needle")
+	// ----------------01234567890123
+	b.AddFile("f1", content)
+	b.AddFile("f2", content)
+	b.SetName("reponame")
+
+	searcher := searcherForTest(t, b)
+	q := &query.Repo{Pattern: "epo"}
+	res, err := searcher.List(q)
+	if err != nil {
+		t.Fatalf("List(%v): %v", q, err)
+	}
+	if len(res.Repos) != 1 || res.Repos[0] != "reponame" {
+		t.Fatalf("got %v, want 1 matches", res)
+	}
+	q = &query.Repo{Pattern: "bla"}
+	res, err = searcher.List(q)
+	if err != nil {
+		t.Fatalf("List(%v): %v", q, err)
+	}
+	if len(res.Repos) != 0 {
+		t.Fatalf("got %v, want 0 matches", res)
 	}
 }
 
