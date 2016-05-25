@@ -18,6 +18,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -40,20 +41,28 @@ func guessRepoURL(repoDir string) (string, error) {
 		return "", err
 	}
 
-	url, err := cfg.LookupString("remote.origin.url")
+	remoteURL, err := cfg.LookupString("remote.origin.url")
 	if err != nil {
 		return "", err
 	}
 
-	if strings.Contains(url, "googlesource.com/") {
+	if strings.Contains(remoteURL, "googlesource.com/") {
 		/// eg. https://gerrit.googlesource.com/gitiles/+/master/.buckversion
-		return url + "/+/{{.Branch}}/{{.Path}}", nil
-	} else if strings.Contains(url, "github.com/") {
+		return remoteURL + "/+/{{.Branch}}/{{.Path}}", nil
+	} else if strings.Contains(remoteURL, "github.com/") {
+		parsed, err := url.Parse(remoteURL)
+		if err != nil {
+			return "", nil
+		}
+
+		// CloneURL from the JSON API has .git
+		parsed.Path = strings.TrimSuffix(parsed.Path, ".git")
+
 		// eg. https://github.com/hanwen/go-fuse/blob/notify/genversion.sh
-		return url + "/blob/{{.Branch}}/{{.Path}}", nil
+		return parsed.String() + "/blob/{{.Branch}}/{{.Path}}", nil
 	}
 
-	return "", fmt.Errorf("scheme unknown for URL %s", url)
+	return "", fmt.Errorf("scheme unknown for URL %s", remoteURL)
 }
 
 func main() {
@@ -165,11 +174,6 @@ func findGitRepos(arg string) (map[string]string, error) {
 }
 
 func indexGitRepo(opts build.Options, branchPrefix string, branches []string, submodules bool) error {
-	builder, err := build.NewBuilder(opts)
-	if err != nil {
-		return err
-	}
-
 	repo, err := git.OpenRepository(opts.RepoDir)
 	if err != nil {
 		return err
@@ -180,6 +184,11 @@ func indexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 		log.Printf("guessRepoURL(%s): %s", opts.RepoDir, err)
 	} else {
 		opts.RepoURL = url
+	}
+
+	builder, err := build.NewBuilder(opts)
+	if err != nil {
+		return err
 	}
 
 	// name => branch
