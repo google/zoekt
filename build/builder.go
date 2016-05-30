@@ -57,6 +57,9 @@ type Options struct {
 
 	// Path to exuberant ctags binary to run
 	CTags string
+
+	// Path to namespace-sandbox from Bazel
+	NamespaceSandbox string
 }
 
 // Builder manages (parallel) creation of uniformly sized shards.
@@ -80,6 +83,12 @@ func (o *Options) SetDefaults() {
 		ctags, err := exec.LookPath("ctags-exuberant")
 		if err == nil {
 			o.CTags = ctags
+		}
+	}
+	if o.NamespaceSandbox == "" {
+		ns, err := exec.LookPath("namespace-sandbox")
+		if err == nil {
+			o.NamespaceSandbox = ns
 		}
 	}
 	if o.Parallelism == 0 {
@@ -147,7 +156,7 @@ func (b *Builder) flush() {
 	go func() {
 		b.throttle <- 1
 		if b.opts.CTags != "" {
-			if err := ctagsAddSymbols(todo, b.opts.CTags); err != nil {
+			if err := ctagsAddSymbols(todo, b.opts.CTags, b.opts.NamespaceSandbox); err != nil {
 				log.Printf("ignoring %s error: %v", b.opts.CTags, err)
 			}
 		}

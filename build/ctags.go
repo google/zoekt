@@ -27,7 +27,7 @@ import (
 	"github.com/google/zoekt/ctags"
 )
 
-func runCTags(bin string, inputs map[string][]byte) ([]*ctags.Entry, error) {
+func runCTags(bin string, sandboxBin string, inputs map[string][]byte) ([]*ctags.Entry, error) {
 	if len(inputs) == 0 {
 		return nil, nil
 	}
@@ -37,8 +37,7 @@ func runCTags(bin string, inputs map[string][]byte) ([]*ctags.Entry, error) {
 	}
 	defer os.RemoveAll(dir)
 
-	cmd := exec.Command(bin, "-n", "-f", "-")
-	cmd.Dir = dir
+	args := []string{bin, "-n", "-f", "-"}
 	for n, c := range inputs {
 		full := filepath.Join(dir, n)
 		if err := os.MkdirAll(filepath.Dir(full), 0700); err != nil {
@@ -48,8 +47,39 @@ func runCTags(bin string, inputs map[string][]byte) ([]*ctags.Entry, error) {
 		if err != nil {
 			return nil, err
 		}
-		cmd.Args = append(cmd.Args, n)
+		args = append(args, n)
 	}
+
+	if sandboxBin != "" {
+		// ctags parses untrusted input and is written in C.
+		// Run it in a sandbox as defense in depth.  The
+		// namespace sandbox only works on Linux,
+		// unfortunately.
+		sandboxDir, err := ioutil.TempDir("", "")
+		if err != nil {
+			return nil, err
+		}
+		defer os.RemoveAll(sandboxDir)
+
+		sandboxArgs := []string{
+			sandboxBin,
+			"-t30", "-T30",
+			"-D", "-S", sandboxDir, "-M", dir, "-m", "/input", "-W", "/input",
+		}
+		for _, d := range []string{"/bin", "/lib", "/usr/bin", "/lib64"} {
+			if _, err := os.Lstat(d); err == nil {
+				sandboxArgs = append(sandboxArgs, "-M", d, "-m", d)
+			}
+		}
+
+		sandboxArgs = append(sandboxArgs, "--")
+		args = append(sandboxArgs, args...)
+	} else {
+		log.Println("WARNING: running ctags without sandboxing.")
+	}
+
+	cmd := exec.Command(args[0], args[1:]...)
+	cmd.Dir = dir
 
 	out, err := cmd.Output()
 	if err != nil {
@@ -74,7 +104,7 @@ func runCTags(bin string, inputs map[string][]byte) ([]*ctags.Entry, error) {
 	return entries, nil
 }
 
-func runCTagsChunked(bin string, in map[string][]byte) ([]*ctags.Entry, error) {
+func runCTagsChunked(bin, sandboxBin string, in map[string][]byte) ([]*ctags.Entry, error) {
 	var res []*ctags.Entry
 
 	cur := map[string][]byte{}
@@ -85,7 +115,7 @@ func runCTagsChunked(bin string, in map[string][]byte) ([]*ctags.Entry, error) {
 
 		// 100k seems reasonable.
 		if sz > (100 << 10) {
-			r, err := runCTags(bin, cur)
+			r, err := runCTags(bin, sandboxBin, cur)
 			if err != nil {
 				return nil, err
 			}
@@ -95,7 +125,7 @@ func runCTagsChunked(bin string, in map[string][]byte) ([]*ctags.Entry, error) {
 			sz = 0
 		}
 	}
-	r, err := runCTags(bin, cur)
+	r, err := runCTags(bin, sandboxBin, cur)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +133,7 @@ func runCTagsChunked(bin string, in map[string][]byte) ([]*ctags.Entry, error) {
 	return res, nil
 }
 
-func ctagsAddSymbols(todo []*zoekt.Document, bin string) error {
+func ctagsAddSymbols(todo []*zoekt.Document, bin, sandboxBin string) error {
 	pathIndices := map[string]int{}
 	contents := map[string][]byte{}
 	for i, t := range todo {
@@ -120,7 +150,7 @@ func ctagsAddSymbols(todo []*zoekt.Document, bin string) error {
 		contents[t.Name] = t.Content
 	}
 
-	entries, err := runCTagsChunked(bin, contents)
+	entries, err := runCTagsChunked(bin, sandboxBin, contents)
 	if err != nil {
 		return err
 	}

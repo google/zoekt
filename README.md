@@ -29,8 +29,24 @@ Starting the web interface
     go install github.com/google/zoekt/cmd/zoekt-webserver
     $GOPATH/bin/zoekt-webserver -listen :6070
 
-It is recommended to install exuberant CTags. If available, it will be
-used to improve ranking.
+
+SYMBOL SEARCH
+=============
+
+It is recommended to install exuberant or universal CTags. If
+available, it will be used to improve ranking.
+
+If you index untrusted code, it is strongly recommended to also
+install Bazel's sandbox, to avoid vulnerabilities of ctags opening up
+access to the indexing machine. The sandbox can be compiled as follows:
+
+    for f in namespace-sandbox.c namespace-sandbox.c process-tools.c network-tools.c \
+       process-tools.h network-tools.h ; do \
+      wget https://raw.githubusercontent.com/bazelbuild/bazel/master/src/main/tools/$f \
+    done
+    gcc -o namespace-sandbox -std=c99 \
+       namespace-sandbox.c process-tools.c network-tools.c  -lm
+    cp namespace-sandbox /usr/local/bin/
 
 
 BACKGROUND
