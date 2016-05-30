@@ -17,9 +17,12 @@ package build
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/query"
@@ -77,4 +80,84 @@ func TestBasic(t *testing.T) {
 		t.Errorf("got %v, want 1 file.", result.Files)
 	}
 	defer ss.Close()
+}
+
+func TestUpdate(t *testing.T) {
+	dir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatalf("TempDir: %v", err)
+	}
+
+	opts := Options{
+		IndexDir:    dir,
+		ShardMax:    1024,
+		RepoName:    "repo",
+		RepoURL:     "url",
+		Parallelism: 2,
+		SizeMax:     1 << 20,
+
+		RepoDir: "/a",
+	}
+
+	if b, err := NewBuilder(opts); err != nil {
+		t.Fatalf("NewBuilder: %v", err)
+	} else {
+		b.AddFile("F", []byte("hoi"))
+		b.Finish()
+	}
+	ss, err := zoekt.NewShardedSearcher(dir)
+	if err != nil {
+		t.Fatalf("NewShardedSearcher(%s): %v", dir, err)
+	}
+
+	repos, err := ss.List(&query.Repo{Pattern: "repo"})
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+
+	if len(repos.Repos) != 1 {
+		t.Errorf("List(repo): got %v, want 1 repo", repos.Repos)
+	}
+
+	fs, err := filepath.Glob(filepath.Join(dir, "*"))
+	if err != nil {
+		t.Fatalf("glob: %v", err)
+	}
+
+	opts.RepoName = "repo2"
+	opts.RepoURL = "url2"
+	opts.RepoDir = "/b"
+	if b, err := NewBuilder(opts); err != nil {
+		t.Fatalf("NewBuilder: %v", err)
+	} else {
+		b.AddFile("F", []byte("hoi"))
+		b.Finish()
+	}
+
+	// This is ugly, and potentially flaky, but there is no
+	// observable synchronization for the Sharded searcher, so
+	// this is the best we can do.
+	time.Sleep(100 * time.Millisecond)
+
+	if repos, err = ss.List(&query.Repo{Pattern: "repo"}); err != nil {
+		t.Fatalf("List: %v", err)
+	} else if len(repos.Repos) != 2 {
+		t.Errorf("List(repo): got %v, want 2 repos", repos.Repos)
+	}
+
+	for _, fn := range fs {
+		log.Printf("removing %s", fn)
+		if err := os.Remove(fn); err != nil {
+			t.Fatalf("Remove(%s): %v", fn, err)
+		}
+		break
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	if repos, err = ss.List(&query.Repo{Pattern: "repo"}); err != nil {
+		t.Fatalf("List: %v", err)
+	} else if len(repos.Repos) != 1 {
+		t.Errorf("List(repo): got %v, want 1 repo", repos.Repos)
+	}
 }

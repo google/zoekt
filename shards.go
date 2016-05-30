@@ -85,24 +85,29 @@ func (s *shardedSearcher) scan() error {
 		ts[key] = fi.ModTime()
 	}
 
-	var todo []string
 	s.mu.Lock()
+	var toLoad []string
 	for k, mtime := range ts {
 		if s.shards[k] == nil || s.shards[k].mtime != mtime {
-			todo = append(todo, k)
+			toLoad = append(toLoad, k)
 		}
 	}
 
+	var toDrop []string
 	// Unload deleted shards.
 	for k := range s.shards {
 		if _, ok := ts[k]; !ok {
-			log.Printf("unloading: %s", k)
-			s.replace(k, nil)
+			toDrop = append(toDrop, k)
 		}
 	}
 	s.mu.Unlock()
 
-	for _, t := range todo {
+	for _, t := range toDrop {
+		log.Printf("unloading: %s", t)
+		s.replace(t, nil)
+	}
+
+	for _, t := range toLoad {
 		shard, err := loadShard(filepath.Join(s.dir, t))
 		log.Printf("reloading: %s, err %v ", t, err)
 		if err != nil {
@@ -116,6 +121,7 @@ func (s *shardedSearcher) scan() error {
 
 func (s *shardedSearcher) replace(key string, shard *searchShard) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	old := s.shards[key]
 	if old != nil {
 		old.Close()
@@ -125,7 +131,6 @@ func (s *shardedSearcher) replace(key string, shard *searchShard) {
 	} else {
 		delete(s.shards, key)
 	}
-	s.mu.Unlock()
 }
 
 func (s *shardedSearcher) watch() error {
@@ -143,7 +148,9 @@ func (s *shardedSearcher) watch() error {
 			case <-watcher.Events:
 				s.scan()
 			case err := <-watcher.Errors:
-				log.Println("watcher error:", err)
+				if err != nil {
+					log.Println("watcher error:", err)
+				}
 			case <-s.quit:
 				watcher.Close()
 				break
@@ -181,10 +188,10 @@ func (ss *shardedSearcher) Close() {
 	close(ss.quit)
 	ss.quit = nil
 	ss.mu.Lock()
+	defer ss.mu.Unlock()
 	for _, s := range ss.shards {
 		s.Close()
 	}
-	ss.mu.Unlock()
 }
 
 func (ss *shardedSearcher) Stats() (*RepoStats, error) {
