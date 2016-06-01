@@ -110,43 +110,6 @@ done:
 	return arg, len(in) - len(left), true, nil
 }
 
-func tryConsumeCase(in []byte) (string, int, bool, error) {
-	arg, n, ok, err := consumeKeyword(in, casePrefix)
-	if err != nil || !ok {
-		return "", 0, ok, err
-	}
-
-	switch string(arg) {
-	case "yes":
-	case "no":
-	case "auto":
-	default:
-		return "", 0, false, fmt.Errorf("unknown case argument %q, want {yes,no,auto}", arg)
-	}
-
-	return string(arg), n, true, nil
-}
-
-func tryConsumeFile(in []byte) (string, int, bool, error) {
-	arg, n, ok, err := consumeKeyword(in, filePrefix)
-	return string(arg), n, ok, err
-}
-
-func tryConsumeBranch(in []byte) (string, int, bool, error) {
-	arg, n, ok, err := consumeKeyword(in, branchPrefix)
-	return string(arg), n, ok, err
-}
-
-func tryConsumeRegexp(in []byte) (string, int, bool, error) {
-	arg, n, ok, err := consumeKeyword(in, regexPrefix)
-	return string(arg), n, ok, err
-}
-
-func tryConsumeRepo(in []byte) (string, int, bool, error) {
-	arg, n, ok, err := consumeKeyword(in, []byte("repo:"))
-	return string(arg), n, ok, err
-}
-
 func Parse(qStr string) (Q, error) {
 	b := []byte(qStr)
 
