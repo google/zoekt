@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/zoekt"
 )
@@ -102,12 +103,31 @@ func (o *Options) SetDefaults() {
 	}
 }
 
+// Timestamp returns the timestamp of the existing index file, or the
+// zero time value if none is found.
+func (o *Options) Timestamp() time.Time {
+	var zero time.Time
+	nm, err := shardName(o.IndexDir, o.RepoDir, 0)
+	if err != nil {
+		return zero
+	}
+
+	fi, err := os.Lstat(nm)
+	if err != nil {
+		return zero
+	}
+
+	return fi.ModTime()
+}
+
 // NewBuilder creates a new Builder instance.
 func NewBuilder(opt Options) (*Builder, error) {
-	return &Builder{
+	b := &Builder{
 		opts:     opt,
 		throttle: make(chan int, opt.Parallelism),
-	}, nil
+	}
+
+	return b, nil
 }
 
 func (b *Builder) AddFile(name string, content []byte) {

@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
@@ -75,6 +76,7 @@ func main() {
 	branchPrefix := flag.String("prefix", "refs/heads/", "prefix for branch names")
 
 	indexDir := flag.String("index", build.DefaultDir, "index directory for *.zoekt files.")
+	incremental := flag.Bool("incremental", true, "only index changed repositories")
 	flag.Parse()
 
 	opts := build.Options{
@@ -124,8 +126,13 @@ func main() {
 	for dir, name := range gitRepos {
 		opts.RepoName = name
 		opts.RepoDir = filepath.Clean(dir)
+
+		if mod, err := repoModTime(opts.RepoDir); *incremental && err == nil && mod.Before(opts.Timestamp()) {
+			continue
+		}
+
 		log.Printf("indexing %s (%s)", dir, name)
-		if err := indexGitRepo(opts, *branchPrefix, branches, *submodules); err != nil {
+		if err := indexGitRepo(opts, *branchPrefix, branches, *submodules, *incremental); err != nil {
 			log.Printf("indexGitRepo(%s): %v", dir, err)
 			exitStatus = 1
 		}
@@ -152,7 +159,7 @@ func findGitRepos(arg string) (map[string]string, error) {
 		}
 
 		fi, err = os.Lstat(filepath.Join(name, "objects"))
-		if err != nil && !fi.IsDir() {
+		if err != nil || !fi.IsDir() {
 			return nil
 		}
 
@@ -173,7 +180,32 @@ func findGitRepos(arg string) (map[string]string, error) {
 	return gitDirs, nil
 }
 
-func indexGitRepo(opts build.Options, branchPrefix string, branches []string, submodules bool) error {
+func repoModTime(dir string) (time.Time, error) {
+	var last time.Time
+	refDir := filepath.Join(dir, "refs")
+	if _, err := os.Lstat(refDir); err == nil {
+		if err := filepath.Walk(refDir,
+			func(name string, fi os.FileInfo, err error) error {
+				if !fi.IsDir() && last.Before(fi.ModTime()) {
+					last = fi.ModTime()
+				}
+				return nil
+			}); err != nil {
+			return last, err
+		}
+	}
+
+	// git gc compresses refs into the following file:
+	for _, fn := range []string{"info/refs", "packed-refs"} {
+		if fi, err := os.Lstat(filepath.Join(dir, fn)); err == nil && !fi.IsDir() && last.Before(fi.ModTime()) {
+			last = fi.ModTime()
+		}
+	}
+
+	return last, nil
+}
+
+func indexGitRepo(opts build.Options, branchPrefix string, branches []string, submodules, incremental bool) error {
 	repo, err := git.OpenRepository(opts.RepoDir)
 	if err != nil {
 		return err
