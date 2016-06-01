@@ -133,7 +133,25 @@ func (b *Builder) Add(doc zoekt.Document) {
 func (b *Builder) Finish() error {
 	b.flush()
 	b.building.Wait()
+	if b.nextShardNum > 0 {
+		b.deleteRemainingShards()
+	}
 	return b.buildError
+}
+
+func (b *Builder) deleteRemainingShards() {
+	for {
+		shard := b.nextShardNum
+		b.nextShardNum++
+		name, err := shardName(b.opts.IndexDir, b.opts.RepoDir, shard)
+		if err != nil {
+			break
+		}
+
+		if err := os.Remove(name); os.IsNotExist(err) {
+			break
+		}
+	}
 }
 
 func (b *Builder) flush() {

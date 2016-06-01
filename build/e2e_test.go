@@ -161,3 +161,71 @@ func TestUpdate(t *testing.T) {
 		t.Errorf("List(repo): got %v, want 1 repo", repos.Repos)
 	}
 }
+
+func TestDeleteOldShards(t *testing.T) {
+	dir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatalf("TempDir: %v", err)
+	}
+
+	opts := Options{
+		IndexDir: dir,
+		ShardMax: 1024,
+		RepoName: "repo",
+		RepoURL:  "url",
+		RepoDir:  "/a",
+		SizeMax:  1 << 20,
+	}
+	opts.SetDefaults()
+
+	b, err := NewBuilder(opts)
+	if err != nil {
+		t.Fatalf("NewBuilder: %v", err)
+	}
+	for i := 0; i < 4; i++ {
+		s := fmt.Sprintf("%d", i)
+		b.AddFile("F"+s, []byte(strings.Repeat(s, 1024)))
+	}
+	b.Finish()
+
+	glob := filepath.Join(dir, "*")
+	fs, err := filepath.Glob(glob)
+	if err != nil {
+		t.Fatalf("Glob(%s): %v", glob, err)
+	} else if len(fs) != 4 {
+		t.Fatalf("Glob(%s): got %v, want 4 shards", glob, fs)
+	}
+
+	// Do again, without sharding.
+	opts.ShardMax = 1 << 20
+	b, err = NewBuilder(opts)
+	if err != nil {
+		t.Fatalf("NewBuilder: %v", err)
+	}
+	for i := 0; i < 4; i++ {
+		s := fmt.Sprintf("%d", i)
+		b.AddFile("F"+s, []byte(strings.Repeat(s, 1024)))
+	}
+	b.Finish()
+
+	fs, err = filepath.Glob(glob)
+	if err != nil {
+		t.Fatalf("Glob(%s): %v", glob, err)
+	} else if len(fs) != 1 {
+		t.Fatalf("Glob(%s): got %v, want 1 shard", glob, fs)
+	}
+
+	// Again, but don't index anything; should leave old shards intact.
+	b, err = NewBuilder(opts)
+	if err != nil {
+		t.Fatalf("NewBuilder: %v", err)
+	}
+	b.Finish()
+
+	fs, err = filepath.Glob(glob)
+	if err != nil {
+		t.Fatalf("Glob(%s): %v", glob, err)
+	} else if len(fs) != 1 {
+		t.Fatalf("Glob(%s): got %v, want 1 shard", glob, fs)
+	}
+}
