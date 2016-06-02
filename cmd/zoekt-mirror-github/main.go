@@ -37,6 +37,7 @@ func main() {
 	user := flag.String("user", "", "user to mirror")
 	token := flag.String("token", "", "file holding API token.")
 	forks := flag.Bool("forks", false, "also mirror forks.")
+	namePattern := flag.String("name", "", "only clone repos whose name contains the given substring.")
 	flag.Parse()
 
 	if *dest == "" {
@@ -80,6 +81,16 @@ func main() {
 		trimmed := repos[:0]
 		for _, r := range repos {
 			if r.Fork == nil || !*r.Fork {
+				trimmed = append(trimmed, r)
+			}
+		}
+		repos = trimmed
+	}
+
+	if *namePattern != "" {
+		trimmed := repos[:0]
+		for _, r := range repos {
+			if r.Name != nil && strings.Contains(*r.Name, *namePattern) {
 				trimmed = append(trimmed, r)
 			}
 		}
@@ -156,7 +167,7 @@ func cloneRepos(destDir string, repos []github.Repository) error {
 			continue
 		}
 
-		cmd := exec.Command("git", "clone", "--bare", *r.CloneURL, base)
+		cmd := exec.Command("git", "clone", "--mirror", "--recursive", *r.CloneURL, base)
 		cmd.Dir = parent
 		log.Println("running:", cmd.Args)
 		if err := cmd.Run(); err != nil {
