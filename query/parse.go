@@ -39,13 +39,15 @@ func (e *SuggestQueryError) Error() string {
 func parseStringLiteral(in []byte) (lit []byte, n int, err error) {
 	left := in[1:]
 	found := false
+
+loop:
 	for len(left) > 0 {
 		c := left[0]
 		left = left[1:]
 		switch c {
 		case '"':
 			found = true
-			break
+			break loop
 		case '\\':
 			// TODO - other escape sequences.
 			if len(left) == 0 {

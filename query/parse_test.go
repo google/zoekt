@@ -123,6 +123,7 @@ func TestTokenize(t *testing.T) {
 		{"file:\"bla\"", tokFile, "bla"},
 		{"\"file:bla\"", tokText, "file:bla"},
 		{"\\", tokError, ""},
+		{"o\"r\" bla", tokText, "or"},
 	}
 	for _, c := range cases {
 		tok, err := nextToken([]byte(c.in))
