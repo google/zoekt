@@ -120,6 +120,8 @@ dt {
   <dl>
     <dt>needle</dt><dd>search for "needle"
   </dd>
+    <dt>thread or needle</dt><dd>search for either "thread" or "needle"
+  </dd>
     <dt>class needle</dt><dd>search for files containing both "class" and "needle"
   </dd>
     <dt>class Needle</dt><dd>search for files containing both "class" (case insensitive) and "Needle" (case sensitive)

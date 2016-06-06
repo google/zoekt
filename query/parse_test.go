@@ -25,7 +25,6 @@ func mustParseRE(s string) *syntax.Regexp {
 	if err != nil {
 		panic(err)
 	}
-
 	return r
 }
 
@@ -37,6 +36,10 @@ func TestParseQuery(t *testing.T) {
 	}
 
 	for _, c := range []testcase{
+		{"fi\"le:bla\"", &Substring{Pattern: "file:bla"}, false},
+		{"abc or def", &Or{[]Q{&Substring{Pattern: "abc"}, &Substring{Pattern: "def"}}}, false},
+		{"(abc or def)", &Or{[]Q{&Substring{Pattern: "abc"}, &Substring{Pattern: "def"}}}, false},
+
 		{"((x) ora b(z(d)))", &And{[]Q{
 			&Regexp{Regexp: mustParseRE("(x)")},
 			&Substring{Pattern: "ora"},
@@ -124,6 +127,8 @@ func TestTokenize(t *testing.T) {
 		{"\"file:bla\"", tokText, "file:bla"},
 		{"\\", tokError, ""},
 		{"o\"r\" bla", tokText, "or"},
+		{"or bla", tokOr, "or"},
+		{"ar bla", tokText, "ar"},
 	}
 	for _, c := range cases {
 		tok, err := nextToken([]byte(c.in))

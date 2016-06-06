@@ -74,6 +74,12 @@ var regexPrefix = []byte("regex:")
 
 type setCase string
 
+type orOperator struct{}
+
+func (o *orOperator) String() string {
+	return "orOp"
+}
+
 func isSpace(c byte) bool {
 	return c == ' ' || c == '\t'
 }
@@ -120,7 +126,9 @@ func Parse(qStr string) (Q, error) {
 		return nil, err
 	}
 
-	return Simplify(&And{qs}), nil
+	q := parseOperators(qs)
+
+	return Simplify(q), nil
 }
 
 func parseExpr(in []byte) (Q, int, error) {
@@ -187,7 +195,7 @@ func parseExpr(in []byte) (Q, int, error) {
 		}
 
 		b = b[len(pTok.Input):]
-		expr = &And{qs}
+		expr = parseOperators(qs)
 	case tokNegate:
 		subQ, n, err := parseExpr(b)
 		if err != nil {
@@ -223,9 +231,24 @@ func regexpQuery(text string, file bool) (Q, error) {
 	return expr, nil
 }
 
+func parseOperators(in []Q) Q {
+	top := &Or{}
+	cur := &And{}
+	for _, q := range in {
+		if _, ok := q.(*orOperator); ok {
+			top.Children = append(top.Children, cur)
+			cur = &And{}
+		} else {
+			cur.Children = append(cur.Children, q)
+		}
+	}
+
+	top.Children = append(top.Children, cur)
+	return top
+}
+
 // TODO - parse OR and AND operators. Right now, there is no way to
 // input an OR query.
-
 func parseExprList(in []byte) ([]Q, int, error) {
 	b := in[:]
 	var qs []Q
@@ -233,8 +256,13 @@ func parseExprList(in []byte) ([]Q, int, error) {
 		for len(b) > 0 && isSpace(b[0]) {
 			b = b[1:]
 		}
-		if tok, _ := nextToken(b); tok != nil && tok.Type == tokParenClose {
+		tok, _ := nextToken(b)
+		if tok != nil && tok.Type == tokParenClose {
 			break
+		} else if tok != nil && tok.Type == tokOr {
+			qs = append(qs, &orOperator{})
+			b = b[len(tok.Input):]
+			continue
 		}
 
 		q, n, err := parseExpr(b)
@@ -314,6 +342,7 @@ const (
 	tokError      = 7
 	tokNegate     = 8
 	tokRegex      = 9
+	tokOr         = 10
 )
 
 var tokNames = map[int]string{
@@ -327,6 +356,7 @@ var tokNames = map[int]string{
 	tokError:      "Error",
 	tokNegate:     "Negate",
 	tokRegex:      "Regex",
+	tokOr:         "Or",
 }
 
 var prefixes = map[string]int{
@@ -339,12 +369,23 @@ var prefixes = map[string]int{
 	"regex:":  tokRegex,
 }
 
+var reservedWords = map[string]int{
+	"or": tokOr,
+}
+
 func (t *token) setType() {
 	if len(t.Text) == 1 && t.Text[0] == '(' {
 		t.Type = tokParenOpen
 	}
 	if len(t.Text) == 1 && t.Text[0] == ')' {
 		t.Type = tokParenClose
+	}
+
+	for w, typ := range reservedWords {
+		if string(t.Text) == w && string(t.Input) == w {
+			t.Type = typ
+			break
+		}
 	}
 
 	for pref, typ := range prefixes {
