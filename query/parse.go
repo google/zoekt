@@ -67,13 +67,10 @@ loop:
 	return lit, len(in) - len(left), nil
 }
 
-var casePrefix = []byte("case:")
-var filePrefix = []byte("file:")
-var branchPrefix = []byte("branch:")
-var regexPrefix = []byte("regex:")
-
 type setCase string
 
+// orOperator is a placeholder intermediate so we can represent [A,
+// or, B] before we convert it to Or{A, B}
 type orOperator struct{}
 
 func (o *orOperator) String() string {
@@ -84,7 +81,9 @@ func isSpace(c byte) bool {
 	return c == ' ' || c == '\t'
 }
 
-// Consumes KEYWORD:<arg>, where arg may be quoted.
+// Consumes KEYWORD:<arg>, where arg may be quoted.  Returns the
+// keyword, the number of bytes consumed, whether it matched, and if
+// there was an error.
 func consumeKeyword(in []byte, kw []byte) ([]byte, int, bool, error) {
 	if !bytes.HasPrefix(in, kw) {
 		return nil, 0, false, nil
@@ -118,6 +117,7 @@ done:
 	return arg, len(in) - len(left), true, nil
 }
 
+// Parse parses a string into a query.
 func Parse(qStr string) (Q, error) {
 	b := []byte(qStr)
 
@@ -131,6 +131,8 @@ func Parse(qStr string) (Q, error) {
 	return Simplify(q), nil
 }
 
+// parseExpr parses a single expression, returning the result, and the
+// number of bytes consumed.
 func parseExpr(in []byte) (Q, int, error) {
 	b := in[:]
 	var expr Q
@@ -208,6 +210,8 @@ func parseExpr(in []byte) (Q, int, error) {
 	return expr, len(in) - len(b), nil
 }
 
+// regexpQuery parses an atom into either a regular expression, or a
+// simple substring atom.
 func regexpQuery(text string, file bool) (Q, error) {
 	var expr Q
 
@@ -231,6 +235,7 @@ func regexpQuery(text string, file bool) (Q, error) {
 	return expr, nil
 }
 
+// parseOperators interprets the orOperator in a list of queries.
 func parseOperators(in []Q) Q {
 	top := &Or{}
 	cur := &And{}
@@ -247,8 +252,8 @@ func parseOperators(in []Q) Q {
 	return top
 }
 
-// TODO - parse OR and AND operators. Right now, there is no way to
-// input an OR query.
+// parseExprList parses a list of query expressions. It is the
+// workhorse of the Parse function.
 func parseExprList(in []byte) ([]Q, int, error) {
 	b := in[:]
 	var qs []Q
@@ -322,8 +327,11 @@ func parseExprList(in []byte) ([]Q, int, error) {
 }
 
 type token struct {
-	Type  int
-	Text  []byte
+	Type int
+	// The value of the token
+	Text []byte
+
+	// The input that we consumed to form the token.
 	Input []byte
 }
 
@@ -331,6 +339,7 @@ func (t *token) String() string {
 	return fmt.Sprintf("%s:%q", tokNames[t.Type], t.Text)
 }
 
+// token types.
 const (
 	tokText       = 0
 	tokFile       = 1
@@ -374,6 +383,9 @@ var reservedWords = map[string]int{
 }
 
 func (t *token) setType() {
+	// After we consumed the input, we have to interpret some of the text,
+	// eg. to distinguish between ")" the text and ) the query grouping
+	// parenthesis.
 	if len(t.Text) == 1 && t.Text[0] == '(' {
 		t.Type = tokParenOpen
 	}
@@ -399,6 +411,7 @@ func (t *token) setType() {
 	}
 }
 
+// nextToken returns the next token from the given input.
 func nextToken(in []byte) (*token, error) {
 	left := in[:]
 	parenCount := 0
