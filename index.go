@@ -78,6 +78,7 @@ func (d *indexData) Stats() (*RepoStats, error) {
 		Repos:        []string{d.repoName},
 		IndexBytes:   int64(d.memoryUse()),
 		ContentBytes: int64(int(last) + int(lastFN)),
+		Documents:    len(d.newlinesIndex) - 1,
 	}, nil
 }
 

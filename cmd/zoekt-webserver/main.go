@@ -149,8 +149,10 @@ dt {
 </div>
 
 <div>
-<p>
-Used {{HumanUnit .Stats.IndexBytes}} memory for {{HumanUnit .Stats.ContentBytes}} indexed data from {{len .Stats.Repos}} repositories.
+
+<p> Used {{HumanUnit .Stats.IndexBytes}} memory for
+{{.Stats.Documents}} documents ({{HumanUnit .Stats.ContentBytes}})
+from {{len .Stats.Repos}} repositories.
 
 <p>
 To list repositories, try:

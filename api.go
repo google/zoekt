@@ -103,6 +103,7 @@ type Searcher interface {
 
 type RepoStats struct {
 	Repos        []string
+	Documents    int
 	IndexBytes   int64
 	ContentBytes int64
 }
@@ -110,6 +111,7 @@ type RepoStats struct {
 func (s *RepoStats) Add(o *RepoStats) {
 	s.Repos = append(s.Repos, o.Repos...)
 	s.IndexBytes += o.IndexBytes
+	s.Documents += o.Documents
 	s.ContentBytes += o.ContentBytes
 }
 
