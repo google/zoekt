@@ -34,7 +34,7 @@ type FileMatch struct {
 	Content []byte
 }
 
-// Match is a match for a single atomic query within a file.
+// Match holds the matches within a single line in a file.
 type Match struct {
 	// The line in which a match was found.
 	Line      []byte
@@ -42,19 +42,25 @@ type Match struct {
 	LineEnd   int
 	LineNum   int
 
-	// Offset within the line.
-	LineOff int
-
-	// Offset from file start
-	Offset      uint32
-	MatchLength int
-
 	// If set, this was a match on the filename.
 	FileName bool
 
 	// The higher the better. Only ranks the quality of the match
 	// within the file, does not take rank of file into account
-	Score float64
+	Score     float64
+	Fragments []MatchFragment
+}
+
+// MatchFragment holds a segment of matching text within a line.
+type MatchFragment struct {
+	// Offset within the line.
+	LineOff int
+
+	// Offset from file start
+	Offset uint32
+
+	// Number bytes that match.
+	MatchLength int
 }
 
 // Stats contains interesting numbers on the search

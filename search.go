@@ -101,21 +101,61 @@ func (p *contentProvider) matchContent(m *candidateMatch) bool {
 	return m.matchContent(p.data(m.fileName))
 }
 
-func (p *contentProvider) fillMatch(m *candidateMatch) Match {
-	var finalMatch Match
-	if m.fileName {
-		finalMatch = Match{
-			Offset:      m.offset,
-			Line:        p.id.fileName(p.idx),
-			LineOff:     int(m.offset),
-			MatchLength: int(m.matchSz),
-			FileName:    true,
+func (p *contentProvider) fillMatches(ms []*candidateMatch) []Match {
+	var result []Match
+	if ms[0].fileName {
+		// There is only "line" in a filename.
+		res := Match{
+			Line:     p.id.fileName(p.idx),
+			FileName: true,
+		}
+
+		for _, m := range ms {
+			res.Fragments = append(res.Fragments, MatchFragment{
+				LineOff:     int(m.offset),
+				MatchLength: int(m.matchSz),
+				Offset:      m.offset,
+			})
+
+			result = []Match{res}
 		}
 	} else {
-		data := p.data(false)
-		endMatch := m.offset + m.matchSz
+		result = p.fillContentMatches(ms)
+	}
 
+	sects := p.docSections()
+	for i, m := range result {
+		result[i].Score = matchScore(sects, &m)
+	}
+
+	return result
+}
+
+func (p *contentProvider) fillContentMatches(ms []*candidateMatch) []Match {
+	var result []Match
+	for len(ms) > 0 {
+		m := ms[0]
 		num, start, end := m.line(p.newlines(), p.fileSize)
+
+		var lineCands []*candidateMatch
+
+		endMatch := m.offset + m.matchSz
+		for len(ms) > 0 {
+			m := ms[0]
+			if int(m.offset) < end {
+				endMatch = m.offset + m.matchSz
+				lineCands = append(lineCands, m)
+				ms = ms[1:]
+			} else {
+				break
+			}
+		}
+
+		data := p.data(false)
+
+		// Due to merging matches, we may have a match that
+		// crosses a line boundary. Prevent confusion by
+		// taking lines until we pass the last match
 		for end < len(data) && endMatch > uint32(end) {
 			end = bytes.IndexByte(data[end+1:], '\n')
 			if end == -1 {
@@ -123,22 +163,25 @@ func (p *contentProvider) fillMatch(m *candidateMatch) Match {
 			}
 		}
 
-		finalMatch = Match{
-			Offset:      m.offset,
-			LineStart:   start,
-			LineEnd:     end,
-			LineNum:     num,
-			LineOff:     int(m.offset) - start,
-			MatchLength: int(m.matchSz),
+		finalMatch := Match{
+			LineStart: start,
+			LineEnd:   end,
+			LineNum:   num,
 		}
 		out := make([]byte, end-start+8)
 		finalMatch.Line = toOriginal(out, p.data(false), p.caseBits(false), start, end)
+
+		for _, m := range lineCands {
+			finalMatch.Fragments = append(finalMatch.Fragments, MatchFragment{
+				Offset:      m.offset,
+				LineOff:     int(m.offset) - start,
+				MatchLength: int(m.matchSz),
+			})
+		}
+
+		result = append(result, finalMatch)
 	}
-
-	sects := p.docSections()
-	finalMatch.Score = matchScore(sects, &finalMatch)
-
-	return finalMatch
+	return result
 }
 
 const (
@@ -167,31 +210,37 @@ func findSection(secs []DocumentSection, off, sz uint32) *DocumentSection {
 }
 
 func matchScore(secs []DocumentSection, m *Match) float64 {
-	startBoundary := m.LineOff < len(m.Line) && (m.LineOff == 0 || byteClass(m.Line[m.LineOff-1]) != byteClass(m.Line[m.LineOff]))
+	var maxScore float64
+	for _, f := range m.Fragments {
+		startBoundary := f.LineOff < len(m.Line) && (f.LineOff == 0 || byteClass(m.Line[f.LineOff-1]) != byteClass(m.Line[f.LineOff]))
 
-	end := int(m.LineOff) + m.MatchLength
-	endBoundary := end > 0 && (end == len(m.Line) || byteClass(m.Line[end-1]) != byteClass(m.Line[end]))
+		end := int(f.LineOff) + f.MatchLength
+		endBoundary := end > 0 && (end == len(m.Line) || byteClass(m.Line[end-1]) != byteClass(m.Line[end]))
 
-	score := 0.0
-	if startBoundary && endBoundary {
-		score = scoreWordMatch
-	} else if startBoundary || endBoundary {
-		score = scorePartialWordMatch
-	}
+		score := 0.0
+		if startBoundary && endBoundary {
+			score = scoreWordMatch
+		} else if startBoundary || endBoundary {
+			score = scorePartialWordMatch
+		}
 
-	sec := findSection(secs, m.Offset, uint32(m.MatchLength))
-	if sec != nil {
-		startMatch := sec.Start == m.Offset
-		endMatch := sec.End == m.Offset+uint32(m.MatchLength)
-		if startMatch && endMatch {
-			score += scoreSymbol
-		} else if startMatch || endMatch {
-			score += (scoreSymbol + scorePartialSymbol) / 2
-		} else {
-			score += scorePartialSymbol
+		sec := findSection(secs, f.Offset, uint32(f.MatchLength))
+		if sec != nil {
+			startMatch := sec.Start == f.Offset
+			endMatch := sec.End == f.Offset+uint32(f.MatchLength)
+			if startMatch && endMatch {
+				score += scoreSymbol
+			} else if startMatch || endMatch {
+				score += (scoreSymbol + scorePartialSymbol) / 2
+			} else {
+				score += scorePartialSymbol
+			}
+		}
+		if score > maxScore {
+			maxScore = score
 		}
 	}
-	return score
+	return maxScore
 }
 
 type matchScoreSlice []Match

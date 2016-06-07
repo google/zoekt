@@ -60,7 +60,7 @@ func TestBasic(t *testing.T) {
 		t.Fatalf("got %v, want 1 matches", fmatches)
 	}
 
-	got := fmt.Sprintf("%s:%d", fmatches[0].Name, fmatches[0].Matches[0].Offset)
+	got := fmt.Sprintf("%s:%d", fmatches[0].Name, fmatches[0].Matches[0].Fragments[0].Offset)
 	want := "f2:9"
 	if got != want {
 		t.Errorf("1: got %s, want %s", got, want)
@@ -92,13 +92,15 @@ func TestNewlines(t *testing.T) {
 		Name: "filename",
 		Matches: []Match{
 			{
-				Offset:      8,
-				Line:        []byte("line2"),
-				LineStart:   6,
-				LineEnd:     11,
-				LineNum:     2,
-				LineOff:     2,
-				MatchLength: 3,
+				Fragments: []MatchFragment{{
+					Offset:      8,
+					LineOff:     2,
+					MatchLength: 3,
+				}},
+				Line:      []byte("line2"),
+				LineStart: 6,
+				LineEnd:   11,
+				LineNum:   2,
 			},
 		}}}
 
@@ -150,7 +152,7 @@ func TestFileBasedSearch(t *testing.T) {
 	if len(matches) != 2 || matches[0].Name != "f2" || matches[1].Name != "f1" {
 		t.Fatalf("got %v, want matches {f1,f2}", matches)
 	}
-	if matches[0].Matches[0].Offset != 10 || matches[1].Matches[0].Offset != 8 {
+	if matches[0].Matches[0].Fragments[0].Offset != 10 || matches[1].Matches[0].Fragments[0].Offset != 8 {
 		t.Fatalf("got %#v, want offsets 10,8", matches)
 	}
 }
@@ -179,7 +181,7 @@ func TestCaseFold(t *testing.T) {
 	matches = sres.Files
 	if len(matches) != 1 {
 		t.Errorf("no foldcase: got %v, want 1 matches", matches)
-	} else if matches[0].Matches[0].Offset != 7 {
+	} else if matches[0].Matches[0].Fragments[0].Offset != 7 {
 		t.Errorf("foldcase: got %v, want offsets 7", matches)
 	}
 }
@@ -202,11 +204,11 @@ func TestAndSearch(t *testing.T) {
 		},
 	})
 	matches := sres.Files
-	if len(matches) != 1 {
-		t.Fatalf("got %v, want 1 match", matches)
+	if len(matches) != 1 || len(matches[0].Matches) != 1 || len(matches[0].Matches[0].Fragments) != 2 {
+		t.Fatalf("got %#v, want 1 match with 2 fragments", matches)
 	}
 
-	if matches[0].Matches[0].Offset != 2 || matches[0].Matches[1].Offset != 9 {
+	if matches[0].Matches[0].Fragments[0].Offset != 2 || matches[0].Matches[0].Fragments[1].Offset != 9 {
 		t.Fatalf("got %#v, want offsets 2,9", matches)
 	}
 
@@ -214,7 +216,7 @@ func TestAndSearch(t *testing.T) {
 		FilesLoaded:     1,
 		BytesLoaded:     16,
 		NgramMatches:    4,
-		MatchCount:      2,
+		MatchCount:      1,
 		FileCount:       1,
 		FilesConsidered: 3,
 	}
@@ -248,7 +250,7 @@ func TestAndNegateSearch(t *testing.T) {
 	if matches[0].Name != "f1" {
 		t.Fatalf("got match %#v, want FileName: f1", matches[0])
 	}
-	if matches[0].Matches[0].Offset != 2 {
+	if matches[0].Matches[0].Fragments[0].Offset != 2 {
 		t.Fatalf("got %v, want offsets 2,9", matches)
 	}
 }
@@ -296,11 +298,13 @@ func TestFileSearch(t *testing.T) {
 
 	got := matches[0].Matches[0]
 	want := Match{
-		Line:        []byte("banana"),
-		Offset:      1,
-		LineOff:     1,
-		MatchLength: 4,
-		FileName:    true,
+		Line: []byte("banana"),
+		Fragments: []MatchFragment{{
+			Offset:      1,
+			LineOff:     1,
+			MatchLength: 4,
+		}},
+		FileName: true,
 	}
 
 	if !reflect.DeepEqual(got, want) {
@@ -434,8 +438,8 @@ func TestFileNameBoundary(t *testing.T) {
 func TestWordBoundaryRanking(t *testing.T) {
 	b := NewIndexBuilder()
 	b.AddFile("f1", []byte("xbytex xbytex"))
-	b.AddFile("f2", []byte("xbytex bytex byte bla"))
-	// ---------------------012345678901234567890
+	b.AddFile("f2", []byte("xbytex\nbytex\nbyte bla"))
+	// ---------------------0123456 789012 34567890
 	b.AddFile("f3", []byte("xbytex ybytex"))
 
 	sres := searchForTest(t, b, &query.Substring{
@@ -451,11 +455,11 @@ func TestWordBoundaryRanking(t *testing.T) {
 		t.Fatalf("got file %s, num matches %d (%#v), want 3 matches in file f2", file0.Name, len(file0.Matches), file0)
 	}
 
-	if file0.Matches[0].Offset != 13 {
+	if file0.Matches[0].Fragments[0].Offset != 13 {
 		t.Fatalf("got first match %#v, want full word match", sres.Files[0].Matches[0])
 	}
-	if file0.Matches[1].Offset != 7 {
-		t.Fatalf("got second match %#v, want partial word match", sres.Files[0].Matches[0])
+	if file0.Matches[1].Fragments[0].Offset != 7 {
+		t.Fatalf("got second match %#v, want partial word match", sres.Files[0].Matches[1])
 	}
 }
 
@@ -556,14 +560,16 @@ func TestRegexp(t *testing.T) {
 
 	got := sres.Files[0].Matches[0]
 	want := Match{
-		LineOff:     3,
-		Offset:      3,
-		MatchLength: 11,
-		Line:        content,
-		FileName:    false,
-		LineNum:     1,
-		LineStart:   0,
-		LineEnd:     14,
+		Fragments: []MatchFragment{{
+			LineOff:     3,
+			Offset:      3,
+			MatchLength: 11,
+		}},
+		Line:      content,
+		FileName:  false,
+		LineNum:   1,
+		LineStart: 0,
+		LineEnd:   14,
 	}
 
 	if !reflect.DeepEqual(got, want) {

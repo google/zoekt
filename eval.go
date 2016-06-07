@@ -637,9 +637,8 @@ nextFileMatch:
 		})
 		fileMatch.Score += float64(atomMatchCount) / float64(totalAtomCount) * scoreFactorAtomMatch
 		finalCands := gatherMatches(mt, known)
-		for _, c := range finalCands {
-			fileMatch.Matches = append(fileMatch.Matches, cp.fillMatch(c))
-		}
+
+		fileMatch.Matches = cp.fillMatches(finalCands)
 
 		maxFileScore := 0.0
 		for i := range fileMatch.Matches {
@@ -696,10 +695,16 @@ func extractSubstringQueries(q query.Q) []*query.Substring {
 
 type sortByOffsetSlice []*candidateMatch
 
-func (m sortByOffsetSlice) Len() int           { return len(m) }
-func (m sortByOffsetSlice) Swap(i, j int)      { m[i], m[j] = m[j], m[i] }
-func (m sortByOffsetSlice) Less(i, j int) bool { return m[i].offset < m[j].offset }
+func (m sortByOffsetSlice) Len() int      { return len(m) }
+func (m sortByOffsetSlice) Swap(i, j int) { m[i], m[j] = m[j], m[i] }
+func (m sortByOffsetSlice) Less(i, j int) bool {
+	return m[i].offset < m[j].offset
+}
 
+// Gather matches from this document. This never returns a mixture of
+// filename/content matches: if there are content matches, all
+// filename matches are trimmed from the result. The matches are
+// returned in document order and are non-overlapping.
 func gatherMatches(mt matchTree, known map[matchTree]bool) []*candidateMatch {
 	var cands []*candidateMatch
 	visitMatches(mt, known, func(mt matchTree) {
@@ -727,7 +732,8 @@ func gatherMatches(mt matchTree, known map[matchTree]bool) []*candidateMatch {
 	}
 	cands = res
 
-	// merge adjacent candidates.
+	// Merge adjacent candidates. This guarantees that the matches
+	// are non-overlapping.
 	sort.Sort((sortByOffsetSlice)(cands))
 	res = cands[:0]
 	for i, c := range cands {

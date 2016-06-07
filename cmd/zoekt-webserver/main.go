@@ -222,12 +222,17 @@ type FileMatchData struct {
 	URL      string
 }
 
+type MatchFragment struct {
+	Pre   string
+	Match string
+	Post  string
+}
+
 type MatchData struct {
-	FileName  string
-	Pre       string
-	MatchText string
-	Post      string
-	LineNum   int
+	FileName string
+	LineNum  int
+
+	Fragments []MatchFragment
 }
 
 type ResultsPage struct {
@@ -258,7 +263,7 @@ var resultTemplate = template.Must(template.New("page").Funcs(funcmap).Parse(`<h
 
       <div style="background: #eef;">
     {{range .Matches}}
-        <pre>{{.LineNum}}: {{.Pre}}<b>{{.MatchText}}</b>{{.Post}}</pre>
+        <pre>{{.LineNum}}: {{range .Fragments}}{{.Pre}}<b>{{.Match}}</b>{{.Post}}{{end}}</pre>
     {{end}}
       </div>
   {{end}}
@@ -368,19 +373,29 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 		}
 
 		for _, m := range f.Matches {
-			l := m.LineOff
-			e := l + m.MatchLength
-			if e > len(m.Line) {
-				e = len(m.Line)
-				log.Printf("%s %#v", f.Name, m)
+			md := MatchData{
+				FileName: f.Name,
+				LineNum:  m.LineNum,
 			}
-			fMatch.Matches = append(fMatch.Matches, MatchData{
-				FileName:  f.Name,
-				LineNum:   m.LineNum,
-				Pre:       string(m.Line[:l]),
-				MatchText: string(m.Line[l:e]),
-				Post:      string(m.Line[e:]),
-			})
+
+			lastEnd := 0
+			line := m.Line
+			for i, f := range m.Fragments {
+				l := f.LineOff
+				e := l + f.MatchLength
+
+				frag := MatchFragment{
+					Pre:   string(line[lastEnd:l]),
+					Match: string(line[l:e]),
+				}
+				if i == len(m.Fragments)-1 {
+					frag.Post = string(m.Line[e:])
+				}
+
+				md.Fragments = append(md.Fragments, frag)
+				lastEnd = e
+			}
+			fMatch.Matches = append(fMatch.Matches, md)
 		}
 		res.FileMatches = append(res.FileMatches, fMatch)
 	}
