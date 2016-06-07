@@ -107,9 +107,12 @@ func TestNewlines(t *testing.T) {
 	}
 }
 
-func searchForTest(t *testing.T, b *IndexBuilder, q query.Q) *SearchResult {
+func searchForTest(t *testing.T, b *IndexBuilder, q query.Q, o ...SearchOptions) *SearchResult {
 	searcher := searcherForTest(t, b)
 	var opts SearchOptions
+	if len(o) > 0 {
+		opts = o[0]
+	}
 	res, err := searcher.Search(q, &opts)
 	if err != nil {
 		t.Fatalf("Search(%s): %v", q, err)
@@ -831,5 +834,28 @@ func TestAtomCountScore(t *testing.T) {
 	want := []string{"needle-file-branch", "needle-file", "f1"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func TestImportantCutoff(t *testing.T) {
+	b := NewIndexBuilder()
+	content := []byte("func bla() blub")
+	// ----------------012345678901234
+	b.Add(Document{
+		Name:    "f1",
+		Content: content,
+		Symbols: []DocumentSection{{5, 8}},
+	})
+	b.Add(Document{
+		Name:    "f2",
+		Content: content,
+	})
+	opts := SearchOptions{
+		MaxImportantMatch: 1,
+	}
+
+	sres := searchForTest(t, b, &query.Substring{Pattern: "bla"}, opts)
+	if len(sres.Files) != 1 || sres.Files[0].Name != "f1" {
+		t.Errorf("got %v, wanted 1 match 'f1'", sres.Files)
 	}
 }

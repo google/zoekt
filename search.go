@@ -143,11 +143,12 @@ func (p *contentProvider) fillMatch(m *candidateMatch) Match {
 
 const (
 	// TODO - how to scale this relative to rank?
-	scorePartialWordMatch = 50.0
-	scoreWordMatch        = 500.0
-	scorePartialSymbol    = 4000.0
-	scoreSymbol           = 7000.0
-	scoreFactorAtomMatch  = 400.0
+	scorePartialWordMatch   = 50.0
+	scoreWordMatch          = 500.0
+	scoreImportantThreshold = 2000.0
+	scorePartialSymbol      = 4000.0
+	scoreSymbol             = 7000.0
+	scoreFactorAtomMatch    = 400.0
 )
 
 func findSection(secs []DocumentSection, off, sz uint32) *DocumentSection {

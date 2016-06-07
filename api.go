@@ -15,6 +15,7 @@
 package zoekt
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/zoekt/query"
@@ -58,14 +59,31 @@ type Match struct {
 
 // Stats contains interesting numbers on the search
 type Stats struct {
-	NgramMatches    int
+	// Number of candidate matches as a result of searching ngrams.
+	NgramMatches int
+
+	// Files that we evaluated. Equivalent to files for which all
+	// atom matches (including negations) evaluated to true.
 	FilesConsidered int
-	FilesLoaded     int
-	BytesLoaded     int64
-	FileCount       int
-	MatchCount      int
-	Duration        time.Duration
-	FilesSkipped    int
+
+	// Files for which we loaded file content to verify substring matches
+	FilesLoaded int
+
+	// Total length of files thus loaded.
+	BytesLoaded int64
+
+	// Number of files containing a match.
+	FileCount int
+
+	// Number of non-overlapping matches
+	MatchCount int
+
+	// Wall clock time for this search
+	Duration time.Duration
+
+	// Candidate files whose contents weren't examined because we
+	// gathered enough matches.
+	FilesSkipped int
 }
 
 func (s *Stats) Add(o Stats) {
@@ -118,4 +136,16 @@ func (s *RepoStats) Add(o *RepoStats) {
 type SearchOptions struct {
 	// Return the whole file.
 	Whole bool
+
+	// Maximum number of matches: skip all processing an index
+	// shard after we found this many non-overlapping matches.
+	MaxMatchCount int
+
+	// Maximum number of important matches: skip processing
+	// shard after we found this many important matches.
+	MaxImportantMatch int
+}
+
+func (s *SearchOptions) String() string {
+	return fmt.Sprintf("%#v", s)
 }

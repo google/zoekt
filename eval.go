@@ -129,6 +129,7 @@ func (t *branchQueryMatchTree) prepare(doc uint32) {
 }
 
 // String.
+
 func (t *andMatchTree) String() string {
 	return fmt.Sprintf("and%v", t.children)
 }
@@ -487,11 +488,23 @@ func (d *indexData) simplify(in query.Q) query.Q {
 	return query.Simplify(eval)
 }
 
-// We cap the total number of matches, so overly broad searches don't
-// crash the machine.
-const maxMatchCount = 100000
+func (o *SearchOptions) SetDefaults() {
+	if o.MaxMatchCount == 0 {
+		// We cap the total number of matches, so overly broad
+		// searches don't crash the machine.
+		o.MaxMatchCount = 100000
+	}
+	if o.MaxImportantMatch == 0 {
+		o.MaxImportantMatch = 10
+	}
+}
 
 func (d *indexData) Search(q query.Q, opts *SearchOptions) (*SearchResult, error) {
+	copyOpts := *opts
+	opts = &copyOpts
+	opts.SetDefaults()
+	importantMatchCount := 0
+
 	var res SearchResult
 
 	q = d.simplify(q)
@@ -548,11 +561,8 @@ nextFileMatch:
 		}
 		res.Stats.FilesConsidered++
 		mt.prepare(nextDoc)
-		if res.Stats.MatchCount > maxMatchCount {
-			// TODO - maxMatchCount should come from the
-			// max results specified in the web interface.
-			// If we have enough 'important' matches, we
-			// should break out of this loop.
+		if res.Stats.MatchCount >= opts.MaxMatchCount ||
+			importantMatchCount >= opts.MaxImportantMatch {
 			res.Stats.FilesSkipped++
 			continue
 		}
@@ -643,6 +653,9 @@ nextFileMatch:
 		}
 		fileMatch.Score += maxFileScore
 
+		if fileMatch.Score > scoreImportantThreshold {
+			importantMatchCount++
+		}
 		fileMatch.Branches = d.gatherBranches(nextDoc, mt, known)
 
 		sortMatchesByScore(fileMatch.Matches)

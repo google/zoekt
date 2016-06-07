@@ -229,12 +229,13 @@ type MatchData struct {
 }
 
 type ResultsPage struct {
-	LastQuery   string
-	QueryStr    string
-	Query       string
-	Stats       zoekt.Stats
-	Duration    time.Duration
-	FileMatches []FileMatchData
+	LastQuery     string
+	QueryStr      string
+	Query         string
+	Stats         zoekt.Stats
+	Duration      time.Duration
+	FileMatches   []FileMatchData
+	SearchOptions string
 }
 
 var resultTemplate = template.Must(template.New("page").Funcs(funcmap).Parse(`<html>
@@ -246,7 +247,7 @@ var resultTemplate = template.Must(template.New("page").Funcs(funcmap).Parse(`<h
   Found {{.Stats.MatchCount}} results in {{.Stats.FileCount}} files ({{.Stats.NgramMatches}} ngram matches,
     {{.Stats.FilesConsidered}} docs considered, {{.Stats.FilesLoaded}} docs ({{HumanUnit .Stats.BytesLoaded}}B) loaded,
     {{.Stats.FilesSkipped}} docs skipped): for
-  <pre style="background: #ffc;">{{.Query}}</pre>
+  <pre style="background: #ffc;">{{.Query}} with options {{.SearchOptions}}</pre>
   in {{.Stats.Duration}}
   <p>
   {{range .FileMatches}}
@@ -292,7 +293,25 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 		num = 50
 	}
 
-	sOpts := zoekt.SearchOptions{}
+	sOpts := zoekt.SearchOptions{
+		MaxImportantMatch: num / 10,
+	}
+
+	repoFound := false
+	query.VisitAtoms(q, func(q query.Q) {
+		if _, ok := q.(*query.Repo); ok {
+			repoFound = true
+		}
+	})
+
+	if !repoFound {
+		// If the search is not restricted to any repo, we
+		// assume the user doesn't really know what they are
+		// looking for, so we restrict the number of matches
+		// to avoid overwhelming the search engine.
+		sOpts.MaxMatchCount = num * 10
+	}
+	sOpts.SetDefaults()
 
 	result, err := s.searcher.Search(q, &sOpts)
 	if err != nil {
@@ -300,10 +319,11 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 	}
 
 	res := ResultsPage{
-		LastQuery: queryStr,
-		Stats:     result.Stats,
-		Query:     q.String(),
-		QueryStr:  queryStr,
+		LastQuery:     queryStr,
+		Stats:         result.Stats,
+		Query:         q.String(),
+		QueryStr:      queryStr,
+		SearchOptions: sOpts.String(),
 	}
 
 	if len(result.Files) > num {
