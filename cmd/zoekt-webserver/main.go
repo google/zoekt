@@ -531,7 +531,7 @@ func main() {
 	logRefresh := flag.Duration("log_refresh", 24*time.Hour, "if using --log_dir, start writing a new file this often.")
 
 	listen := flag.String("listen", ":6070", "address to listen on.")
-	index := flag.String("index", build.DefaultDir, "index file glob to use")
+	index := flag.String("index", build.DefaultDir, "index directory to use")
 	print := flag.Bool("print", false, "local result URLs")
 	flag.Parse()
 
