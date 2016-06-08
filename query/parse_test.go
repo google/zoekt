@@ -15,15 +15,16 @@
 package query
 
 import (
+	"log"
 	"reflect"
 	"regexp/syntax"
 	"testing"
 )
 
 func mustParseRE(s string) *syntax.Regexp {
-	r, err := syntax.Parse(s, 0)
+	r, err := syntax.Parse(s, syntax.Perl)
 	if err != nil {
-		panic(err)
+		log.Panicf("parsing %q: %v", s, err)
 	}
 	return r
 }
@@ -36,6 +37,7 @@ func TestParseQuery(t *testing.T) {
 	}
 
 	for _, c := range []testcase{
+		{`\bword\b`, &Regexp{Regexp: mustParseRE(`\bword\b`)}, false},
 		{"fi\"le:bla\"", &Substring{Pattern: "file:bla"}, false},
 		{"abc or def", &Or{[]Q{&Substring{Pattern: "abc"}, &Substring{Pattern: "def"}}}, false},
 		{"(abc or def)", &Or{[]Q{&Substring{Pattern: "abc"}, &Substring{Pattern: "def"}}}, false},

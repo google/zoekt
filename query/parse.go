@@ -211,7 +211,7 @@ func parseExpr(in []byte) (Q, int, error) {
 func regexpQuery(text string, file bool) (Q, error) {
 	var expr Q
 
-	r, err := syntax.Parse(text, 0)
+	r, err := syntax.Parse(text, syntax.Perl)
 	if err != nil {
 		return nil, err
 	}

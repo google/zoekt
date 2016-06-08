@@ -76,7 +76,7 @@ func TestRegexpParse(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		r, err := syntax.Parse(c.in, 0)
+		r, err := syntax.Parse(c.in, syntax.Perl)
 		if err != nil {
 			t.Errorf("Parse(%q): %v", c.in, err)
 			continue
