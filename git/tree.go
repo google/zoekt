@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package gitindex
 
 import (
 	"path/filepath"
@@ -105,22 +105,4 @@ func (r *repoWalker) cbInt(n string, e *git.TreeEntry) int {
 		return 1
 	}
 	return 0
-}
-
-func getTree(repo *git.Repository, ref string) (*git.Tree, error) {
-	obj, err := repo.RevparseSingle(ref)
-	if err != nil {
-		return nil, err
-	}
-	defer obj.Free()
-
-	treeObj, err := obj.Peel(git.ObjectTree)
-	if err != nil {
-		return nil, err
-	}
-	tree, err := treeObj.AsTree()
-	if err != nil {
-		return nil, err
-	}
-	return tree, nil
 }
