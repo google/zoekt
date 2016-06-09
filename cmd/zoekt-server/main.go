@@ -57,6 +57,9 @@ func refresh(repoDir, indexDir string, fetchInterval time.Duration) {
 			log.Println(err)
 			continue
 		}
+		if len(repos) == 0 {
+			log.Printf("no repos found under %s", repoDir)
+		}
 		for dir := range repos {
 			cmd := exec.Command("git", "--git-dir", dir, "fetch")
 			loggedRun(cmd)
