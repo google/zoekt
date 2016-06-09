@@ -31,76 +31,75 @@ func mustParseRE(s string) *syntax.Regexp {
 
 func TestParseQuery(t *testing.T) {
 	type testcase struct {
-		in     string
-		out    Q
-		hasErr bool
+		in   string
+		want Q
 	}
 
 	for _, c := range []testcase{
-		{`\bword\b`, &Regexp{Regexp: mustParseRE(`\bword\b`)}, false},
-		{"fi\"le:bla\"", &Substring{Pattern: "file:bla"}, false},
-		{"abc or def", &Or{[]Q{&Substring{Pattern: "abc"}, &Substring{Pattern: "def"}}}, false},
-		{"(abc or def)", &Or{[]Q{&Substring{Pattern: "abc"}, &Substring{Pattern: "def"}}}, false},
+		{`\bword\b`, &Regexp{Regexp: mustParseRE(`\bword\b`)}},
+		{"fi\"le:bla\"", &Substring{Pattern: "file:bla"}},
+		{"abc or def", &Or{[]Q{&Substring{Pattern: "abc"}, &Substring{Pattern: "def"}}}},
+		{"(abc or def)", &Or{[]Q{&Substring{Pattern: "abc"}, &Substring{Pattern: "def"}}}},
 
 		{"((x) ora b(z(d)))", &And{[]Q{
 			&Regexp{Regexp: mustParseRE("(x)")},
 			&Substring{Pattern: "ora"},
 			&Regexp{Regexp: mustParseRE("b(z(d))")},
-		}}, false},
+		}}},
 
-		{"( )", &Const{Value: true}, false},
-		{"(abc)(de)", &Regexp{Regexp: mustParseRE("(abc)(de)")}, false},
-		{"sub-pixel", &Substring{Pattern: "sub-pixel"}, false},
-		{"abc", &Substring{Pattern: "abc"}, false},
-		{"ABC", &Substring{Pattern: "ABC", CaseSensitive: true}, false},
-		{"\"abc bcd\"", &Substring{Pattern: "abc bcd"}, false},
+		{"( )", &Const{Value: true}},
+		{"(abc)(de)", &Regexp{Regexp: mustParseRE("(abc)(de)")}},
+		{"sub-pixel", &Substring{Pattern: "sub-pixel"}},
+		{"abc", &Substring{Pattern: "abc"}},
+		{"ABC", &Substring{Pattern: "ABC", CaseSensitive: true}},
+		{"\"abc bcd\"", &Substring{Pattern: "abc bcd"}},
 		{"abc bcd", &And{[]Q{
 			&Substring{Pattern: "abc"},
 			&Substring{Pattern: "bcd"},
-		}}, false},
-		{"f:fs", &Substring{Pattern: "fs", FileName: true}, false},
-		{"fs", &Substring{Pattern: "fs"}, false},
-		{"-abc", &Not{&Substring{Pattern: "abc"}}, false},
-		{"abccase:yes", &Substring{Pattern: "abccase:yes"}, false},
-		{"file:abc", &Substring{Pattern: "abc", FileName: true}, false},
-		{"branch:pqr", &Branch{Pattern: "pqr"}, false},
-		{"((x) )", &Regexp{Regexp: mustParseRE("(x)")}, false},
+		}}},
+		{"f:fs", &Substring{Pattern: "fs", FileName: true}},
+		{"fs", &Substring{Pattern: "fs"}},
+		{"-abc", &Not{&Substring{Pattern: "abc"}}},
+		{"abccase:yes", &Substring{Pattern: "abccase:yes"}},
+		{"file:abc", &Substring{Pattern: "abc", FileName: true}},
+		{"branch:pqr", &Branch{Pattern: "pqr"}},
+		{"((x) )", &Regexp{Regexp: mustParseRE("(x)")}},
 		{"file:helpers\\.go byte", &And{[]Q{
 			&Substring{Pattern: "helpers.go", FileName: true},
 			&Substring{Pattern: "byte"},
-		}}, false},
+		}}},
 		{"(abc def)", &And{[]Q{
 			&Substring{Pattern: "abc"},
 			&Substring{Pattern: "def"},
-		}}, false},
-		{"(abc def", nil, true},
-		{"regex:abc[p-q]", &Regexp{Regexp: mustParseRE("abc[p-q]")}, false},
-		{"aBc[p-q]", &Regexp{Regexp: mustParseRE("aBc[p-q]"), CaseSensitive: true}, false},
-		{"aBc[p-q] case:auto", &Regexp{Regexp: mustParseRE("aBc[p-q]"), CaseSensitive: true}, false},
-		{"repo:go", &Repo{"go"}, false},
+		}}},
+		{"(abc def", nil},
+		{"regex:abc[p-q]", &Regexp{Regexp: mustParseRE("abc[p-q]")}},
+		{"aBc[p-q]", &Regexp{Regexp: mustParseRE("aBc[p-q]"), CaseSensitive: true}},
+		{"aBc[p-q] case:auto", &Regexp{Regexp: mustParseRE("aBc[p-q]"), CaseSensitive: true}},
+		{"repo:go", &Repo{"go"}},
 
-		{"file:\"\"", &Const{true}, false},
-		{"abc.*def", &Regexp{Regexp: mustParseRE("abc.*def")}, false},
-		{"abc\\.\\*def", &Substring{Pattern: "abc.*def"}, false},
-		{"(abc)", &Regexp{Regexp: mustParseRE("(abc)")}, false},
+		{"file:\"\"", &Const{true}},
+		{"abc.*def", &Regexp{Regexp: mustParseRE("abc.*def")}},
+		{"abc\\.\\*def", &Substring{Pattern: "abc.*def"}},
+		{"(abc)", &Regexp{Regexp: mustParseRE("(abc)")}},
 
 		// case
-		{"abc case:yes", &Substring{Pattern: "abc", CaseSensitive: true}, false},
-		{"abc case:auto", &Substring{Pattern: "abc", CaseSensitive: false}, false},
-		{"ABC case:auto", &Substring{Pattern: "ABC", CaseSensitive: true}, false},
-		{"ABC case:\"auto\"", &Substring{Pattern: "ABC", CaseSensitive: true}, false},
+		{"abc case:yes", &Substring{Pattern: "abc", CaseSensitive: true}},
+		{"abc case:auto", &Substring{Pattern: "abc", CaseSensitive: false}},
+		{"ABC case:auto", &Substring{Pattern: "ABC", CaseSensitive: true}},
+		{"ABC case:\"auto\"", &Substring{Pattern: "ABC", CaseSensitive: true}},
 		// errors.
-		{"\"abc", nil, true},
-		{"\"a\\", nil, true},
-		{"case:foo", nil, true},
-		{"", &Const{Value: true}, false},
+		{"\"abc", nil},
+		{"\"a\\", nil},
+		{"case:foo", nil},
+		{"", &Const{Value: true}},
 	} {
-		q, err := Parse(c.in)
-		if c.hasErr != (err != nil) {
-			t.Errorf("Parse(%q): error %v, value %v", c.in, err, q)
-		} else if q != nil {
-			if !reflect.DeepEqual(q, c.out) {
-				t.Errorf("Parse(%s): got %v want %v", c.in, q, c.out)
+		got, err := Parse(c.in)
+		if (c.want == nil) != (err != nil) {
+			t.Errorf("Parse(%q): error %v, want %v", c.in, err, c.want)
+		} else if got != nil {
+			if !reflect.DeepEqual(got, c.want) {
+				t.Errorf("Parse(%s): got %v want %v", c.in, got, c.want)
 			}
 		}
 	}
