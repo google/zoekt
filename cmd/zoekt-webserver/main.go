@@ -22,6 +22,8 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"time"
@@ -499,11 +501,49 @@ func (s *httpServer) servePrintErr(w http.ResponseWriter, r *http.Request) error
 	return nil
 }
 
+const logFormat = "2006-01-02T15-04-05.999999999Z07"
+
+func divertLogs(dir string, interval time.Duration) {
+	t := time.NewTicker(interval)
+	var last *os.File
+	for {
+		nm := filepath.Join(dir, fmt.Sprintf("zoekt-webserver.%d.%s.log", os.Getpid(), time.Now().Format(logFormat)))
+		fmt.Fprintf(os.Stderr, "writing logs to %s\n", nm)
+
+		f, err := os.Create(nm)
+		if err != nil {
+			// There is not much we can do now.
+			fmt.Fprintf(os.Stderr, "can't create output file %s: %v\n", nm, err)
+			os.Exit(2)
+		}
+
+		log.SetOutput(f)
+		last.Close()
+
+		last = f
+
+		<-t.C
+	}
+}
+
 func main() {
+	logDir := flag.String("log_dir", "", "If set, log to this directory rather than stderr.")
+	logRefresh := flag.Duration("log_refresh", 24*time.Hour, "if using --log_dir, start writing a new file this often.")
+
 	listen := flag.String("listen", ":6070", "address to listen on.")
 	index := flag.String("index", build.DefaultDir, "index file glob to use")
 	print := flag.Bool("print", false, "local result URLs")
 	flag.Parse()
+
+	if *logDir != "" {
+		if fi, err := os.Lstat(*logDir); err != nil || !fi.IsDir() {
+			log.Fatal("%s is not a directory", *logDir)
+		}
+		// We could do fdup acrobatics to also redirect
+		// stderr, but it is simpler and more portable for the
+		// caller to divert stderr output if necessary.
+		go divertLogs(*logDir, *logRefresh)
+	}
 
 	searcher, err := zoekt.NewShardedSearcher(*index)
 	if err != nil {
