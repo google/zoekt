@@ -126,7 +126,10 @@ func Parse(qStr string) (Q, error) {
 		return nil, err
 	}
 
-	q := parseOperators(qs)
+	q, err := parseOperators(qs)
+	if err != nil {
+		return nil, err
+	}
 
 	return Simplify(q), nil
 }
@@ -197,7 +200,10 @@ func parseExpr(in []byte) (Q, int, error) {
 		}
 
 		b = b[len(pTok.Input):]
-		expr = parseOperators(qs)
+		expr, err = parseOperators(qs)
+		if err != nil {
+			return nil, 0, err
+		}
 	case tokNegate:
 		subQ, n, err := parseExpr(b)
 		if err != nil {
@@ -236,11 +242,17 @@ func regexpQuery(text string, file bool) (Q, error) {
 }
 
 // parseOperators interprets the orOperator in a list of queries.
-func parseOperators(in []Q) Q {
+func parseOperators(in []Q) (Q, error) {
 	top := &Or{}
 	cur := &And{}
+
+	seenOr := false
 	for _, q := range in {
 		if _, ok := q.(*orOperator); ok {
+			seenOr = true
+			if len(cur.Children) == 0 {
+				return nil, fmt.Errorf("OR operator should have operand")
+			}
 			top.Children = append(top.Children, cur)
 			cur = &And{}
 		} else {
@@ -248,8 +260,11 @@ func parseOperators(in []Q) Q {
 		}
 	}
 
+	if seenOr && len(cur.Children) == 0 {
+		return nil, fmt.Errorf("OR operator should have operand")
+	}
 	top.Children = append(top.Children, cur)
-	return top
+	return top, nil
 }
 
 // parseExprList parses a list of query expressions. It is the
