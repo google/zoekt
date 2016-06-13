@@ -35,7 +35,9 @@ func main() {
 	dest := flag.String("dest", "", "destination directory")
 	org := flag.String("org", "", "organization to mirror")
 	user := flag.String("user", "", "user to mirror")
-	token := flag.String("token", "", "file holding API token.")
+	token := flag.String("token",
+		filepath.Join(os.Getenv("HOME"), ".github-token"),
+		"file holding API token.")
 	forks := flag.Bool("forks", false, "also mirror forks.")
 	namePattern := flag.String("name", "", "only clone repos whose name contains the given substring.")
 	flag.Parse()
