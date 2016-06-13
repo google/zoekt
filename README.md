@@ -30,6 +30,28 @@ Starting the web interface
     $GOPATH/bin/zoekt-webserver -listen :6070
 
 
+SEARCH SERVICE
+==============
+
+Zoekt comes with a small service management program:
+
+    go install github.com/google/zoekt/cmd/zoekt-server
+
+    cat << EOF > config.json
+    [{"GithubUser": "username"},
+     {"GitilesURL": "https://gerrit.googlesource.com", Name: "zoekt" }
+    ]
+    EOF
+
+    $GOPATH/bin/zoekt-server -mirror_config config.json
+
+This will mirror all repos under 'github.com/username' as well as the
+'zoekt' repository. It will index the repositories and start the webserver interface.
+
+It takes care of fetching and indexing new data, restarting crashed
+webservers and cleaning up logfiles
+
+
 SYMBOL SEARCH
 =============
 

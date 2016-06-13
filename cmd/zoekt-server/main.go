@@ -126,6 +126,9 @@ func main() {
 	dataDir := flag.String("data_dir",
 		filepath.Join(os.Getenv("HOME"), "zoekt-serving"), "directory holding all data.")
 	port := flag.Int("port", 6070, "port on which to serve HTTP")
+	mirrorConfig := flag.String("mirror_config",
+		"", "JSON file holding mirror configuration.")
+	mirrorInterval := flag.Duration("mirror_duration", 24*time.Hour, "clone new repos at this frequency.")
 	flag.Parse()
 
 	if *dataDir == "" {
@@ -145,7 +148,14 @@ func main() {
 		}
 	}
 
+	config, err := readConfig(*mirrorConfig)
+	if err != nil {
+		log.Fatalf("readConfig(%s): %v", *mirrorConfig, err)
+	}
+	if len(config) > 0 {
+		go periodicMirror(repoDir, config, *mirrorInterval)
+	}
 	go refresh(repoDir, indexDir, *fetchInterval)
 	go deleteLogs(logDir, *maxLogAge)
-	runServer(logDir, indexDir, *port, *maxLogAge / 10)
+	runServer(logDir, indexDir, *port, *maxLogAge/10)
 }
