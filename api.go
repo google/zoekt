@@ -87,6 +87,9 @@ type Stats struct {
 	// Wall clock time for this search
 	Duration time.Duration
 
+	// Wall clock time for queued search.
+	Wait time.Duration
+
 	// Candidate files whose contents weren't examined because we
 	// gathered enough matches.
 	FilesSkipped int

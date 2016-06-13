@@ -255,7 +255,7 @@ var resultTemplate = template.Must(template.New("page").Funcs(funcmap).Parse(`<h
     {{.Stats.FilesConsidered}} docs considered, {{.Stats.FilesLoaded}} docs ({{HumanUnit .Stats.BytesLoaded}}B) loaded,
     {{.Stats.FilesSkipped}} docs skipped): for
   <pre style="background: #ffc;">{{.Query}} with options {{.SearchOptions}}</pre>
-  in {{.Stats.Duration}}
+  in {{.Stats.Duration}} (queued: {{.Stats.Wait}})
   <p>
   {{range .FileMatches}}
     {{if .URL}}<a href="{{.URL}}">{{end}}

@@ -19,8 +19,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
-	"sync"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -33,8 +33,14 @@ type searchShard struct {
 }
 
 type shardedSearcher struct {
-	dir    string
-	mu     sync.Mutex
+	dir string
+
+	// Limit the number of parallel queries. Since searching is
+	// CPU bound, we can't do better than #CPU queries in
+	// parallel.  If we do so, we just create more memory
+	// pressure.
+	throttle chan struct{}
+
 	shards map[string]*searchShard
 	quit   chan struct{}
 }
@@ -85,7 +91,7 @@ func (s *shardedSearcher) scan() error {
 		ts[key] = fi.ModTime()
 	}
 
-	s.mu.Lock()
+	s.lock()
 	var toLoad []string
 	for k, mtime := range ts {
 		if s.shards[k] == nil || s.shards[k].mtime != mtime {
@@ -100,7 +106,7 @@ func (s *shardedSearcher) scan() error {
 			toDrop = append(toDrop, k)
 		}
 	}
-	s.mu.Unlock()
+	s.unlock()
 
 	for _, t := range toDrop {
 		log.Printf("unloading: %s", t)
@@ -119,9 +125,25 @@ func (s *shardedSearcher) scan() error {
 	return nil
 }
 
+func (s *shardedSearcher) lock() {
+	n := cap(s.throttle)
+	for n > 0 {
+		s.throttle <- struct{}{}
+		n--
+	}
+}
+
+func (s *shardedSearcher) unlock() {
+	n := cap(s.throttle)
+	for n > 0 {
+		<-s.throttle
+		n--
+	}
+}
+
 func (s *shardedSearcher) replace(key string, shard *searchShard) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.lock()
+	defer s.unlock()
 	old := s.shards[key]
 	if old != nil {
 		old.Close()
@@ -164,9 +186,10 @@ func (s *shardedSearcher) watch() error {
 // shards corresponding to a glob into memory.
 func NewShardedSearcher(dir string) (Searcher, error) {
 	ss := shardedSearcher{
-		dir:    dir,
-		shards: make(map[string]*searchShard),
-		quit:   make(chan struct{}, 1),
+		dir:      dir,
+		shards:   make(map[string]*searchShard),
+		quit:     make(chan struct{}, 1),
+		throttle: make(chan struct{}, runtime.NumCPU()),
 	}
 
 	if err := ss.scan(); err != nil {
@@ -180,15 +203,11 @@ func NewShardedSearcher(dir string) (Searcher, error) {
 	return &ss, nil
 }
 
+// Close closes references to open files. It may be called only once.
 func (ss *shardedSearcher) Close() {
-	if ss.quit == nil {
-		return
-	}
-
 	close(ss.quit)
-	ss.quit = nil
-	ss.mu.Lock()
-	defer ss.mu.Unlock()
+	ss.lock()
+	defer ss.unlock()
 	for _, s := range ss.shards {
 		s.Close()
 	}
@@ -213,9 +232,18 @@ func (ss *shardedSearcher) Search(pat query.Q, opts *SearchOptions) (*SearchResu
 		err error
 	}
 
+	aggregate := SearchResult{
+		RepoURLs: map[string]string{},
+	}
+
 	// This critical section is large, but we don't want to deal with
 	// searches on a shards that have just been closed.
-	ss.mu.Lock()
+	ss.throttle <- struct{}{}
+	aggregate.Wait = time.Now().Sub(start)
+	start = time.Now()
+
+	// TODO - allow for canceling the query.
+
 	shardCount := len(ss.shards)
 	all := make(chan res, shardCount)
 	for _, s := range ss.shards {
@@ -224,11 +252,8 @@ func (ss *shardedSearcher) Search(pat query.Q, opts *SearchOptions) (*SearchResu
 			all <- res{ms, err}
 		}(s)
 	}
-	ss.mu.Unlock()
+	<-ss.throttle
 
-	aggregate := SearchResult{
-		RepoURLs: map[string]string{},
-	}
 	for i := 0; i < shardCount; i++ {
 		r := <-all
 		if r.err != nil {
@@ -251,7 +276,7 @@ func (ss *shardedSearcher) List(r query.Q) (*RepoList, error) {
 		err error
 	}
 
-	ss.mu.Lock()
+	ss.throttle <- struct{}{}
 	shardCount := len(ss.shards)
 	all := make(chan res, shardCount)
 	for _, s := range ss.shards {
@@ -260,7 +285,7 @@ func (ss *shardedSearcher) List(r query.Q) (*RepoList, error) {
 			all <- res{ms, err}
 		}(s)
 	}
-	ss.mu.Unlock()
+	<-ss.throttle
 
 	uniq := map[string]struct{}{}
 	for i := 0; i < shardCount; i++ {
