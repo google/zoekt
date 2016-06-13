@@ -522,7 +522,7 @@ func divertLogs(dir string, interval time.Duration) {
 	t := time.NewTicker(interval)
 	var last *os.File
 	for {
-		nm := filepath.Join(dir, fmt.Sprintf("zoekt-webserver.%d.%s.log", os.Getpid(), time.Now().Format(logFormat)))
+		nm := filepath.Join(dir, fmt.Sprintf("zoekt-webserver.%s.%d.log", time.Now().Format(logFormat), os.Getpid()))
 		fmt.Fprintf(os.Stderr, "writing logs to %s\n", nm)
 
 		f, err := os.Create(nm)
