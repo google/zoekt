@@ -106,6 +106,19 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 		branchNames:    map[uint]string{},
 		branchIDs:      map[string]uint{},
 	}
+	blob, err := d.readSectionBlob(toc.unaryData)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := json.Unmarshal(blob, &d.unaryData); err != nil {
+		return nil, err
+	}
+
+	if d.unaryData.IndexFormatVersion != IndexFormatVersion {
+		return nil, fmt.Errorf("file is v%d, want v%d", d.unaryData.IndexFormatVersion, IndexFormatVersion)
+	}
+
 	d.caseBitsIndex = toc.fileContents.caseBits.absoluteIndex()
 	d.boundaries = toc.fileContents.content.absoluteIndex()
 	d.newlinesIndex = toc.newlines.absoluteIndex()
@@ -143,15 +156,6 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 
 	d.fileNameCaseBitsIndex = toc.fileNames.caseBits.relativeIndex()
 	d.fileNameIndex = toc.fileNames.content.relativeIndex()
-
-	blob, err := d.readSectionBlob(toc.unaryData)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := json.Unmarshal(blob, &d.unaryData); err != nil {
-		return nil, err
-	}
 
 	nameNgramText, err := d.readSectionBlob(toc.nameNgramText)
 	if err != nil {

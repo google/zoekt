@@ -233,7 +233,7 @@ func shardName(dir string, repoDir string, shardNum int) (string, error) {
 	}
 
 	return filepath.Join(dir,
-		fmt.Sprintf("%s.%05d.zoekt", strings.Replace(abs, "/", "_", -1), shardNum)), nil
+		fmt.Sprintf("%s_v%d.%05d.zoekt", strings.Replace(abs, "/", "_", -1), zoekt.IndexFormatVersion, shardNum)), nil
 }
 
 func writeShard(fn string, b *zoekt.IndexBuilder) error {

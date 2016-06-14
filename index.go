@@ -56,8 +56,9 @@ type indexData struct {
 }
 
 type indexUnaryData struct {
-	RepoName string
-	RepoURL  string
+	RepoName           string
+	RepoURL            string
+	IndexFormatVersion int
 }
 
 func (d *indexData) memoryUse() int {

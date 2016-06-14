@@ -22,6 +22,10 @@ import (
 	"sort"
 )
 
+// FormatVersion is a version number. It is increased every time the
+// on-disk index format is changed.
+const IndexFormatVersion = 1
+
 var _ = log.Println
 
 type indexTOC struct {
@@ -145,8 +149,9 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 	toc.branchNames.end(w)
 
 	unaryData := indexUnaryData{
-		RepoName: b.repoName,
-		RepoURL:  b.repoURL,
+		RepoName:           b.repoName,
+		RepoURL:            b.repoURL,
+		IndexFormatVersion: IndexFormatVersion,
 	}
 
 	blob, err := json.Marshal(&unaryData)
