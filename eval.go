@@ -481,7 +481,7 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*substrMatchTree]struct{}) (m
 func (d *indexData) simplify(in query.Q) query.Q {
 	eval := query.Map(in, func(q query.Q) query.Q {
 		if r, ok := q.(*query.Repo); ok {
-			return &query.Const{strings.Contains(d.repoName, r.Pattern)}
+			return &query.Const{strings.Contains(d.unaryData.RepoName, r.Pattern)}
 		}
 		return q
 	})
@@ -623,7 +623,7 @@ nextFileMatch:
 		}
 
 		fileMatch := FileMatch{
-			Repo: d.repoName,
+			Repo: d.unaryData.RepoName,
 			Name: string(d.fileName(nextDoc)),
 			// Maintain ordering of input files. This
 			// strictly dominates the in-file ordering of
@@ -669,7 +669,7 @@ nextFileMatch:
 	}
 	sortFilesByScore(res.Files)
 	res.RepoURLs = map[string]string{
-		d.repoName: d.repoURL,
+		d.unaryData.RepoName: d.unaryData.RepoURL,
 	}
 	return &res, nil
 }
@@ -793,7 +793,7 @@ func (d *indexData) List(q query.Q) (*RepoList, error) {
 
 	l := &RepoList{}
 	if c.Value {
-		l.Repos = append(l.Repos, d.repoName)
+		l.Repos = append(l.Repos, d.unaryData.RepoName)
 	}
 	return l, nil
 }

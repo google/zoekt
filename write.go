@@ -16,6 +16,7 @@ package zoekt
 
 import (
 	"bufio"
+	"encoding/json"
 	"io"
 	"log"
 	"sort"
@@ -36,8 +37,7 @@ type indexTOC struct {
 
 	nameNgramText simpleSection
 	namePostings  compoundSection
-	repoName      simpleSection
-	repoURL       simpleSection
+	unaryData     simpleSection
 }
 
 func (t *indexTOC) sections() []section {
@@ -52,8 +52,7 @@ func (t *indexTOC) sections() []section {
 		&t.namePostings,
 		&t.branchMasks,
 		&t.branchNames,
-		&t.repoName,
-		&t.repoURL,
+		&t.unaryData,
 	}
 }
 
@@ -145,13 +144,19 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 	}
 	toc.branchNames.end(w)
 
-	toc.repoName.start(w)
-	w.Write([]byte(b.repoName))
-	toc.repoName.end(w)
+	unaryData := indexUnaryData{
+		RepoName: b.repoName,
+		RepoURL:  b.repoURL,
+	}
 
-	toc.repoURL.start(w)
-	w.Write([]byte(b.repoURL))
-	toc.repoURL.end(w)
+	blob, err := json.Marshal(&unaryData)
+	if err != nil {
+		return err
+	}
+
+	toc.unaryData.start(w)
+	w.Write(blob)
+	toc.unaryData.end(w)
 
 	var tocSection simpleSection
 

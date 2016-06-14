@@ -16,6 +16,7 @@ package zoekt
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"log"
 )
@@ -143,16 +144,14 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 	d.fileNameCaseBitsIndex = toc.fileNames.caseBits.relativeIndex()
 	d.fileNameIndex = toc.fileNames.content.relativeIndex()
 
-	blob, err := d.readSectionBlob(toc.repoName)
+	blob, err := d.readSectionBlob(toc.unaryData)
 	if err != nil {
 		return nil, err
 	}
-	d.repoName = string(blob)
-	blob, err = d.readSectionBlob(toc.repoURL)
-	if err != nil {
+
+	if err := json.Unmarshal(blob, &d.unaryData); err != nil {
 		return nil, err
 	}
-	d.repoURL = string(blob)
 
 	nameNgramText, err := d.readSectionBlob(toc.nameNgramText)
 	if err != nil {

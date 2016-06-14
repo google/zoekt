@@ -52,8 +52,12 @@ type indexData struct {
 	branchNames     map[uint]string
 	branchIDs       map[string]uint
 
-	repoName string
-	repoURL  string
+	unaryData indexUnaryData
+}
+
+type indexUnaryData struct {
+	RepoName string
+	RepoURL  string
 }
 
 func (d *indexData) memoryUse() int {
@@ -75,7 +79,7 @@ func (d *indexData) Stats() (*RepoStats, error) {
 	last := d.boundaries[len(d.boundaries)-1]
 	lastFN := d.fileNameIndex[len(d.fileNameIndex)-1]
 	return &RepoStats{
-		Repos:        []string{d.repoName},
+		Repos:        []string{d.unaryData.RepoName},
 		IndexBytes:   int64(d.memoryUse()),
 		ContentBytes: int64(int(last) + int(lastFN)),
 		Documents:    len(d.newlinesIndex) - 1,
