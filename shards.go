@@ -23,6 +23,8 @@ import (
 	"sort"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"github.com/fsnotify/fsnotify"
 	"github.com/google/zoekt/query"
 )
@@ -225,7 +227,7 @@ func (ss *shardedSearcher) Stats() (*RepoStats, error) {
 	return &r, nil
 }
 
-func (ss *shardedSearcher) Search(pat query.Q, opts *SearchOptions) (*SearchResult, error) {
+func (ss *shardedSearcher) Search(ctx context.Context, pat query.Q, opts *SearchOptions) (*SearchResult, error) {
 	start := time.Now()
 	type res struct {
 		sr  *SearchResult
@@ -246,9 +248,10 @@ func (ss *shardedSearcher) Search(pat query.Q, opts *SearchOptions) (*SearchResu
 
 	shardCount := len(ss.shards)
 	all := make(chan res, shardCount)
+	childCtx, cancel := context.WithCancel(ctx)
 	for _, s := range ss.shards {
 		go func(s Searcher) {
-			ms, err := s.Search(pat, opts)
+			ms, err := s.Search(childCtx, pat, opts)
 			all <- res{ms, err}
 		}(s)
 	}
@@ -264,13 +267,19 @@ func (ss *shardedSearcher) Search(pat query.Q, opts *SearchOptions) (*SearchResu
 		for k, v := range r.sr.RepoURLs {
 			aggregate.RepoURLs[k] = v
 		}
+
+		if cancel != nil && aggregate.Stats.MatchCount > opts.TotalMaxMatchCount {
+			cancel()
+			cancel = nil
+		}
 	}
+
 	sortFilesByScore(aggregate.Files)
 	aggregate.Duration = time.Now().Sub(start)
 	return &aggregate, nil
 }
 
-func (ss *shardedSearcher) List(r query.Q) (*RepoList, error) {
+func (ss *shardedSearcher) List(ctx context.Context, r query.Q) (*RepoList, error) {
 	type res struct {
 		rl  *RepoList
 		err error
@@ -281,7 +290,7 @@ func (ss *shardedSearcher) List(r query.Q) (*RepoList, error) {
 	all := make(chan res, shardCount)
 	for _, s := range ss.shards {
 		go func(s Searcher) {
-			ms, err := s.List(r)
+			ms, err := s.List(ctx, r)
 			all <- res{ms, err}
 		}(s)
 	}

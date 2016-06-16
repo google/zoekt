@@ -28,6 +28,8 @@ import (
 	"sort"
 	"strings"
 
+	"golang.org/x/net/context"
+
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
 	"github.com/google/zoekt/query"
@@ -122,7 +124,7 @@ func compare(dir, patfile string, caseSensitive bool) error {
 
 		// search engine results
 		var opts zoekt.SearchOptions
-		res, err := searcher.Search(q, &opts)
+		res, err := searcher.Search(context.Background(), q, &opts)
 		if err != nil {
 			return err
 		}

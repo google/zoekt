@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"github.com/google/zoekt/query"
 )
 
@@ -119,11 +121,11 @@ type RepoList struct {
 }
 
 type Searcher interface {
-	Search(q query.Q, opts *SearchOptions) (*SearchResult, error)
+	Search(ctx context.Context, q query.Q, opts *SearchOptions) (*SearchResult, error)
 
 	// List lists repositories. The query `q` can only contain
 	// query.Repo atoms.
-	List(q query.Q) (*RepoList, error)
+	List(ctx context.Context, q query.Q) (*RepoList, error)
 	Stats() (*RepoStats, error)
 	Close()
 }
@@ -148,11 +150,18 @@ type SearchOptions struct {
 
 	// Maximum number of matches: skip all processing an index
 	// shard after we found this many non-overlapping matches.
-	MaxMatchCount int
+	ShardMaxMatchCount int
+
+	// Maximum number of matches: stop looking for more matches
+	// once we have this many matches across shards.
+	TotalMaxMatchCount int
 
 	// Maximum number of important matches: skip processing
 	// shard after we found this many important matches.
-	MaxImportantMatch int
+	ShardMaxImportantMatch int
+
+	// Maximum number of important matches across shards.
+	TotalMaxImportantMatch int
 }
 
 func (s *SearchOptions) String() string {

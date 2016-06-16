@@ -28,6 +28,8 @@ import (
 	"strconv"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
 	"github.com/google/zoekt/query"
@@ -301,7 +303,7 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 	}
 
 	sOpts := zoekt.SearchOptions{
-		MaxImportantMatch: num / 10,
+		ShardMaxImportantMatch: num / 10,
 	}
 
 	repoFound := false
@@ -316,11 +318,12 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 		// assume the user doesn't really know what they are
 		// looking for, so we restrict the number of matches
 		// to avoid overwhelming the search engine.
-		sOpts.MaxMatchCount = num * 10
+		sOpts.ShardMaxMatchCount = num * 10
 	}
 	sOpts.SetDefaults()
 
-	result, err := s.searcher.Search(q, &sOpts)
+	ctx := context.Background()
+	result, err := s.searcher.Search(ctx, q, &sOpts)
 	if err != nil {
 		return err
 	}
@@ -426,7 +429,8 @@ var repoListTemplate = template.Must(template.New("repolist").Funcs(funcmap).Par
 `))
 
 func (s *httpServer) serveListReposErr(q query.Q, qStr string, w http.ResponseWriter, r *http.Request) error {
-	repos, err := s.searcher.List(q)
+	ctx := context.Background()
+	repos, err := s.searcher.List(ctx, q)
 	if err != nil {
 		return err
 	}
@@ -485,7 +489,8 @@ func (s *httpServer) servePrintErr(w http.ResponseWriter, r *http.Request) error
 		Whole: true,
 	}
 
-	result, err := s.searcher.Search(q, &sOpts)
+	ctx := context.Background()
+	result, err := s.searcher.Search(ctx, q, &sOpts)
 	if err != nil {
 		return err
 	}

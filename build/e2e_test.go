@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/query"
 )
@@ -71,7 +73,8 @@ func TestBasic(t *testing.T) {
 	}
 
 	var sOpts zoekt.SearchOptions
-	result, err := ss.Search(q, &sOpts)
+	ctx := context.Background()
+	result, err := ss.Search(ctx, q, &sOpts)
 	if err != nil {
 		t.Fatalf("Parse(111): %v", err)
 	}
@@ -110,7 +113,8 @@ func TestUpdate(t *testing.T) {
 		t.Fatalf("NewShardedSearcher(%s): %v", dir, err)
 	}
 
-	repos, err := ss.List(&query.Repo{Pattern: "repo"})
+	ctx := context.Background()
+	repos, err := ss.List(ctx, &query.Repo{Pattern: "repo"})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
@@ -139,7 +143,8 @@ func TestUpdate(t *testing.T) {
 	// this is the best we can do.
 	time.Sleep(100 * time.Millisecond)
 
-	if repos, err = ss.List(&query.Repo{Pattern: "repo"}); err != nil {
+	ctx = context.Background()
+	if repos, err = ss.List(ctx, &query.Repo{Pattern: "repo"}); err != nil {
 		t.Fatalf("List: %v", err)
 	} else if len(repos.Repos) != 2 {
 		t.Errorf("List(repo): got %v, want 2 repos", repos.Repos)
@@ -155,7 +160,8 @@ func TestUpdate(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	if repos, err = ss.List(&query.Repo{Pattern: "repo"}); err != nil {
+	ctx = context.Background()
+	if repos, err = ss.List(ctx, &query.Repo{Pattern: "repo"}); err != nil {
 		t.Fatalf("List: %v", err)
 	} else if len(repos.Repos) != 1 {
 		t.Errorf("List(repo): got %v, want 1 repo", repos.Repos)

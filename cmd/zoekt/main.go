@@ -22,6 +22,8 @@ import (
 	"path/filepath"
 	"runtime/pprof"
 
+	"golang.org/x/net/context"
+
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/query"
 )
@@ -72,7 +74,7 @@ func main() {
 	}
 
 	var sOpts zoekt.SearchOptions
-	sres, err := searcher.Search(query, &sOpts)
+	sres, err := searcher.Search(context.Background(), query, &sOpts)
 	if *cpuProfile != "" {
 		// If profiling, do it another time so we measure with
 		// warm caches.
@@ -84,7 +86,7 @@ func main() {
 		log.Println("Displaying matches...")
 		pprof.StartCPUProfile(f)
 		for i := 0; i < 10; i++ {
-			sres, err = searcher.Search(query, &sOpts)
+			sres, err = searcher.Search(context.Background(), query, &sOpts)
 		}
 		pprof.StopCPUProfile()
 	}

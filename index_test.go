@@ -22,6 +22,8 @@ import (
 	"regexp/syntax"
 	"testing"
 
+	"golang.org/x/net/context"
+
 	"github.com/google/zoekt/query"
 )
 
@@ -115,7 +117,7 @@ func searchForTest(t *testing.T, b *IndexBuilder, q query.Q, o ...SearchOptions)
 	if len(o) > 0 {
 		opts = o[0]
 	}
-	res, err := searcher.Search(q, &opts)
+	res, err := searcher.Search(context.Background(), q, &opts)
 	if err != nil {
 		t.Fatalf("Search(%s): %v", q, err)
 	}
@@ -789,7 +791,7 @@ func TestListRepos(t *testing.T) {
 
 	searcher := searcherForTest(t, b)
 	q := &query.Repo{Pattern: "epo"}
-	res, err := searcher.List(q)
+	res, err := searcher.List(context.Background(), q)
 	if err != nil {
 		t.Fatalf("List(%v): %v", q, err)
 	}
@@ -797,7 +799,7 @@ func TestListRepos(t *testing.T) {
 		t.Fatalf("got %v, want 1 matches", res)
 	}
 	q = &query.Repo{Pattern: "bla"}
-	res, err = searcher.List(q)
+	res, err = searcher.List(context.Background(), q)
 	if err != nil {
 		t.Fatalf("List(%v): %v", q, err)
 	}
@@ -857,7 +859,7 @@ func TestImportantCutoff(t *testing.T) {
 		Content: content,
 	})
 	opts := SearchOptions{
-		MaxImportantMatch: 1,
+		ShardMaxImportantMatch: 1,
 	}
 
 	sres := searchForTest(t, b, &query.Substring{Pattern: "bla"}, opts)

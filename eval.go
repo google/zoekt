@@ -21,6 +21,8 @@ import (
 	"sort"
 	"strings"
 
+	"golang.org/x/net/context"
+
 	"github.com/google/zoekt/query"
 )
 
@@ -489,17 +491,23 @@ func (d *indexData) simplify(in query.Q) query.Q {
 }
 
 func (o *SearchOptions) SetDefaults() {
-	if o.MaxMatchCount == 0 {
+	if o.ShardMaxMatchCount == 0 {
 		// We cap the total number of matches, so overly broad
 		// searches don't crash the machine.
-		o.MaxMatchCount = 100000
+		o.ShardMaxMatchCount = 100000
 	}
-	if o.MaxImportantMatch == 0 {
-		o.MaxImportantMatch = 10
+	if o.TotalMaxMatchCount == 0 {
+		o.TotalMaxMatchCount = 10 * o.ShardMaxMatchCount
+	}
+	if o.ShardMaxImportantMatch == 0 {
+		o.ShardMaxImportantMatch = 10
+	}
+	if o.TotalMaxImportantMatch == 0 {
+		o.TotalMaxImportantMatch = 10 * o.ShardMaxImportantMatch
 	}
 }
 
-func (d *indexData) Search(q query.Q, opts *SearchOptions) (*SearchResult, error) {
+func (d *indexData) Search(ctx context.Context, q query.Q, opts *SearchOptions) (*SearchResult, error) {
 	copyOpts := *opts
 	opts = &copyOpts
 	opts.SetDefaults()
@@ -546,8 +554,18 @@ func (d *indexData) Search(q query.Q, opts *SearchOptions) (*SearchResult, error
 	totalAtomCount := 0
 	collectAtoms(mt, func(t matchTree) { totalAtomCount++ })
 
+	canceled := false
+
 nextFileMatch:
 	for {
+		if !canceled {
+			select {
+			case <-ctx.Done():
+				canceled = true
+			default:
+			}
+		}
+
 		var nextDoc uint32
 		nextDoc = maxUInt32
 		for _, st := range positiveAtoms {
@@ -561,8 +579,8 @@ nextFileMatch:
 		}
 		res.Stats.FilesConsidered++
 		mt.prepare(nextDoc)
-		if res.Stats.MatchCount >= opts.MaxMatchCount ||
-			importantMatchCount >= opts.MaxImportantMatch {
+		if canceled || res.Stats.MatchCount >= opts.ShardMaxMatchCount ||
+			importantMatchCount >= opts.ShardMaxImportantMatch {
 			res.Stats.FilesSkipped++
 			continue
 		}
@@ -783,7 +801,7 @@ func (d *indexData) gatherBranches(docID uint32, mt matchTree, known map[matchTr
 	return branches
 }
 
-func (d *indexData) List(q query.Q) (*RepoList, error) {
+func (d *indexData) List(ctx context.Context, q query.Q) (*RepoList, error) {
 	q = d.simplify(q)
 	c, ok := q.(*query.Const)
 
