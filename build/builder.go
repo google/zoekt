@@ -81,6 +81,13 @@ type Builder struct {
 // SetDefaults sets reasonable default options.
 func (o *Options) SetDefaults() {
 	if o.CTags == "" {
+		ctags, err := exec.LookPath("ctags-universal")
+		if err == nil {
+			o.CTags = ctags
+		}
+	}
+
+	if o.CTags == "" {
 		ctags, err := exec.LookPath("ctags-exuberant")
 		if err == nil {
 			o.CTags = ctags
