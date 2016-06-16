@@ -65,7 +65,9 @@ func refresh(repoDir, indexDir string, fetchInterval time.Duration) {
 			loggedRun(cmd)
 		}
 
-		cmd := exec.Command("zoekt-git-index", "-index", indexDir, "-incremental", "-recursive", repoDir)
+		cmd := exec.Command("zoekt-git-index",
+			"-parallelism", "1",
+			"-index", indexDir, "-incremental", "-recursive", repoDir)
 		loggedRun(cmd)
 		<-t.C
 	}
