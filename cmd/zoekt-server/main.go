@@ -148,12 +148,11 @@ func main() {
 		}
 	}
 
-	config, err := readConfig(*mirrorConfig)
+	_, err := readConfig(*mirrorConfig)
 	if err != nil {
 		log.Fatalf("readConfig(%s): %v", *mirrorConfig, err)
-	}
-	if len(config) > 0 {
-		go periodicMirror(repoDir, config, *mirrorInterval)
+	} else {
+		go periodicMirror(repoDir, *mirrorConfig, *mirrorInterval)
 	}
 	go refresh(repoDir, indexDir, *fetchInterval)
 	go deleteLogs(logDir, *maxLogAge)

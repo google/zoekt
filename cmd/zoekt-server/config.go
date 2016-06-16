@@ -17,6 +17,7 @@ package main
 import (
 	"encoding/json"
 	"io/ioutil"
+	"log"
 	"os/exec"
 	"time"
 )
@@ -45,10 +46,21 @@ func readConfig(filename string) ([]configEntry, error) {
 	return result, nil
 }
 
-func periodicMirror(repoDir string, cfg []configEntry, interval time.Duration) {
+func periodicMirror(repoDir string, cfgFile string, interval time.Duration) {
 	t := time.NewTicker(interval)
-	for {
-		for _, c := range cfg {
+
+	var lastCfg []configEntry
+	for ; true; <-t.C {
+		// We reread the file so we can pickup changes without
+		// restarting the service management.
+		cfg, err := readConfig(cfgFile)
+		if err != nil {
+			log.Printf("readConfig(%s): %v", cfgFile, err)
+			continue
+		} else {
+			lastCfg = cfg
+		}
+		for _, c := range lastCfg {
 			if c.GithubUser != "" {
 				cmd := exec.Command("zoekt-mirror-github", "-user", c.GithubUser, "-name", c.Name, "-dest", repoDir)
 				loggedRun(cmd)
@@ -57,7 +69,5 @@ func periodicMirror(repoDir string, cfg []configEntry, interval time.Duration) {
 				loggedRun(cmd)
 			}
 		}
-
-		<-t.C
 	}
 }
