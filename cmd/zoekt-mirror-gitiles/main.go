@@ -26,12 +26,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
+	"regexp"
 )
 
 func main() {
 	dest := flag.String("dest", "", "destination directory")
-	namePattern := flag.String("name", "", "only clone repos whose name contains the given substring.")
+	namePattern := flag.String("name", "", "only clone repos whose name matches the regexp.")
 	flag.Parse()
 
 	if len(flag.Args()) < 1 {
@@ -53,9 +53,14 @@ func main() {
 
 	repos, err := getRepos(gitilesURL)
 	if *namePattern != "" {
+		re, err := regexp.Compile(*namePattern)
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		trimmed := map[string]string{}
 		for k, v := range repos {
-			if strings.Contains(k, *namePattern) {
+			if re.FindString(k) != "" {
 				trimmed[k] = v
 			}
 		}

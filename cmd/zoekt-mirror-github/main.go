@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/google/go-github/github"
@@ -39,7 +40,7 @@ func main() {
 		filepath.Join(os.Getenv("HOME"), ".github-token"),
 		"file holding API token.")
 	forks := flag.Bool("forks", false, "also mirror forks.")
-	namePattern := flag.String("name", "", "only clone repos whose name contains the given substring.")
+	namePattern := flag.String("name", "", "only clone repos whose name matches the given regexp.")
 	flag.Parse()
 
 	if *dest == "" {
@@ -90,9 +91,13 @@ func main() {
 	}
 
 	if *namePattern != "" {
+		re, err := regexp.Compile(*namePattern)
+		if err != nil {
+			log.Fatal(err)
+		}
 		trimmed := repos[:0]
 		for _, r := range repos {
-			if r.Name != nil && strings.Contains(*r.Name, *namePattern) {
+			if r.Name != nil && re.FindString(*r.Name) != "" {
 				trimmed = append(trimmed, r)
 			}
 		}
