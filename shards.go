@@ -177,7 +177,7 @@ func (s *shardedSearcher) watch() error {
 				}
 			case <-s.quit:
 				watcher.Close()
-				break
+				return
 			}
 		}
 	}()
