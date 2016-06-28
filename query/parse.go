@@ -105,7 +105,6 @@ done:
 			}
 
 			left = left[n:]
-			break
 		case isSpace(c):
 			break done
 		default:
