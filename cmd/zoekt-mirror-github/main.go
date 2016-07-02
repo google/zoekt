@@ -69,7 +69,7 @@ func main() {
 		client = github.NewClient(tc)
 	}
 
-	var repos []github.Repository
+	var repos []*github.Repository
 	var err error
 	if *org != "" {
 		repos, err = getOrgRepos(client, *org)
@@ -109,8 +109,8 @@ func main() {
 	}
 }
 
-func getOrgRepos(client *github.Client, org string) ([]github.Repository, error) {
-	var allRepos []github.Repository
+func getOrgRepos(client *github.Client, org string) ([]*github.Repository, error) {
+	var allRepos []*github.Repository
 	opt := &github.RepositoryListByOrgOptions{}
 	for {
 		repos, resp, err := client.Repositories.ListByOrg(org, opt)
@@ -135,8 +135,8 @@ func getOrgRepos(client *github.Client, org string) ([]github.Repository, error)
 	return allRepos, nil
 }
 
-func getUserRepos(client *github.Client, user string) ([]github.Repository, error) {
-	var allRepos []github.Repository
+func getUserRepos(client *github.Client, user string) ([]*github.Repository, error) {
+	var allRepos []*github.Repository
 	opt := &github.RepositoryListOptions{}
 	for {
 		repos, resp, err := client.Repositories.List(user, opt)
@@ -162,7 +162,7 @@ func getUserRepos(client *github.Client, user string) ([]github.Repository, erro
 	return allRepos, nil
 }
 
-func cloneRepos(destDir string, repos []github.Repository) error {
+func cloneRepos(destDir string, repos []*github.Repository) error {
 	for _, r := range repos {
 		parent := filepath.Join(destDir, filepath.Dir(*r.FullName))
 		if err := os.MkdirAll(parent, 0755); err != nil {
