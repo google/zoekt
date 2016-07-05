@@ -27,11 +27,19 @@ import (
 )
 
 type fileAggregator struct {
-	sizeMax int64
-	sink    chan string
+	ignoreDirs map[string]struct{}
+	sizeMax    int64
+	sink       chan string
 }
 
 func (a *fileAggregator) add(path string, info os.FileInfo, err error) error {
+	if info.IsDir() {
+		base := filepath.Base(path)
+		if _, ok := a.ignoreDirs[base]; ok {
+			return filepath.SkipDir
+		}
+	}
+
 	sz := info.Size()
 	if sz > a.sizeMax || !info.Mode().IsRegular() {
 		return nil
@@ -47,6 +55,7 @@ func main() {
 	var shardLimit = flag.Int("shard_limit", 100<<20, "maximum corpus size for a shard")
 	var parallelism = flag.Int("parallelism", 4, "maximum number of parallel indexing processes.")
 
+	ignoreDirs := flag.String("ignore_dirs", ".git,.hg,.svn", "comma separated list of directories to ignore.")
 	indexDir := flag.String("index", build.DefaultDir, "directory for search indices")
 	flag.Parse()
 
@@ -67,14 +76,25 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
+	ignoreDirMap := map[string]struct{}{}
+	if *ignoreDirs != "" {
+		dirs := strings.Split(*ignoreDirs, ",")
+		for _, d := range dirs {
+			d = strings.TrimSpace(d)
+			if d != "" {
+				ignoreDirMap[d] = struct{}{}
+			}
+		}
+	}
+
 	for _, arg := range flag.Args() {
-		if err := indexArg(arg, opts); err != nil {
+		if err := indexArg(arg, opts, ignoreDirMap); err != nil {
 			log.Fatal(err)
 		}
 	}
 }
 
-func indexArg(arg string, opts build.Options) error {
+func indexArg(arg string, opts build.Options, ignore map[string]struct{}) error {
 	dir, err := filepath.Abs(filepath.Clean(arg))
 	if err != nil {
 		return err
@@ -88,8 +108,9 @@ func indexArg(arg string, opts build.Options) error {
 
 	comm := make(chan string, 100)
 	agg := fileAggregator{
-		sink:    comm,
-		sizeMax: int64(opts.SizeMax),
+		ignoreDirs: ignore,
+		sink:       comm,
+		sizeMax:    int64(opts.SizeMax),
 	}
 
 	go func() {
