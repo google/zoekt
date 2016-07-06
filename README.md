@@ -9,6 +9,10 @@ code. (Pronunciation: roughly as you would pronounce "zooked" in English)
 INSTRUCTIONS
 ============
 
+Downloading:
+
+    go get github.com/google/zoekt/
+
 Indexing:
 
     go install github.com/google/zoekt/cmd/zoekt-index
@@ -19,7 +23,7 @@ Searching
     go install github.com/google/zoekt/cmd/zoekt
     $GOPATH/bin/zoekt 'ngram f:READ'
 
-Indexing git repositories:
+Indexing git repositories (requires libgit2 + git2go):
 
     go install github.com/google/zoekt/cmd/zoekt-git-index
     $GOPATH/bin/zoekt-git-index -branches master,stable-1.4 -prefix origin/ .
@@ -46,7 +50,8 @@ Zoekt comes with a small service management program:
     $GOPATH/bin/zoekt-server -mirror_config config.json
 
 This will mirror all repos under 'github.com/username' as well as the
-'zoekt' repository. It will index the repositories and start the webserver interface.
+'zoekt' repository. It will index the repositories and start the
+webserver.
 
 It takes care of fetching and indexing new data, restarting crashed
 webservers and cleaning up logfiles
@@ -55,8 +60,10 @@ webservers and cleaning up logfiles
 SYMBOL SEARCH
 =============
 
-It is recommended to install exuberant or universal CTags. If
-available, it will be used to improve ranking.
+It is recommended to install CTags to improve ranking:
+
+   * [Universal ctags](https://github.com/universal-ctags/ctags) is more up to date, but not commonly packaged for distributions. It must be compiled from source.
+   * [Exuberant ctags](http://ctags.sourceforge.net/) is a languishing, but commonly available through Linux distributions. It has several known vulnerabilities.
 
 If you index untrusted code, it is strongly recommended to also
 install Bazel's sandbox, to avoid vulnerabilities of ctags opening up
