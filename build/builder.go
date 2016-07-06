@@ -56,6 +56,9 @@ type Options struct {
 	// RepoURL is the URL template for the repository.
 	RepoURL string
 
+	// RepoLineFragment is the URL fragment template for the line number.
+	RepoLineFragment string
+
 	// Path to exuberant ctags binary to run
 	CTags string
 
@@ -226,7 +229,7 @@ func (b *Builder) buildShard(todo []*zoekt.Document, nextShardNum int) error {
 
 	shardBuilder := zoekt.NewIndexBuilder()
 	shardBuilder.SetName(b.opts.RepoName)
-	shardBuilder.SetRepoURL(b.opts.RepoURL)
+	shardBuilder.SetRepoURL(b.opts.RepoURL, b.opts.RepoLineFragment)
 	for _, t := range todo {
 		shardBuilder.Add(*t)
 	}

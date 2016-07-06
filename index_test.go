@@ -669,12 +669,15 @@ func TestRepoURL(t *testing.T) {
 	content := []byte("blablabla")
 	b.AddFile("f1", content)
 	b.SetName("name")
-	b.SetRepoURL("URL")
+	b.SetRepoURL("URL", "fragment")
 	sres := searchForTest(t, b,
 		&query.Substring{Pattern: "bla"})
 
 	if sres.RepoURLs["name"] != "URL" {
 		t.Errorf("got URLs %v, want {name: URL}", sres.RepoURLs)
+	}
+	if sres.LineFragments["name"] != "fragment" {
+		t.Errorf("got URLs %v, want {name: URL}", sres.LineFragments)
 	}
 
 }

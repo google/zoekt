@@ -114,6 +114,10 @@ type SearchResult struct {
 
 	// RepoURLs holds a repo => template string map.
 	RepoURLs map[string]string
+
+	// FragmentNames holds a repo => template string map, for
+	// the line number fragment.
+	LineFragments map[string]string
 }
 
 type RepoList struct {

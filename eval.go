@@ -689,6 +689,9 @@ nextFileMatch:
 	res.RepoURLs = map[string]string{
 		d.unaryData.RepoName: d.unaryData.RepoURL,
 	}
+	res.LineFragments = map[string]string{
+		d.unaryData.RepoName: d.unaryData.RepoLineFragment,
+	}
 	return &res, nil
 }
 

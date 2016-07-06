@@ -235,7 +235,8 @@ func (ss *shardedSearcher) Search(ctx context.Context, pat query.Q, opts *Search
 	}
 
 	aggregate := SearchResult{
-		RepoURLs: map[string]string{},
+		RepoURLs:      map[string]string{},
+		LineFragments: map[string]string{},
 	}
 
 	// This critical section is large, but we don't want to deal with
@@ -266,6 +267,9 @@ func (ss *shardedSearcher) Search(ctx context.Context, pat query.Q, opts *Search
 		aggregate.Stats.Add(r.sr.Stats)
 		for k, v := range r.sr.RepoURLs {
 			aggregate.RepoURLs[k] = v
+		}
+		for k, v := range r.sr.LineFragments {
+			aggregate.LineFragments[k] = v
 		}
 
 		if cancel != nil && aggregate.Stats.MatchCount > opts.TotalMaxMatchCount {

@@ -58,6 +58,7 @@ type indexData struct {
 type indexUnaryData struct {
 	RepoName           string
 	RepoURL            string
+	RepoLineFragment   string
 	IndexFormatVersion int
 }
 

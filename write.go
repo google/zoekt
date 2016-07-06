@@ -151,6 +151,7 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 	unaryData := indexUnaryData{
 		RepoName:           b.repoName,
 		RepoURL:            b.repoURL,
+		RepoLineFragment:   b.repoLineFragment,
 		IndexFormatVersion: IndexFormatVersion,
 	}
 

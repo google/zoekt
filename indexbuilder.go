@@ -80,6 +80,9 @@ type IndexBuilder struct {
 
 	// The repository URL
 	repoURL string
+
+	// The URL fragment for line numbers.
+	repoLineFragment string
 }
 
 // ContentSize returns the number of content bytes so far ingested.
@@ -104,12 +107,15 @@ func (b *IndexBuilder) SetName(nm string) {
 
 // SetRepoURL sets the repository URL template for linking back to
 // files.
-func (b *IndexBuilder) SetRepoURL(url string) error {
-	_, err := template.New("url").Parse(url)
-	if err != nil {
+func (b *IndexBuilder) SetRepoURL(url, fragment string) error {
+	if _, err := template.New("url").Parse(url); err != nil {
+		return err
+	}
+	if _, err := template.New("fragment").Parse(fragment); err != nil {
 		return err
 	}
 	b.repoURL = url
+	b.repoLineFragment = fragment
 	return nil
 }
 

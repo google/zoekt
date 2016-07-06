@@ -97,38 +97,38 @@ func FindGitRepos(arg string) (map[string]string, error) {
 
 // GuessRepoURL guesses the URL template for a repo mirrored from a
 // well-known git hosting site.
-func GuessRepoURL(repoDir string) (string, error) {
+func GuessRepoURL(repoDir string) (string, string, error) {
 	base, err := git.NewConfig()
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	cfg, err := git.OpenOndisk(base, filepath.Join(repoDir, "config"))
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	remoteURL, err := cfg.LookupString("remote.origin.url")
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	if strings.Contains(remoteURL, "googlesource.com/") {
-		/// eg. https://gerrit.googlesource.com/gitiles/+/master/.buckversion
-		return remoteURL + "/+/{{.Branch}}/{{.Path}}", nil
-	} else if strings.Contains(remoteURL, "github.com/") {
-		parsed, err := url.Parse(remoteURL)
-		if err != nil {
-			return "", nil
-		}
+	parsed, err := url.Parse(remoteURL)
+	if err != nil {
+		return "", "", err
+	}
 
+	if strings.HasSuffix(parsed.Host, "googlesource.com") {
+		/// eg. https://gerrit.googlesource.com/gitiles/+/master/tools/run_dev.sh#20
+		return remoteURL + "/+/{{.Branch}}/{{.Path}}", "{{.LineNumber}}", nil
+	} else if parsed.Host == "github.com" {
 		// CloneURL from the JSON API has .git
 		parsed.Path = strings.TrimSuffix(parsed.Path, ".git")
 
-		// eg. https://github.com/hanwen/go-fuse/blob/notify/genversion.sh
-		return parsed.String() + "/blob/{{.Branch}}/{{.Path}}", nil
+		// eg. https://github.com/hanwen/go-fuse/blob/notify/genversion.sh#L10
+		return parsed.String() + "/blob/{{.Branch}}/{{.Path}}", "L{{.LineNumber}}", nil
 	}
 
-	return "", fmt.Errorf("scheme unknown for URL %s", remoteURL)
+	return "", "", fmt.Errorf("scheme unknown for URL %s", remoteURL)
 }
 
 // GetTree returns a tree object for the given reference.
@@ -157,11 +157,12 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 		return err
 	}
 
-	url, err := GuessRepoURL(opts.RepoDir)
+	url, fragment, err := GuessRepoURL(opts.RepoDir)
 	if err != nil {
 		log.Printf("guessRepoURL(%s): %s", opts.RepoDir, err)
 	} else {
 		opts.RepoURL = url
+		opts.RepoLineFragment = fragment
 	}
 
 	builder, err := build.NewBuilder(opts)

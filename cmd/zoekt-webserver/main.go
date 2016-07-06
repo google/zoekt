@@ -231,6 +231,7 @@ type MatchFragment struct {
 }
 
 type MatchData struct {
+	URL      string
 	FileName string
 	LineNum  int
 
@@ -265,7 +266,7 @@ var resultTemplate = template.Must(template.New("page").Funcs(funcmap).Parse(`<h
 
       <div style="background: #eef;">
     {{range .Matches}}
-        <pre>{{.LineNum}}: {{range .Fragments}}{{.Pre}}<b>{{.Match}}</b>{{.Post}}{{end}}</pre>
+        <pre>{{if .URL}}<a href="{{.URL}}">{{end}}{{.LineNum}}{{if .URL}}</a>{{end}}: {{range .Fragments}}{{.Pre}}<b>{{.Match}}</b>{{.Post}}{{end}}</pre>
     {{end}}
       </div>
   {{end}}
@@ -340,45 +341,83 @@ func (s *httpServer) serveSearchErr(w http.ResponseWriter, r *http.Request) erro
 		result.Files = result.Files[:num]
 	}
 
+	templateMap := map[string]*template.Template{}
+	fragmentMap := map[string]*template.Template{}
+	if !s.localPrint {
+		for repo, str := range result.RepoURLs {
+			tpl, err := template.New("url").Parse(str)
+			if err != nil {
+				log.Println("url template: %v", err)
+				tpl = nil
+			}
+			templateMap[repo] = tpl
+		}
+		for repo, str := range result.LineFragments {
+			tpl, err := template.New("lineFragment").Parse(str)
+			if err != nil {
+				log.Println("fragment template: %v", err)
+				tpl = nil
+			}
+			fragmentMap[repo] = tpl
+		}
+	}
+	getFragment := func(repo string, linenum int) string {
+		if tpl := fragmentMap[repo]; tpl != nil {
+			var buf bytes.Buffer
+			if err := tpl.Execute(&buf, map[string]string{
+				"LineNumber": strconv.Itoa(linenum),
+			}); err != nil {
+				log.Println("fragment template: %v", err)
+				return ""
+			}
+			return buf.String()
+		}
+		return ""
+	}
+	getURL := func(repo, filename string, branches []string) string {
+		if s.localPrint {
+			v := make(url.Values)
+			v.Add("r", repo)
+			v.Add("f", filename)
+			v.Add("q", queryStr)
+			if len(branches) > 0 {
+				v.Add("b", branches[0])
+			}
+			return "print?" + v.Encode()
+		}
+
+		if tpl := templateMap[repo]; tpl != nil {
+			var buf bytes.Buffer
+			b := ""
+			if len(branches) > 0 {
+				b = branches[0]
+			}
+			err := tpl.Execute(&buf, map[string]string{
+				"Branch": b,
+				"Path":   filename,
+			})
+			if err != nil {
+				log.Println("url template: %v", err)
+				return ""
+			}
+			return buf.String()
+		}
+		return ""
+	}
+
 	for _, f := range result.Files {
 		fMatch := FileMatchData{
 			FileName: f.Name,
 			Repo:     f.Repo,
 			Branches: f.Branches,
-		}
-
-		if s.localPrint {
-			v := make(url.Values)
-			v.Add("r", f.Repo)
-			v.Add("f", f.Name)
-			v.Add("q", queryStr)
-			if len(f.Branches) > 0 {
-				v.Add("b", f.Branches[0])
-			}
-			fMatch.URL = "print?" + v.Encode()
-		} else if len(f.Branches) > 0 {
-			urlTemplate := result.RepoURLs[f.Repo]
-			t, err := template.New("url").Parse(urlTemplate)
-			if err != nil {
-				log.Println("url template: %v", err)
-			} else {
-				var buf bytes.Buffer
-				err := t.Execute(&buf, map[string]string{
-					"Branch": f.Branches[0],
-					"Path":   f.Name,
-				})
-				if err != nil {
-					log.Println("url template: %v", err)
-				} else {
-					fMatch.URL = buf.String()
-				}
-			}
+			URL:      getURL(f.Repo, f.Name, f.Branches),
 		}
 
 		for _, m := range f.Matches {
 			md := MatchData{
 				FileName: f.Name,
 				LineNum:  m.LineNum,
+				URL:      fMatch.URL + "#" + getFragment(f.Repo, m.LineNum),
 			}
 
 			lastEnd := 0
