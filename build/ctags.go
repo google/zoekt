@@ -31,7 +31,7 @@ func runCTags(bin string, sandboxBin string, inputs map[string][]byte) ([]*ctags
 	if len(inputs) == 0 {
 		return nil, nil
 	}
-	dir, err := ioutil.TempDir("", "")
+	dir, err := ioutil.TempDir("", "ctags-input")
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +65,10 @@ func runCTags(bin string, sandboxBin string, inputs map[string][]byte) ([]*ctags
 			sandboxBin,
 			"-t30", "-T30",
 			"-D", "-S", sandboxDir, "-M", dir, "-m", "/input", "-W", "/input",
+			// Make sure the binary is available in the sandbox.
+			"-M", bin, "-m", "/ctags",
 		}
+		args[0] = "/ctags"
 		for _, d := range []string{"/bin", "/lib", "/usr/bin", "/lib64"} {
 			if _, err := os.Lstat(d); err == nil {
 				sandboxArgs = append(sandboxArgs, "-M", d, "-m", d)
@@ -81,9 +84,11 @@ func runCTags(bin string, sandboxBin string, inputs map[string][]byte) ([]*ctags
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Dir = dir
 
+	var errBuf bytes.Buffer
+	cmd.Stderr = &errBuf
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("exec(%s): %v", cmd.Args, err)
+		return nil, fmt.Errorf("exec(%s): %v, stderr: %s", cmd.Args, err, errBuf.String())
 	}
 
 	var entries []*ctags.Entry
