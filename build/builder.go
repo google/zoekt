@@ -132,6 +132,10 @@ func (o *Options) Timestamp() time.Time {
 
 // NewBuilder creates a new Builder instance.
 func NewBuilder(opt Options) (*Builder, error) {
+	if opt.RepoDir == "" {
+		return nil, fmt.Errorf("must set options.RepoDir")
+	}
+
 	b := &Builder{
 		opts:     opt,
 		throttle: make(chan int, opt.Parallelism),
