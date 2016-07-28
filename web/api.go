@@ -20,9 +20,13 @@ import (
 	"github.com/google/zoekt"
 )
 
+type LastInput struct {
+	Query string
+}
+
 // Result holds the data provided to the search results template.
 type ResultInput struct {
-	LastQuery     string
+	Last          LastInput
 	QueryStr      string
 	Query         string
 	Stats         zoekt.Stats
@@ -59,14 +63,13 @@ type Fragment struct {
 
 // SearchBoxInput is provided to the SearchBox template.
 type SearchBoxInput struct {
-	LastQuery string
-	Stats     *zoekt.RepoStats
+	Last  LastInput
+	Stats *zoekt.RepoStats
 }
 
 // RepoListInput is provided to the RepoList template.
 type RepoListInput struct {
-	LastQuery string
-	QueryStr  string
+	Last      LastInput
 	RepoCount int
 	Repo      []string
 }
@@ -74,5 +77,5 @@ type RepoListInput struct {
 // PrintInput is provided to the server.Print template.
 type PrintInput struct {
 	Repo, Name, Content string
-	LastQuery           string
+	Last                LastInput
 }

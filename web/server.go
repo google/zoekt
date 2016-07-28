@@ -50,21 +50,49 @@ var Funcmap = template.FuncMap{
 type Server struct {
 	Searcher zoekt.Searcher
 
-	DidYouMean *template.Template
-	RepoList   *template.Template
-	Result     *template.Template
-	Print      *template.Template
-	SearchBox  *template.Template
+	// If set, show files from the index.
+	Print bool
+
+	// This should contain the following templates: "didyoumean"
+	// (for suggestions), "repolist" (for the repo search result
+	// page), "result" for the search results, "search" (for the
+	// opening page), "box" for the search query input element and
+	// "print" for the show file functionality.
+	Top *template.Template
+
+	didYouMean *template.Template
+	repolist   *template.Template
+	search     *template.Template
+	result     *template.Template
+	print      *template.Template
 }
 
-func NewMux(s *Server) *http.ServeMux {
+func NewMux(s *Server) (*http.ServeMux, error) {
+	s.print = s.Top.Lookup("print")
+	if s.print == nil {
+		return nil, fmt.Errorf("missing template 'print'")
+	}
+
+	for k, v := range map[string]**template.Template{
+		"didyoumean": &s.didYouMean,
+		"results":    &s.result,
+		"print":      &s.print,
+		"search":     &s.search,
+		"repolist":   &s.repolist,
+	} {
+		*v = s.Top.Lookup(k)
+		if *v == nil {
+			return nil, fmt.Errorf("missing template %q", k)
+		}
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/search", s.serveSearch)
 	mux.HandleFunc("/", s.serveSearchBox)
-	if s.Print != nil {
+	if s.Print {
 		mux.HandleFunc("/print", s.servePrint)
 	}
-	return mux
+	return mux, nil
 }
 
 func (s *Server) serveSearch(w http.ResponseWriter, r *http.Request) {
@@ -72,7 +100,7 @@ func (s *Server) serveSearch(w http.ResponseWriter, r *http.Request) {
 
 	if suggest, ok := err.(*query.SuggestQueryError); ok {
 		var buf bytes.Buffer
-		if err := s.DidYouMean.Execute(&buf, suggest); err != nil {
+		if err := s.didYouMean.Execute(&buf, suggest); err != nil {
 			http.Error(w, err.Error(), http.StatusTeapot)
 		}
 
@@ -144,13 +172,13 @@ func (s *Server) serveSearchErr(w http.ResponseWriter, r *http.Request) error {
 		result.Files = result.Files[:num]
 	}
 
-	fileMatches, err := formatResults(result, s.Print != nil)
+	fileMatches, err := formatResults(result, s.Print)
 	if err != nil {
 		return err
 	}
 
 	res := ResultInput{
-		LastQuery:     queryStr,
+		Last:          LastInput{Query: queryStr},
 		Stats:         result.Stats,
 		Query:         q.String(),
 		QueryStr:      queryStr,
@@ -159,7 +187,7 @@ func (s *Server) serveSearchErr(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	var buf bytes.Buffer
-	if err := s.Result.Execute(&buf, &res); err != nil {
+	if err := s.result.Execute(&buf, &res); err != nil {
 		return err
 	}
 
@@ -192,10 +220,9 @@ func (s *Server) serveSearchBoxErr(w http.ResponseWriter, r *http.Request) error
 	}
 	sort.Strings(stats.Repos)
 	d := SearchBoxInput{
-		LastQuery: "",
-		Stats:     stats,
+		Stats: stats,
 	}
-	if err := s.SearchBox.Execute(&buf, &d); err != nil {
+	if err := s.search.Execute(&buf, &d); err != nil {
 		return err
 	}
 	w.Write(buf.Bytes())
@@ -216,14 +243,13 @@ func (s *Server) serveListReposErr(q query.Q, qStr string, w http.ResponseWriter
 	}
 
 	res := RepoListInput{
-		LastQuery: qStr,
-		QueryStr:  qStr,
+		Last:      LastInput{Query: qStr},
 		RepoCount: len(repos.Repos),
 		Repo:      repos.Repos,
 	}
 
 	var buf bytes.Buffer
-	if err := s.RepoList.Execute(&buf, &res); err != nil {
+	if err := s.repolist.Execute(&buf, &res); err != nil {
 		return err
 	}
 
@@ -232,7 +258,7 @@ func (s *Server) serveListReposErr(q query.Q, qStr string, w http.ResponseWriter
 }
 
 func (s *Server) servePrintErr(w http.ResponseWriter, r *http.Request) error {
-	if s.Print == nil {
+	if !s.Print {
 		return fmt.Errorf("no printing template defined.")
 	}
 
@@ -268,14 +294,14 @@ func (s *Server) servePrintErr(w http.ResponseWriter, r *http.Request) error {
 
 	f := result.Files[0]
 	d := PrintInput{
-		Name:      f.Name,
-		Repo:      f.Repo,
-		Content:   string(f.Content),
-		LastQuery: queryStr,
+		Name:    f.Name,
+		Repo:    f.Repo,
+		Content: string(f.Content),
+		Last:    LastInput{Query: queryStr},
 	}
 
 	var buf bytes.Buffer
-	if err := s.Print.Execute(&buf, &d); err != nil {
+	if err := s.print.Execute(&buf, &d); err != nil {
 		return err
 	}
 

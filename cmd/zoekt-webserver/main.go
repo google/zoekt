@@ -78,17 +78,18 @@ func main() {
 	}
 
 	s := &web.Server{
-		Searcher:   searcher,
-		DidYouMean: web.DidYouMeanTemplate,
-		RepoList:   web.RepoListTemplate,
-		Result:     web.ResultTemplate,
-		SearchBox:  web.SearchBoxTemplate,
+		Searcher: searcher,
+		Top:      web.Top,
 	}
 	if *print {
-		s.Print = web.PrintTemplate
+		s.Print = true
 	}
 
-	handler := web.NewMux(s)
+	handler, err := web.NewMux(s)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	log.Printf("serving on %s", *listen)
 	err = http.ListenAndServe(*listen, handler)
 	log.Printf("ListenAndServe: %v", err)

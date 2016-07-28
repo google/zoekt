@@ -16,7 +16,9 @@ package web
 
 import "html/template"
 
-var DidYouMeanTemplate = template.Must(template.New("didyoumean").Funcs(Funcmap).Parse(`<html>
+var Top = template.New("top").Funcs(Funcmap)
+
+var DidYouMeanTemplate = template.Must(Top.New("didyoumean").Parse(`<html>
   <head>
     <title>Error</title>
   </head>
@@ -26,13 +28,13 @@ var DidYouMeanTemplate = template.Must(template.New("didyoumean").Funcs(Funcmap)
 </html>
 `))
 
-const searchBox = `
+var QueryTemplate = template.Must(Top.New("box").Parse(`
   <form action="search">
-    Search some code: <input autofocus {{if .LastQuery}}value={{.LastQuery}} {{end}} type="text" name="q"> Max results:  <input style="width: 5em;" type="text" name="num" value="50"> <input type="submit" value="Search">
+    Search some code: <input autofocus {{if .Query}}value={{.Query}} {{end}} type="text" name="q"> Max results:  <input style="width: 5em;" type="text" name="num" value="50"> <input type="submit" value="Search">
   </form>
-`
+`))
 
-var SearchBoxTemplate = template.Must(template.New("box").Funcs(Funcmap).Parse(
+var SearchBoxTemplate = template.Must(Top.New("search").Parse(
 	`<html>
 <head>
 <style>
@@ -44,7 +46,7 @@ dt {
 <title>Zoekt, en gij zult spinazie eten</title>
 <body>
 <div style="margin: 3em; padding 3em; position: center;">
-` + searchBox + `
+{{template "box"}}
 </div>
 
 <div style="display: flex; justify-content: space-around; flex-direction: row;">
@@ -103,12 +105,13 @@ To list repositories, try:
 </html>
 `))
 
-var ResultTemplate = template.Must(template.New("page").Funcs(Funcmap).Parse(`<html>
+var ResultsTemplate = template.Must(Top.New("results").Parse(`<html>
   <head>
     <title>Results for {{.QueryStr}}</title>
   </head>
-<body>` + searchBox +
-	`  <hr>
+<body>
+  {{template "box" .Last}}
+<hr>
   Found {{.Stats.MatchCount}} results in {{.Stats.FileCount}} files ({{.Stats.NgramMatches}} ngram matches,
     {{.Stats.FilesConsidered}} docs considered, {{.Stats.FilesLoaded}} docs ({{HumanUnit .Stats.BytesLoaded}}B) loaded,
     {{.Stats.FilesSkipped}} docs skipped): for
@@ -129,12 +132,13 @@ var ResultTemplate = template.Must(template.New("page").Funcs(Funcmap).Parse(`<h
 </html>
 `))
 
-var RepoListTemplate = template.Must(template.New("repolist").Funcs(Funcmap).Parse(`<html>
+var RepoListTemplate = template.Must(Top.New("repolist").Parse(`<html>
   <head>
-    <title>Repo search result for {{.LastQuery}}</title>
+    <title>Repo search result for {{.Last.Query}}</title>
   </head>
-<body>` + searchBox +
-	`  <hr>
+<body>
+{{template "box" .Last}}
+ <hr>
   Found {{.RepoCount}} repositories:
   <p>
   {{range .Repo}}
@@ -145,12 +149,12 @@ var RepoListTemplate = template.Must(template.New("repolist").Funcs(Funcmap).Par
 </html>
 `))
 
-var PrintTemplate = template.Must(template.New("print").Parse(`
+var PrintTemplate = template.Must(Top.New("print").Parse(`
   <head>
     <title>{{.Repo}}:{{.Name}}</title>
   </head>
-<body>` + searchBox +
-	`  <hr>
+<body>{{template "box" .Last}}
+ <hr>
 
 <pre>{{.Content}}
 </pre>`))
