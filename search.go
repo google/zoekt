@@ -31,7 +31,6 @@ type contentProvider struct {
 	// mutable
 	err      error
 	idx      uint32
-	_cb      []byte
 	_data    []byte
 	_nl      []uint32
 	_nlBuf   []uint32
@@ -51,7 +50,6 @@ func (p *contentProvider) setDocument(docID uint32) {
 	p._nl = nil
 	p._sects = nil
 	p._data = nil
-	p._cb = nil
 }
 
 func (p *contentProvider) docSections() []DocumentSection {
@@ -80,21 +78,6 @@ func (p *contentProvider) data(fileName bool) []byte {
 		p.stats.BytesLoaded += int64(len(p._data))
 	}
 	return p._data
-}
-
-func (p *contentProvider) caseBits(fileName bool) []byte {
-	if fileName {
-		return p.id.fileNameCaseBits[p.id.fileNameCaseBitsIndex[p.idx]:p.id.fileNameCaseBitsIndex[p.idx+1]]
-	}
-
-	if p._cb == nil {
-		p._cb, p.err = p.id.readCaseBits(p.idx)
-	}
-	return p._cb
-}
-
-func (p *contentProvider) caseMatches(m *candidateMatch) bool {
-	return m.caseMatches(p.caseBits(m.fileName))
 }
 
 func (p *contentProvider) matchContent(m *candidateMatch) bool {
@@ -168,8 +151,7 @@ func (p *contentProvider) fillContentMatches(ms []*candidateMatch) []Match {
 			LineEnd:   end,
 			LineNum:   num,
 		}
-		out := make([]byte, end-start+8)
-		finalMatch.Line = toOriginal(out, p.data(false), p.caseBits(false), start, end)
+		finalMatch.Line = p.data(false)[start:end]
 
 		for _, m := range lineCands {
 			finalMatch.Fragments = append(finalMatch.Fragments, MatchFragment{

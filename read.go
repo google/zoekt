@@ -119,8 +119,7 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 		return nil, fmt.Errorf("file is v%d, want v%d", d.unaryData.IndexFormatVersion, IndexFormatVersion)
 	}
 
-	d.caseBitsIndex = toc.fileContents.caseBits.absoluteIndex()
-	d.boundaries = toc.fileContents.content.absoluteIndex()
+	d.boundaries = toc.fileContents.absoluteIndex()
 	d.newlinesIndex = toc.newlines.absoluteIndex()
 	d.docSectionsIndex = toc.fileSections.absoluteIndex()
 
@@ -138,24 +137,18 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 		}
 	}
 
-	d.fileEnds = toc.fileContents.content.relativeIndex()[1:]
+	d.fileEnds = toc.fileContents.relativeIndex()[1:]
 	d.fileBranchMasks, err = d.readSectionU32(toc.branchMasks)
 	if err != nil {
 		return nil, err
 	}
 
-	d.fileNameContent, err = d.readSectionBlob(toc.fileNames.content.data)
+	d.fileNameContent, err = d.readSectionBlob(toc.fileNames.data)
 	if err != nil {
 		return nil, err
 	}
 
-	d.fileNameCaseBits, err = d.readSectionBlob(toc.fileNames.caseBits.data)
-	if err != nil {
-		return nil, err
-	}
-
-	d.fileNameCaseBitsIndex = toc.fileNames.caseBits.relativeIndex()
-	d.fileNameIndex = toc.fileNames.content.relativeIndex()
+	d.fileNameIndex = toc.fileNames.relativeIndex()
 
 	nameNgramText, err := d.readSectionBlob(toc.nameNgramText)
 	if err != nil {
@@ -198,13 +191,6 @@ func (d *indexData) readContents(i uint32) ([]byte, error) {
 	return d.readSectionBlob(simpleSection{
 		off: d.boundaries[i],
 		sz:  d.boundaries[i+1] - d.boundaries[i],
-	})
-}
-
-func (d *indexData) readCaseBits(i uint32) ([]byte, error) {
-	return d.readSectionBlob(simpleSection{
-		off: d.caseBitsIndex[i],
-		sz:  d.caseBitsIndex[i+1] - d.caseBitsIndex[i],
 	})
 }
 

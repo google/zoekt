@@ -283,31 +283,13 @@ func (p *contentProvider) evalRegexpMatchesCase(s *regexpMatchTree) {
 
 	trimmed := s.found[:0]
 
-	buf := make([]byte, 200)
 	for _, c := range s.found {
-		if cap(buf) < int(c.matchSz+8) {
-			buf = make([]byte, int(c.matchSz+8))
-		}
-		orig := toOriginal(buf, p.data(s.fileName), p.caseBits(s.fileName), int(c.offset),
-			int(c.offset+c.matchSz))
+		orig := p.data(s.fileName)
 		if s.caseRegexp.Match(orig) {
 			trimmed = append(trimmed, c)
 		}
 	}
 	s.found = trimmed
-	s.caseEvaluated = true
-}
-
-func (p *contentProvider) evalCaseMatches(s *substrMatchTree) {
-	if s.caseSensitive {
-		pruned := s.current[:0]
-		for _, m := range s.current {
-			if p.caseMatches(m) {
-				pruned = append(pruned, m)
-			}
-		}
-		s.current = pruned
-	}
 	s.caseEvaluated = true
 }
 
@@ -602,20 +584,11 @@ nextFileMatch:
 		// Files are cheap to match. Do them first.
 		if len(fileAtoms) > 0 {
 			for _, st := range fileAtoms {
-				cp.evalCaseMatches(st)
 				cp.evalContentMatches(st)
 			}
 			if v, ok := evalMatchTree(known, mt); ok && !v {
 				continue nextFileMatch
 			}
-		}
-
-		for st := range atoms {
-			cp.evalCaseMatches(st)
-		}
-
-		if v, ok := evalMatchTree(known, mt); ok && !v {
-			continue nextFileMatch
 		}
 
 		for st := range atoms {
@@ -685,8 +658,7 @@ nextFileMatch:
 
 		sortMatchesByScore(fileMatch.Matches)
 		if opts.Whole {
-			c := make([]byte, cp.fileSize+8)
-			fileMatch.Content = toOriginal(c, cp.data(false), cp.caseBits(false), 0, int(cp.fileSize))
+			fileMatch.Content = cp.data(false)
 		}
 
 		res.Files = append(res.Files, fileMatch)

@@ -24,13 +24,13 @@ import (
 
 // FormatVersion is a version number. It is increased every time the
 // on-disk index format is changed.
-const IndexFormatVersion = 1
+const IndexFormatVersion = 2
 
 var _ = log.Println
 
 type indexTOC struct {
-	fileContents contentSection
-	fileNames    contentSection
+	fileContents compoundSection
+	fileNames    compoundSection
 	fileSections compoundSection
 	postings     compoundSection
 	newlines     compoundSection
@@ -68,6 +68,14 @@ func (w *writer) writeTOC(toc *indexTOC) {
 	for _, s := range secs {
 		s.write(w)
 	}
+}
+
+func (s *compoundSection) writeStrings(w *writer, strs []*searchableString) {
+	s.start(w)
+	for _, f := range strs {
+		s.addItem(w, f.data)
+	}
+	s.end(w)
 }
 
 func (b *IndexBuilder) Write(out io.Writer) error {

@@ -33,9 +33,6 @@ type candidateMatch struct {
 	substrBytes   []byte
 	substrLowered []byte
 
-	caseMask [][]byte
-	caseBits [][]byte
-
 	file    uint32
 	offset  uint32
 	matchSz uint32
@@ -45,29 +42,13 @@ func (m *candidateMatch) String() string {
 	return fmt.Sprintf("%d:%d", m.file, m.offset)
 }
 
-func (m *candidateMatch) caseMatches(fileCaseBits []byte) bool {
+func (m *candidateMatch) matchContentCaseFolding(content []byte) bool {
 	if !m.caseSensitive {
 		return true
 	}
-	patLen := len(m.substrBytes)
-	startExtend := m.offset % 8
-	patEnd := m.offset + uint32(patLen)
-	endExtend := (8 - (patEnd % 8)) % 8
 
-	start := m.offset - startExtend
-	end := m.offset + uint32(patLen) + endExtend
-
-	fileBits := fileCaseBits[start/8 : end/8]
-	mask := m.caseMask[startExtend]
-	bits := m.caseBits[startExtend]
-
-	for i := range fileBits {
-		if fileBits[i]&mask[i] != bits[i] {
-			return false
-		}
-	}
-
-	return true
+	l := toLower(content[m.offset : m.offset+uint32(m.matchSz)])
+	return bytes.Compare(l, m.substrLowered) == 0
 }
 
 func (m *candidateMatch) matchContent(content []byte) bool {
@@ -124,7 +105,6 @@ func (s *ngramDocIterator) next() []*candidateMatch {
 	patBytes := []byte(s.query.Pattern)
 	lowerPatBytes := toLower(patBytes)
 
-	caseMasks, caseBits := findCaseMasks(patBytes)
 	var candidates []*candidateMatch
 	for {
 		if len(s.first) == 0 || len(s.last) == 0 {
@@ -155,8 +135,6 @@ func (s *ngramDocIterator) next() []*candidateMatch {
 
 			candidates = append(candidates,
 				&candidateMatch{
-					caseMask:      caseMasks,
-					caseBits:      caseBits,
 					caseSensitive: s.query.CaseSensitive,
 					fileName:      s.query.FileName,
 					substrBytes:   patBytes,

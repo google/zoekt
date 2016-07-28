@@ -35,18 +35,15 @@ type indexData struct {
 
 	newlinesIndex    []uint32
 	docSectionsIndex []uint32
-	caseBitsIndex    []uint32
 
 	// offsets of file contents. Includes end of last file.
 	boundaries []uint32
 
 	fileEnds []uint32
 
-	fileNameContent       []byte
-	fileNameCaseBits      []byte
-	fileNameCaseBitsIndex []uint32
-	fileNameIndex         []uint32
-	fileNameNgrams        map[ngram][]uint32
+	fileNameContent []byte
+	fileNameIndex   []uint32
+	fileNameNgrams  map[ngram][]uint32
 
 	fileBranchMasks []uint32
 	branchNames     map[uint]string
@@ -65,8 +62,8 @@ type indexUnaryData struct {
 func (d *indexData) memoryUse() int {
 	sz := 0
 	for _, a := range [][]uint32{
-		d.newlinesIndex, d.docSectionsIndex, d.caseBitsIndex,
-		d.fileEnds, d.fileNameCaseBitsIndex, d.fileNameIndex, d.fileBranchMasks,
+		d.newlinesIndex, d.docSectionsIndex,
+		d.fileEnds, d.fileNameIndex, d.fileBranchMasks,
 	} {
 		sz += 4 * len(a)
 	}
@@ -249,10 +246,7 @@ func (data *indexData) getContentDocIterator(query *query.Substring) (docIterato
 }
 
 func (d *indexData) fileName(i uint32) []byte {
-	data := d.fileNameContent[d.fileNameIndex[i]:d.fileNameIndex[i+1]]
-	cb := d.fileNameCaseBits[d.fileNameCaseBitsIndex[i]:d.fileNameCaseBitsIndex[i+1]]
-
-	return toOriginal(make([]byte, len(data)+8), data, cb, 0, len(data))
+	return d.fileNameContent[d.fileNameIndex[i]:d.fileNameIndex[i+1]]
 }
 
 func (s *indexData) Close() {

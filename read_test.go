@@ -39,8 +39,8 @@ func TestReadWrite(t *testing.T) {
 	if err != nil {
 		t.Errorf("got read error %v", err)
 	}
-	if toc.fileContents.content.data.sz != 5 {
-		t.Errorf("got contents size %d, want 5", toc.fileContents.content.data.sz)
+	if toc.fileContents.data.sz != 5 {
+		t.Errorf("got contents size %d, want 5", toc.fileContents.data.sz)
 	}
 
 	data, err := r.readIndexData(&toc)
@@ -78,21 +78,18 @@ func TestReadWriteNames(t *testing.T) {
 	if err := r.readTOC(&toc); err != nil {
 		t.Errorf("got read error %v", err)
 	}
-	if toc.fileNames.content.data.sz != 4 {
-		t.Errorf("got contents size %d, want 4", toc.fileNames.content.data.sz)
+	if toc.fileNames.data.sz != 4 {
+		t.Errorf("got contents size %d, want 4", toc.fileNames.data.sz)
 	}
 
 	data, err := r.readIndexData(&toc)
 	if err != nil {
 		t.Fatalf("readIndexData: %v", err)
 	}
-	if !reflect.DeepEqual([]byte{0x4}, data.fileNameCaseBits) {
-		t.Errorf("got case bits %v, want {0x4}", data.fileNameCaseBits)
-	}
 	if !reflect.DeepEqual([]uint32{0, 4}, data.fileNameIndex) {
 		t.Errorf("got index %v, want {0,4}", data.fileNameIndex)
 	}
-	if got := data.fileNameNgrams[stringToNGram("bcd")]; !reflect.DeepEqual(got, []uint32{1}) {
+	if got := data.fileNameNgrams[stringToNGram("bCd")]; !reflect.DeepEqual(got, []uint32{1}) {
 		t.Errorf("got trigram bcd at bits %v, want sz 2", data.fileNameNgrams)
 	}
 }

@@ -29,9 +29,6 @@ type searchableString struct {
 	// lower cased data.
 	data []byte
 
-	// Bit vector describing where we found uppercase letters
-	caseBits []byte
-
 	// offset of the content
 	offset uint32
 }
@@ -43,8 +40,8 @@ func (e *searchableString) end() uint32 {
 func newSearchableString(data []byte, startOff uint32, postings map[ngram][]uint32) *searchableString {
 	dest := searchableString{
 		offset: startOff,
+		data:   data,
 	}
-	dest.data, dest.caseBits = splitCase(data)
 	for i := range dest.data {
 		if i+ngramSize > len(dest.data) {
 			break
