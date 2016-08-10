@@ -38,3 +38,37 @@ func TestDocSection(t *testing.T) {
 		t.Errorf("got %v, want %v", roundtrip, in)
 	}
 }
+
+func TestGenerateCaseNgrams(t *testing.T) {
+	ng := stringToNGram("aB1")
+	gotNG := generateCaseNgrams(ng)
+
+	var got []string
+	for _, n := range gotNG {
+		got = append(got, string(ngramToBytes(n)))
+	}
+
+	want := []string{
+		"aB1",
+		"AB1",
+		"ab1",
+		"Ab1",
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func TestMergeUInt32(t *testing.T) {
+	in := [][]uint32{
+		{1, 7, 9},
+		{5, 7},
+	}
+	got := mergeUint32(in)
+	want := []uint32{1, 5, 7, 7, 9}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("DeepEqual: got %v want %v", got, want)
+	}
+}

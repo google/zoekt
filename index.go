@@ -87,16 +87,12 @@ func (d *indexData) Stats() (*RepoStats, error) {
 
 func (data *indexData) getDocIterator(q query.Q) (docIterator, error) {
 	switch s := q.(type) {
-
 	case *query.Substring:
-		if s.FileName {
-			return data.getFileNameDocIterator(s), nil
-		}
-		if len(s.Pattern) < ngramSize {
+		if !s.FileName && len(s.Pattern) < ngramSize {
 			return nil, fmt.Errorf("pattern %q less than %d bytes", s.Pattern, ngramSize)
 		}
+		return data.getNgramDocIterator(s)
 
-		return data.getContentDocIterator(s)
 	case *query.Const:
 		if s.Value {
 			return data.matchAllDocIterator(), nil
@@ -194,17 +190,79 @@ func minarg(xs []uint32) uint32 {
 	return uint32(j)
 }
 
-func (data *indexData) getContentDocIterator(query *query.Substring) (docIterator, error) {
-	str := strings.ToLower(query.Pattern) // TODO - UTF-8
+func hasCase(c byte) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+}
+
+func flipCase(c byte) byte {
+	if c >= 'A' && c <= 'Z' {
+		return c - 'A' + 'a'
+	}
+	if c >= 'a' && c <= 'z' {
+		return c - 'a' + 'A'
+	}
+	return c
+}
+
+func generateCaseNgrams(g ngram) []ngram {
+	asBytes := ngramToBytes(g)
+
+	variants := make([]ngram, 0, 8)
+	seen := map[ngram]struct{}{}
+	for i := 0; i < (1 << ngramSize); i++ {
+		var variant [ngramSize]byte
+		for j := 0; j < ngramSize; j++ {
+			c := asBytes[j]
+			if i&(1<<uint(j)) != 0 {
+				if hasCase(c) {
+					c = flipCase(c)
+				}
+			}
+			variant[j] = c
+		}
+
+		next := bytesToNGram(variant[:])
+		if _, ok := seen[next]; !ok {
+			variants = append(variants, next)
+			seen[next] = struct{}{}
+		}
+	}
+
+	return variants
+}
+
+func (data *indexData) ngramFrequency(ng ngram, filename bool) uint32 {
+	if filename {
+		return uint32(len(data.fileNameNgrams[ng]))
+	}
+
+	return data.ngrams[ng].sz
+}
+
+func (data *indexData) getNgramDocIterator(query *query.Substring) (docIterator, error) {
 	input := &ngramDocIterator{
 		query: query,
-		ends:  data.fileEnds,
 	}
+	if query.FileName {
+		input.ends = data.fileNameIndex[1:]
+	} else {
+		input.ends = data.fileEnds
+	}
+
+	str := query.Pattern
 
 	// Find the 2 least common ngrams from the string.
 	frequencies := make([]uint32, len(str)-ngramSize+1)
 	for i := range frequencies {
-		frequencies[i] = data.ngrams[stringToNGram(str[i:i+ngramSize])].sz
+		ng := stringToNGram(str[i : i+ngramSize])
+		if query.CaseSensitive {
+			frequencies[i] = data.ngramFrequency(ng, query.FileName)
+		} else {
+			for _, v := range generateCaseNgrams(ng) {
+				frequencies[i] += data.ngramFrequency(v, query.FileName)
+			}
+		}
+
 		if frequencies[i] == 0 {
 			return input, nil
 		}
@@ -217,24 +275,24 @@ func (data *indexData) getContentDocIterator(query *query.Substring) (docIterato
 		lastI, firstI = firstI, lastI
 	}
 
-	first := data.ngrams[stringToNGram(str[firstI:firstI+ngramSize])]
-	last := data.ngrams[stringToNGram(str[lastI:lastI+ngramSize])]
+	firstNG := stringToNGram(str[firstI : firstI+ngramSize])
+	lastNG := stringToNGram(str[lastI : lastI+ngramSize])
 	input.distance = lastI - firstI
 	input.leftPad = firstI
 	input.rightPad = uint32(len(str)-ngramSize) - lastI
 
-	blob, err := data.readSectionBlob(first)
+	postings, err := data.readPostings(firstNG, query.CaseSensitive, query.FileName)
 	if err != nil {
 		return nil, err
 	}
-	input.first = fromDeltas(blob, nil)
 
+	input.first = postings
 	if firstI != lastI {
-		blob, err = data.readSectionBlob(last)
+		postings, err = data.readPostings(lastNG, query.CaseSensitive, query.FileName)
 		if err != nil {
 			return nil, err
 		}
-		input.last = fromDeltas(blob, nil)
+		input.last = postings
 	} else {
 		input.last = input.first
 	}
@@ -243,6 +301,69 @@ func (data *indexData) getContentDocIterator(query *query.Substring) (docIterato
 		input._coversContent = true
 	}
 	return input, nil
+}
+
+func (d *indexData) readPostings(ng ngram, caseSensitive, fileName bool) ([]uint32, error) {
+	variants := []ngram{ng}
+	if !caseSensitive {
+		variants = generateCaseNgrams(ng)
+	}
+
+	// TODO - generate less garbage.
+	postings := make([][]uint32, 0, len(variants))
+	for _, v := range variants {
+		if fileName {
+			postings = append(postings, d.fileNameNgrams[v])
+			continue
+		}
+
+		sec := d.ngrams[v]
+		blob, err := d.readSectionBlob(sec)
+		if err != nil {
+			return nil, err
+		}
+		ps := fromDeltas(blob, nil)
+		if len(ps) > 0 {
+			postings = append(postings, ps)
+		}
+	}
+
+	result := mergeUint32(postings)
+	return result, nil
+}
+
+func mergeUint32(in [][]uint32) []uint32 {
+	sz := 0
+	for _, i := range in {
+		sz += len(i)
+	}
+	out := make([]uint32, 0, sz)
+	for len(in) > 0 {
+		minVal := uint32(maxUInt32)
+		for _, n := range in {
+			if len(n) > 0 && n[0] < minVal {
+				minVal = n[0]
+			}
+		}
+
+		next := in[:0]
+		for _, n := range in {
+			if len(n) == 0 {
+				continue
+			}
+			if n[0] == minVal {
+				out = append(out, minVal)
+				n = n[1:]
+			}
+			if len(n) > 0 {
+				next = append(next, n)
+			}
+		}
+
+		in = next
+	}
+
+	return out
 }
 
 func (d *indexData) fileName(i uint32) []byte {

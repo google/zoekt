@@ -682,6 +682,40 @@ func TestRepoURL(t *testing.T) {
 
 }
 
+func TestRegexpCaseSensitive(t *testing.T) {
+	b := NewIndexBuilder()
+
+	content := []byte("bla\nfunc unmarshalGitiles\n")
+	b.AddFile("f1", content)
+
+	res := searchForTest(t, b,
+		&query.Regexp{
+			Regexp:        mustParseRE("func.*Gitiles"),
+			CaseSensitive: true,
+		})
+
+	if len(res.Files) != 1 {
+		t.Fatalf("got %v, want one match", res.Files)
+	}
+}
+
+func TestRegexpCaseFolding(t *testing.T) {
+	b := NewIndexBuilder()
+
+	content := []byte("bla\nfunc unmarshalGitiles\n")
+	b.AddFile("f1", content)
+
+	res := searchForTest(t, b,
+		&query.Regexp{
+			Regexp:        mustParseRE("func.*GITILES"),
+			CaseSensitive: false,
+		})
+
+	if len(res.Files) != 1 {
+		t.Fatalf("got %v, want one match", res.Files)
+	}
+}
+
 func TestCaseRegexp(t *testing.T) {
 	b := NewIndexBuilder()
 
@@ -890,5 +924,20 @@ func TestImportantCutoff(t *testing.T) {
 	sres := searchForTest(t, b, &query.Substring{Pattern: "bla"}, opts)
 	if len(sres.Files) != 1 || sres.Files[0].Name != "f1" {
 		t.Errorf("got %v, wanted 1 match 'f1'", sres.Files)
+	}
+}
+
+func TestFrequency(t *testing.T) {
+	b := NewIndexBuilder()
+	content := []byte("sla _Py_HashDouble(double v sla las las shd dot dot")
+	// ----------------012345678901234
+	b.Add(Document{
+		Name:    "f1",
+		Content: content,
+	})
+
+	sres := searchForTest(t, b, &query.Substring{Pattern: "slashdot"})
+	if len(sres.Files) != 0 {
+		t.Errorf("got %v, wanted 0 matches", sres.Files)
 	}
 }
