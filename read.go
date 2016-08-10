@@ -84,7 +84,7 @@ func (r *indexData) readSectionU32(sec simpleSection) ([]uint32, error) {
 
 func readSectionU32(f IndexFile, sec simpleSection) ([]uint32, error) {
 	if sec.sz%4 != 0 {
-		log.Panic("barf", sec.sz)
+		return nil, fmt.Errorf("barf: section size %% 4 != 0: sz %d ", sec.sz)
 	}
 	blob, err := f.Read(sec.off, sec.sz)
 	if err != nil {

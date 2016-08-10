@@ -46,6 +46,9 @@ type indexTOC struct {
 
 func (t *indexTOC) sections() []section {
 	return []section{
+		// This must be first, so it can be reliably read across
+		// file format versions.
+		&t.unaryData,
 		&t.fileContents,
 		&t.fileNames,
 		&t.fileSections,
@@ -56,7 +59,6 @@ func (t *indexTOC) sections() []section {
 		&t.namePostings,
 		&t.branchMasks,
 		&t.branchNames,
-		&t.unaryData,
 	}
 }
 
