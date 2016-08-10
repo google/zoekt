@@ -69,6 +69,7 @@ type regexpMatchTree struct {
 }
 
 type substrMatchTree struct {
+	query         *query.Substring
 	cands         []*candidateMatch
 	coversContent bool
 	caseSensitive bool
@@ -154,7 +155,7 @@ func (t *substrMatchTree) String() string {
 		f = "f"
 	}
 
-	return fmt.Sprintf("%ssubstr(%v)", f, t.current)
+	return fmt.Sprintf("%ssubstr(%q,%v)", f, t.query.Pattern, t.current)
 }
 
 func (t *branchQueryMatchTree) String() string {
@@ -204,6 +205,8 @@ func collectRegexps(t matchTree, f func(*regexpMatchTree)) {
 		for _, ch := range s.children {
 			collectRegexps(ch, f)
 		}
+	case *notMatchTree:
+		collectRegexps(s.child, f)
 	case *regexpMatchTree:
 		f(s)
 	}
@@ -444,6 +447,7 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*substrMatchTree]struct{}) (m
 			return nil, err
 		}
 		st := &substrMatchTree{
+			query:         s,
 			caseSensitive: s.CaseSensitive,
 			coversContent: iter.coversContent(),
 			cands:         iter.next(),
@@ -467,13 +471,16 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*substrMatchTree]struct{}) (m
 		if s.Value {
 			iter := d.matchAllDocIterator()
 			return &substrMatchTree{
+				query:         &query.Substring{Pattern: "TRUE"},
 				coversContent: true,
 				caseSensitive: false,
 				fileName:      true,
 				cands:         iter.next(),
 			}, nil
 		} else {
-			return &substrMatchTree{}, nil
+			return &substrMatchTree{
+				query: &query.Substring{Pattern: "FALSE"},
+			}, nil
 		}
 	}
 	log.Panicf("type %T", q)
@@ -635,7 +642,8 @@ nextFileMatch:
 		}
 
 		if v, ok := evalMatchTree(known, mt); !ok {
-			panic("did not decide")
+			log.Panicf("did not decide. Repo %s, doc %d, known %v",
+				d.unaryData.RepoName, nextDoc, known)
 		} else if !v {
 			continue nextFileMatch
 		}

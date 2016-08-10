@@ -698,6 +698,28 @@ func TestCaseRegexp(t *testing.T) {
 	}
 }
 
+func TestNegativeRegexp(t *testing.T) {
+	b := NewIndexBuilder()
+
+	content := []byte("BLABLABLA needle bla")
+	b.AddFile("f1", content)
+	res := searchForTest(t, b,
+		&query.And{[]query.Q{
+			&query.Substring{
+				Pattern: "needle",
+			},
+			&query.Not{
+				&query.Regexp{
+					Regexp: mustParseRE(".cs"),
+				},
+			}},
+		})
+
+	if len(res.Files) != 1 {
+		t.Fatalf("got %v, want 1 match", res.Files)
+	}
+}
+
 func TestSymbolRank(t *testing.T) {
 	b := NewIndexBuilder()
 
