@@ -40,6 +40,7 @@ func TestBasic(t *testing.T) {
 		IndexDir:    dir,
 		ShardMax:    1024,
 		RepoName:    "repo",
+		RepoDir:     "/repo",
 		RepoURL:     "url",
 		Parallelism: 2,
 		SizeMax:     1 << 20,
