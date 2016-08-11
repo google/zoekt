@@ -54,12 +54,15 @@ func divertLogs(dir string, interval time.Duration) {
 }
 
 func main() {
-	logDir := flag.String("log_dir", "", "If set, log to this directory rather than stderr.")
+	logDir := flag.String("log_dir", "", "log to this directory rather than stderr.")
 	logRefresh := flag.Duration("log_refresh", 24*time.Hour, "if using --log_dir, start writing a new file this often.")
 
-	listen := flag.String("listen", ":6070", "address to listen on.")
-	index := flag.String("index", build.DefaultDir, "index directory to use")
-	print := flag.Bool("print", false, "local result URLs")
+	listen := flag.String("listen", ":6070", "listen on this address.")
+	index := flag.String("index", build.DefaultDir, "set index directory to use")
+	print := flag.Bool("print", false, "enable local result URLs")
+
+	sslCert := flag.String("ssl_cert", "", "set path to SSL .pem holding certificate.")
+	sslKey := flag.String("ssl_key", "", "set path to SSL .pem holding key.")
 	flag.Parse()
 
 	if *logDir != "" {
@@ -90,7 +93,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Printf("serving on %s", *listen)
-	err = http.ListenAndServe(*listen, handler)
+	if *sslCert != "" || *sslKey != "" {
+		log.Printf("serving HTTPS on %s", *listen)
+		err = http.ListenAndServeTLS(*listen, *sslCert, *sslKey, handler)
+	} else {
+		log.Printf("serving HTTP on %s", *listen)
+		err = http.ListenAndServe(*listen, handler)
+	}
 	log.Printf("ListenAndServe: %v", err)
 }
