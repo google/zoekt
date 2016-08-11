@@ -29,6 +29,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	gitindex "github.com/google/zoekt/git"
 )
 
 const day = time.Hour * 24
@@ -60,6 +62,8 @@ func refresh(repoDir, indexDir string, fetchInterval time.Duration) {
 		}
 		for dir := range repos {
 			cmd := exec.Command("git", "--git-dir", dir, "fetch", "origin")
+			// Prevent prompting
+			cmd.Stdin = &bytes.Buffer{}
 			loggedRun(cmd)
 		}
 

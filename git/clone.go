@@ -15,6 +15,7 @@
 package gitindex
 
 import (
+	"bytes"
 	"log"
 	"os"
 	"os/exec"
@@ -34,6 +35,8 @@ func CloneRepos(destDir string, repos map[string]string) error {
 		}
 
 		cmd := exec.Command("git", "clone", "--bare", "--verbose", "--progress", "--recursive", cloneURL, repoDest)
+		// Prevent prompting
+		cmd.Stdin = &bytes.Buffer{}
 		log.Println("running:", cmd.Args)
 		if err := cmd.Run(); err != nil {
 			return err
