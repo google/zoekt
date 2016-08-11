@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"path/filepath"
 	"time"
@@ -60,7 +61,7 @@ func main() {
 	listen := flag.String("listen", ":6070", "listen on this address.")
 	index := flag.String("index", build.DefaultDir, "set index directory to use")
 	print := flag.Bool("print", false, "enable local result URLs")
-
+	enablePprof := flag.Bool("pprof", false, "set to enable remote profiling.")
 	sslCert := flag.String("ssl_cert", "", "set path to SSL .pem holding certificate.")
 	sslKey := flag.String("ssl_key", "", "set path to SSL .pem holding key.")
 	flag.Parse()
@@ -91,6 +92,14 @@ func main() {
 	handler, err := web.NewMux(s)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if *enablePprof {
+		handler.HandleFunc("/debug/pprof/", pprof.Index)
+		handler.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+		handler.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		handler.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		handler.HandleFunc("/debug/pprof/trace", pprof.Trace)
 	}
 
 	if *sslCert != "" || *sslKey != "" {
