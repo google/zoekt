@@ -50,6 +50,9 @@ func loggedRun(cmd *exec.Cmd) {
 }
 
 func refresh(repoDir, indexDir string, fetchInterval time.Duration) {
+	// Start with indexing something, so we can start the webserver.
+	runIndexCommand(indexDir, repoDir)
+
 	t := time.NewTicker(fetchInterval)
 	for {
 		repos, err := gitindex.FindGitRepos(repoDir)
@@ -67,12 +70,16 @@ func refresh(repoDir, indexDir string, fetchInterval time.Duration) {
 			loggedRun(cmd)
 		}
 
-		cmd := exec.Command("zoekt-git-index",
-			"-parallelism", "1",
-			"-index", indexDir, "-incremental", "-recursive", repoDir)
-		loggedRun(cmd)
+		runIndexCommand(indexDir, repoDir)
 		<-t.C
 	}
+}
+
+func runIndexCommand(indexDir, repoDir string) {
+	cmd := exec.Command("zoekt-git-index",
+		"-parallelism", "1",
+		"-index", indexDir, "-incremental", "-recursive", repoDir)
+	loggedRun(cmd)
 }
 
 // deleteLogs deletes old logs.
@@ -100,6 +107,8 @@ func deleteLogs(logDir string, maxAge time.Duration) {
 // any fatal bugs will be recorded in a log file.
 func runServer(logDir, indexDir string, port int, refresh time.Duration) {
 	for {
+		start := time.Now()
+
 		nm := fmt.Sprintf("%s/zoekt-webserver.%s.stderr", logDir, time.Now().Format(time.RFC3339Nano))
 		nm = strings.Replace(nm, ":", "_", -1)
 
@@ -120,7 +129,13 @@ func runServer(logDir, indexDir string, port int, refresh time.Duration) {
 		f.Close()
 		if err := cmd.Wait(); err != nil {
 			log.Printf("webserver died, see %s", nm)
+
+			if time.Now().Sub(start) < 2*time.Second {
+				log.Println("crash loop?")
+				time.Sleep(5 * time.Second)
+			}
 		}
+
 	}
 }
 
