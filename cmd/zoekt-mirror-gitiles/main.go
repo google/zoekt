@@ -24,9 +24,10 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
+
+	gitindex "github.com/google/zoekt/git"
 )
 
 func main() {
@@ -67,7 +68,7 @@ func main() {
 		repos = trimmed
 	}
 
-	if err := cloneRepos(destDir, repos); err != nil {
+	if err := gitindex.CloneRepos(destDir, repos); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -103,26 +104,4 @@ func getRepos(URL *url.URL) (map[string]string, error) {
 		result[k] = v.CloneURL
 	}
 	return result, nil
-}
-
-func cloneRepos(destDir string, repos map[string]string) error {
-	for name, cloneURL := range repos {
-		parent := filepath.Join(destDir, filepath.Dir(name))
-		if err := os.MkdirAll(parent, 0755); err != nil {
-			return err
-		}
-
-		base := filepath.Base(name) + ".git"
-		if _, err := os.Lstat(filepath.Join(parent, base)); err == nil {
-			continue
-		}
-
-		cmd := exec.Command("git", "clone", "--mirror", "--recursive", cloneURL, base)
-		cmd.Dir = parent
-		log.Println("running:", cmd.Args)
-		if err := cmd.Run(); err != nil {
-			return err
-		}
-	}
-	return nil
 }

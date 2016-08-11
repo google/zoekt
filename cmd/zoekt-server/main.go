@@ -29,8 +29,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/google/zoekt/git"
 )
 
 const day = time.Hour * 24
@@ -61,7 +59,7 @@ func refresh(repoDir, indexDir string, fetchInterval time.Duration) {
 			log.Printf("no repos found under %s", repoDir)
 		}
 		for dir := range repos {
-			cmd := exec.Command("git", "--git-dir", dir, "fetch")
+			cmd := exec.Command("git", "--git-dir", dir, "fetch", "origin")
 			loggedRun(cmd)
 		}
 

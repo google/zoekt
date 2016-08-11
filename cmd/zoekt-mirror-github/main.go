@@ -23,13 +23,14 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/google/go-github/github"
 	"golang.org/x/oauth2"
+
+	gitindex "github.com/google/zoekt/git"
 )
 
 func main() {
@@ -163,23 +164,10 @@ func getUserRepos(client *github.Client, user string) ([]*github.Repository, err
 }
 
 func cloneRepos(destDir string, repos []*github.Repository) error {
+	urlMap := map[string]string{}
 	for _, r := range repos {
-		parent := filepath.Join(destDir, filepath.Dir(*r.FullName))
-		if err := os.MkdirAll(parent, 0755); err != nil {
-			return err
-		}
-
-		base := *r.Name + ".git"
-		if _, err := os.Lstat(filepath.Join(parent, base)); err == nil {
-			continue
-		}
-
-		cmd := exec.Command("git", "clone", "--mirror", "--recursive", *r.CloneURL, base)
-		cmd.Dir = parent
-		log.Println("running:", cmd.Args)
-		if err := cmd.Run(); err != nil {
-			return err
-		}
+		urlMap[*r.FullName] = *r.CloneURL
 	}
-	return nil
+
+	return gitindex.CloneRepos(destDir, urlMap)
 }
