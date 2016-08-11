@@ -40,6 +40,10 @@ func TestParseQuery(t *testing.T) {
 		{"fi\"le:bla\"", &Substring{Pattern: "file:bla"}},
 		{"abc or def", &Or{[]Q{&Substring{Pattern: "abc"}, &Substring{Pattern: "def"}}}},
 		{"(abc or def)", &Or{[]Q{&Substring{Pattern: "abc"}, &Substring{Pattern: "def"}}}},
+		{"(ppp qqq or rrr sss)", &Or{[]Q{
+			&And{[]Q{&Substring{Pattern: "ppp"}, &Substring{Pattern: "qqq"}}},
+			&And{[]Q{&Substring{Pattern: "rrr"}, &Substring{Pattern: "sss"}}},
+		}}},
 
 		{"((x) ora b(z(d)))", &And{[]Q{
 			&Regexp{Regexp: mustParseRE("(x)")},

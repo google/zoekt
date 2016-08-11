@@ -78,59 +78,6 @@ access to the indexing machine. The sandbox can be compiled as follows:
     cp namespace-sandbox /usr/local/bin/
 
 
-BACKGROUND
-==========
-
-This uses ngrams (n=3) for searching data, and builds an index containing the
-offset of each ngram's occurrence within a file.  If we look for "the quick
-brown fox", we look for two trigrams (eg. "the" and "fox"), and check that they
-are found at the right distance apart.
-
-Regular expressions are handled by extracting normal strings from the regular
-expressions. For example, to search for
-
-  (Path|PathFragment).*=.*/usr/local
-
-we look for
-
-  (AND (OR substr:"Path" substr:"PathFragment") substr:"/usr/local")
-
-and any documents thus found would be searched for the regular
-expression.
-
-Compared to indexing 3-grams on a per-file basis, as described
-[here](https://swtch.com/~rsc/regexp/regexp4.html), there are some advantages:
-
-* for each substring, we only have to intersect just a couple of posting-lists:
-  one for the beginning, and one for the end.
-
-* we can select any pair of trigrams from the pattern for which the
-  number of matches is minimal. For example, we could search for "qui"
-  rather than "the".
-
-There are some downsides compared to trigrams:
-
-* The index is large. Empirically, it is about 3x the corpus size, composed of
-  2x (offsets), and 1x (original content). However, since we have to look at
-  just a limited number of ngrams, we don't have to keep the index in memory.
-
-Compared to [suffix
-arrays](https://blog.nelhage.com/2015/02/regular-expression-search-with-suffix-arrays/),
-there are the following advantages:
-
-* The index construction is straightforward, and can easily be made
-  incremental.
-
-* It uses a less memory.
-
-* All the matches are returned in document order. This makes it
-  straightforward to process compound boolean queries with AND and OR.
-
-Downsides compared to suffix array:
-
-* there is no way to transform regular expressions into index ranges into
-  the suffix array.
-
 
 
 ACKNOWLEDGEMENTS
