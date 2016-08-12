@@ -265,11 +265,14 @@ func (ss *shardedSearcher) Search(ctx context.Context, pat query.Q, opts *Search
 		}
 		aggregate.Files = append(aggregate.Files, r.sr.Files...)
 		aggregate.Stats.Add(r.sr.Stats)
-		for k, v := range r.sr.RepoURLs {
-			aggregate.RepoURLs[k] = v
-		}
-		for k, v := range r.sr.LineFragments {
-			aggregate.LineFragments[k] = v
+
+		if len(r.sr.Files) > 0 {
+			for k, v := range r.sr.RepoURLs {
+				aggregate.RepoURLs[k] = v
+			}
+			for k, v := range r.sr.LineFragments {
+				aggregate.LineFragments[k] = v
+			}
 		}
 
 		if cancel != nil && aggregate.Stats.MatchCount > opts.TotalMaxMatchCount {

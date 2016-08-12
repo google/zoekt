@@ -24,27 +24,17 @@ import (
 	"github.com/google/zoekt"
 )
 
-func formatResults(result *zoekt.SearchResult, localPrint bool) ([]*FileMatch, error) {
+func (s *Server) formatResults(result *zoekt.SearchResult, localPrint bool) ([]*FileMatch, error) {
 	var fmatches []*FileMatch
 
 	templateMap := map[string]*template.Template{}
 	fragmentMap := map[string]*template.Template{}
 	if !localPrint {
 		for repo, str := range result.RepoURLs {
-			tpl, err := template.New("url").Parse(str)
-			if err != nil {
-				log.Println("url template: %v", err)
-				tpl = nil
-			}
-			templateMap[repo] = tpl
+			templateMap[repo] = s.getTemplate(str)
 		}
 		for repo, str := range result.LineFragments {
-			tpl, err := template.New("lineFragment").Parse(str)
-			if err != nil {
-				log.Println("fragment template: %v", err)
-				tpl = nil
-			}
-			fragmentMap[repo] = tpl
+			fragmentMap[repo] = s.getTemplate(str)
 		}
 	}
 	getFragment := func(repo string, linenum int) string {

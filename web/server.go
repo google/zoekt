@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"sync"
 
 	"golang.org/x/net/context"
 
@@ -65,6 +66,26 @@ type Server struct {
 	search     *template.Template
 	result     *template.Template
 	print      *template.Template
+
+	mu            sync.Mutex
+	templateCache map[string]*template.Template
+}
+
+func (s *Server) getTemplate(str string) *template.Template {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	t := s.templateCache[str]
+	if t != nil {
+		return t
+	}
+
+	t, err := template.New("cache").Parse(str)
+	if err != nil {
+		log.Println("template parse error: %v", err)
+		t = template.Must(template.New("empty").Parse(""))
+	}
+	s.templateCache[str] = t
+	return t
 }
 
 func NewMux(s *Server) (*http.ServeMux, error) {
@@ -85,6 +106,8 @@ func NewMux(s *Server) (*http.ServeMux, error) {
 			return nil, fmt.Errorf("missing template %q", k)
 		}
 	}
+
+	s.templateCache = map[string]*template.Template{}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/search", s.serveSearch)
@@ -172,7 +195,7 @@ func (s *Server) serveSearchErr(w http.ResponseWriter, r *http.Request) error {
 		result.Files = result.Files[:num]
 	}
 
-	fileMatches, err := formatResults(result, s.Print)
+	fileMatches, err := s.formatResults(result, s.Print)
 	if err != nil {
 		return err
 	}
