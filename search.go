@@ -118,14 +118,15 @@ func (p *contentProvider) fillContentMatches(ms []*candidateMatch) []Match {
 	var result []Match
 	for len(ms) > 0 {
 		m := ms[0]
-		num, start, end := m.line(p.newlines(), p.fileSize)
+		num, lineStart, lineEnd := m.line(p.newlines(), p.fileSize)
 
 		var lineCands []*candidateMatch
 
 		endMatch := m.offset + m.matchSz
+
 		for len(ms) > 0 {
 			m := ms[0]
-			if int(m.offset) < end {
+			if int(m.offset) <= lineEnd {
 				endMatch = m.offset + m.matchSz
 				lineCands = append(lineCands, m)
 				ms = ms[1:]
@@ -134,35 +135,47 @@ func (p *contentProvider) fillContentMatches(ms []*candidateMatch) []Match {
 			}
 		}
 
+		if len(lineCands) == 0 {
+			log.Panicf(
+				"%s %v infinite loop: num %d start,end %d,%d, offset %d",
+				p.id.fileName(p.idx), p.id.unaryData,
+				num, lineStart, lineEnd,
+				m.offset)
+		}
+
 		data := p.data(false)
 
 		// Due to merging matches, we may have a match that
 		// crosses a line boundary. Prevent confusion by
 		// taking lines until we pass the last match
-		for end < len(data) && endMatch > uint32(end) {
-			end = bytes.IndexByte(data[end+1:], '\n')
-			if end == -1 {
-				end = len(data)
+		for lineEnd < len(data) && endMatch > uint32(lineEnd) {
+			next := bytes.IndexByte(data[lineEnd+1:], '\n')
+			if next == -1 {
+				lineEnd = len(data)
+			} else {
+				// TODO(hanwen): test that checks "+1" part here.
+				lineEnd += next + 1
 			}
 		}
 
 		finalMatch := Match{
-			LineStart: start,
-			LineEnd:   end,
+			LineStart: lineStart,
+			LineEnd:   lineEnd,
 			LineNum:   num,
 		}
-		finalMatch.Line = p.data(false)[start:end]
+		finalMatch.Line = p.data(false)[lineStart:lineEnd]
 
 		for _, m := range lineCands {
-			finalMatch.Fragments = append(finalMatch.Fragments, MatchFragment{
+			fragment := MatchFragment{
 				Offset:      m.offset,
-				LineOff:     int(m.offset) - start,
+				LineOff:     int(m.offset) - lineStart,
 				MatchLength: int(m.matchSz),
-			})
+			}
+			finalMatch.Fragments = append(finalMatch.Fragments, fragment)
 		}
-
 		result = append(result, finalMatch)
 	}
+
 	return result
 }
 

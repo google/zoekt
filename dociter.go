@@ -53,6 +53,11 @@ func (m *candidateMatch) matchContent(content []byte) bool {
 	}
 }
 
+// line returns the line holding the match. If the match starts with
+// the newline ending line M, we return M.  The line is characterized
+// by its linenumber (base-1, byte index of line start, byte index of
+// line end).  The line end is the index of a newline, or the filesize
+// (if matching the last line of the file.)
 func (m *candidateMatch) line(newlines []uint32, fileSize uint32) (lineNum, lineStart, lineEnd int) {
 	idx := sort.Search(len(newlines), func(n int) bool {
 		return newlines[n] >= m.offset

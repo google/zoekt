@@ -941,3 +941,24 @@ func TestFrequency(t *testing.T) {
 		t.Errorf("got %v, wanted 0 matches", sres.Files)
 	}
 }
+
+func TestMatchNewline(t *testing.T) {
+	re, err := syntax.Parse("[^a]a", syntax.ClassNL)
+	if err != nil {
+		panic(err)
+	}
+	b := NewIndexBuilder()
+	content := []byte("pqr\nalex")
+	// ----------------0123 4567
+	b.Add(Document{
+		Name:    "f1",
+		Content: content,
+	})
+
+	sres := searchForTest(t, b, &query.Regexp{Regexp: re, CaseSensitive: true})
+	if len(sres.Files) != 1 {
+		t.Errorf("got %v, wanted 1 matches", sres.Files)
+	} else if l := sres.Files[0].Matches[0].Line; bytes.Compare(l, content) != 0 {
+		t.Errorf("got match line %q, want %q", l, content)
+	}
+}
