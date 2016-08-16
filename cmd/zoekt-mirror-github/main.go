@@ -42,6 +42,7 @@ func main() {
 		"file holding API token.")
 	forks := flag.Bool("forks", false, "also mirror forks.")
 	namePattern := flag.String("name", "", "only clone repos whose name matches the given regexp.")
+	excludePattern := flag.String("exclude", "", "don't mirror repos whose names match this regexp.")
 	flag.Parse()
 
 	if *dest == "" {
@@ -98,7 +99,22 @@ func main() {
 		}
 		trimmed := repos[:0]
 		for _, r := range repos {
-			if r.Name != nil && re.FindString(*r.Name) != "" {
+			if r.Name != nil && re.MatchString(*r.Name) {
+				trimmed = append(trimmed, r)
+			}
+		}
+		repos = trimmed
+	}
+
+	if *excludePattern != "" {
+		re, err := regexp.Compile(*excludePattern)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		trimmed := repos[:0]
+		for _, r := range repos {
+			if !re.MatchString(*r.Name) {
 				trimmed = append(trimmed, r)
 			}
 		}

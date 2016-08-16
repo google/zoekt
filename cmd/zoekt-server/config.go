@@ -26,6 +26,7 @@ type configEntry struct {
 	GithubUser string
 	GitilesURL string
 	Name       string
+	Exclude    string
 }
 
 func readConfig(filename string) ([]configEntry, error) {
@@ -62,10 +63,12 @@ func periodicMirror(repoDir string, cfgFile string, interval time.Duration) {
 		}
 		for _, c := range lastCfg {
 			if c.GithubUser != "" {
-				cmd := exec.Command("zoekt-mirror-github", "-user", c.GithubUser, "-name", c.Name, "-dest", repoDir)
+				cmd := exec.Command("zoekt-mirror-github", "-user", c.GithubUser, "-name", c.Name,
+					"-exclude", c.Exclude, "-dest", repoDir)
 				loggedRun(cmd)
 			} else if c.GitilesURL != "" {
-				cmd := exec.Command("zoekt-mirror-gitiles", "-dest", repoDir, "-name", c.Name, c.GitilesURL)
+				cmd := exec.Command("zoekt-mirror-gitiles",
+					"-exclude", c.Exclude, "-dest", repoDir, "-name", c.Name, c.GitilesURL)
 				loggedRun(cmd)
 			}
 		}

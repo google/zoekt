@@ -33,6 +33,7 @@ import (
 func main() {
 	dest := flag.String("dest", "", "destination directory")
 	namePattern := flag.String("name", "", "only clone repos whose name matches the regexp.")
+	excludePattern := flag.String("exclude", "", "don't mirror repos whose names match this regexp.")
 	flag.Parse()
 
 	if len(flag.Args()) < 1 {
@@ -61,13 +62,37 @@ func main() {
 
 		trimmed := map[string]string{}
 		for k, v := range repos {
-			if re.FindString(k) != "" {
+			if re.MatchString(k) {
 				trimmed[k] = v
 			}
 		}
 		repos = trimmed
 	}
 
+	{
+		trimmed := map[string]string{}
+		for k, v := range repos {
+			if k != "All-Users" && k != "All-Projects" {
+				trimmed[k] = v
+			}
+		}
+		repos = trimmed
+	}
+
+	if *excludePattern != "" {
+		re, err := regexp.Compile(*excludePattern)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		trimmed := map[string]string{}
+		for k, v := range repos {
+			if !re.MatchString(k) {
+				trimmed[k] = v
+			}
+		}
+		repos = trimmed
+	}
 	if err := gitindex.CloneRepos(destDir, repos); err != nil {
 		log.Fatal(err)
 	}
