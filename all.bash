@@ -1,6 +1,6 @@
 #!/bin/sh
 set -eux
-for p in zoekt zoekt/query zoekt/build zoekt/git ; do
+for p in zoekt zoekt/query zoekt/build zoekt/git zoekt/web ; do
     go test github.com/google/$p
 done
 
