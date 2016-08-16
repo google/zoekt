@@ -23,6 +23,7 @@ import (
 	"sort"
 	"strconv"
 	"sync"
+	"time"
 
 	"golang.org/x/net/context"
 
@@ -167,6 +168,7 @@ func (s *Server) serveSearchErr(w http.ResponseWriter, r *http.Request) error {
 
 	sOpts := zoekt.SearchOptions{
 		ShardMaxImportantMatch: num / 10,
+		MaxWallTime:            10 * time.Second,
 	}
 
 	repoFound := false

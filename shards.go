@@ -246,10 +246,19 @@ func (ss *shardedSearcher) Search(ctx context.Context, pat query.Q, opts *Search
 	start = time.Now()
 
 	// TODO - allow for canceling the query.
-
 	shardCount := len(ss.shards)
 	all := make(chan res, shardCount)
-	childCtx, cancel := context.WithCancel(ctx)
+
+	var childCtx context.Context
+	var cancel context.CancelFunc
+	if opts.MaxWallTime == 0 {
+		childCtx, cancel = context.WithCancel(ctx)
+	} else {
+		childCtx, cancel = context.WithTimeout(ctx, opts.MaxWallTime)
+	}
+
+	defer cancel()
+
 	for _, s := range ss.shards {
 		go func(s Searcher) {
 			ms, err := s.Search(childCtx, pat, opts)

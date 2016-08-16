@@ -166,6 +166,9 @@ type SearchOptions struct {
 
 	// Maximum number of important matches across shards.
 	TotalMaxImportantMatch int
+
+	// Abort the search after this much time has passed.
+	MaxWallTime time.Duration
 }
 
 func (s *SearchOptions) String() string {
