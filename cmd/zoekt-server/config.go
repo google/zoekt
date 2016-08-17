@@ -18,8 +18,12 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"log"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
+
+	"github.com/fsnotify/fsnotify"
 )
 
 type configEntry struct {
@@ -47,13 +51,53 @@ func readConfig(filename string) ([]configEntry, error) {
 	return result, nil
 }
 
+func watchFile(path string) (<-chan struct{}, error) {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := watcher.Add(filepath.Dir(path)); err != nil {
+		return nil, err
+	}
+
+	out := make(chan struct{}, 1)
+	go func() {
+		var last time.Time
+		for {
+			select {
+			case <-watcher.Events:
+				fi, err := os.Stat(path)
+				if err == nil && fi.ModTime() != last {
+					out <- struct{}{}
+					last = fi.ModTime()
+				}
+			case err := <-watcher.Errors:
+				if err != nil {
+					log.Printf("watcher error: %v", err)
+				}
+			}
+		}
+	}()
+	return out, nil
+}
+
 func periodicMirror(repoDir string, cfgFile string, interval time.Duration) {
 	t := time.NewTicker(interval)
+	watcher, err := watchFile(cfgFile)
+	if err != nil {
+		log.Printf("watchFile(%q): %v", cfgFile, err)
+	}
 
 	var lastCfg []configEntry
-	for ; true; <-t.C {
-		// We reread the file so we can pickup changes without
-		// restarting the service management.
+	for {
+
+		select {
+		case <-watcher:
+			log.Printf("mirror config %s changed", cfgFile)
+		case <-t.C:
+		}
+
 		cfg, err := readConfig(cfgFile)
 		if err != nil {
 			log.Printf("readConfig(%s): %v", cfgFile, err)
