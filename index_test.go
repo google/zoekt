@@ -71,11 +71,22 @@ func TestBasic(t *testing.T) {
 
 func TestEmptyIndex(t *testing.T) {
 	b := NewIndexBuilder()
+	searcher := searcherForTest(t, b)
 
-	res := searchForTest(t, b, &query.Substring{Pattern: "water"})
-	if fmatches := res.Files; len(fmatches) != 0 {
-		t.Fatalf("got %v, want 0 matches", fmatches)
+	var opts SearchOptions
+	_, err := searcher.Search(context.Background(), &query.Substring{}, &opts)
+	if err != nil {
+		t.Fatalf("Search: %v", err)
 	}
+
+	if _, err := searcher.Stats(); err != nil {
+		t.Fatalf("Stats: %v", err)
+	}
+
+	if _, err := searcher.List(context.Background(), &query.Repo{}); err != nil {
+		t.Fatalf("List: %v", err)
+	}
+
 }
 
 type memSeeker struct {

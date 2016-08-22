@@ -76,7 +76,10 @@ func (d *indexData) memoryUse() int {
 
 func (d *indexData) Stats() (*RepoStats, error) {
 	last := d.boundaries[len(d.boundaries)-1]
-	lastFN := d.fileNameIndex[len(d.fileNameIndex)-1]
+	lastFN := last
+	if len(d.fileNameIndex) > 0 {
+		lastFN = d.fileNameIndex[len(d.fileNameIndex)-1]
+	}
 	return &RepoStats{
 		Repos:        []string{d.unaryData.RepoName},
 		IndexBytes:   int64(d.memoryUse()),
@@ -117,6 +120,11 @@ func (i *bruteForceIter) coversContent() bool {
 
 func (data *indexData) matchAllDocIterator() docIterator {
 	var cands []*candidateMatch
+
+	if len(data.fileNameIndex) == 0 {
+		return &bruteForceIter{cands}
+	}
+
 	var last uint32
 	for i, off := range data.fileNameIndex[1:] {
 		name := data.fileNameContent[last:off]
