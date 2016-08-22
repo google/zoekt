@@ -69,6 +69,15 @@ func TestBasic(t *testing.T) {
 	}
 }
 
+func TestEmptyIndex(t *testing.T) {
+	b := NewIndexBuilder()
+
+	res := searchForTest(t, b, &query.Substring{Pattern: "water"})
+	if fmatches := res.Files; len(fmatches) != 0 {
+		t.Fatalf("got %v, want 0 matches", fmatches)
+	}
+}
+
 type memSeeker struct {
 	data []byte
 }

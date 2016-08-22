@@ -137,7 +137,9 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 		}
 	}
 
-	d.fileEnds = toc.fileContents.relativeIndex()[1:]
+	if r := toc.fileContents.relativeIndex(); len(r) > 0 {
+		d.fileEnds = r[1:]
+	}
 	d.fileBranchMasks, err = d.readSectionU32(toc.branchMasks)
 	if err != nil {
 		return nil, err
