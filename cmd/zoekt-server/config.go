@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -31,6 +32,17 @@ type configEntry struct {
 	GitilesURL string
 	Name       string
 	Exclude    string
+}
+
+func randomize(entries []configEntry) []configEntry {
+	perm := rand.Perm(len(entries))
+
+	var shuffled []configEntry
+	for _, i := range perm {
+		shuffled = append(shuffled, entries[i])
+	}
+
+	return shuffled
 }
 
 func readConfig(filename string) ([]configEntry, error) {
@@ -91,13 +103,6 @@ func periodicMirror(repoDir string, cfgFile string, interval time.Duration) {
 
 	var lastCfg []configEntry
 	for {
-
-		select {
-		case <-watcher:
-			log.Printf("mirror config %s changed", cfgFile)
-		case <-t.C:
-		}
-
 		cfg, err := readConfig(cfgFile)
 		if err != nil {
 			log.Printf("readConfig(%s): %v", cfgFile, err)
@@ -105,6 +110,11 @@ func periodicMirror(repoDir string, cfgFile string, interval time.Duration) {
 		} else {
 			lastCfg = cfg
 		}
+
+		// Randomize the ordering in which we query
+		// things. This is to ensure that quota limits don't
+		// always hit the last one in the list.
+		lastCfg = randomize(lastCfg)
 		for _, c := range lastCfg {
 			if c.GithubUser != "" {
 				cmd := exec.Command("zoekt-mirror-github", "-user", c.GithubUser, "-name", c.Name,
@@ -115,6 +125,12 @@ func periodicMirror(repoDir string, cfgFile string, interval time.Duration) {
 					"-exclude", c.Exclude, "-dest", repoDir, "-name", c.Name, c.GitilesURL)
 				loggedRun(cmd)
 			}
+		}
+
+		select {
+		case <-watcher:
+			log.Printf("mirror config %s changed", cfgFile)
+		case <-t.C:
 		}
 	}
 }
