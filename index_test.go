@@ -87,6 +87,9 @@ func TestEmptyIndex(t *testing.T) {
 		t.Fatalf("List: %v", err)
 	}
 
+	if _, err := searcher.Search(context.Background(), &query.Substring{Pattern: "java", FileName: true}, &opts); err != nil {
+		t.Fatalf("Search: %v", err)
+	}
 }
 
 type memSeeker struct {

@@ -481,6 +481,10 @@ func (d *indexData) Search(ctx context.Context, q query.Q, opts *SearchOptions) 
 	opts.SetDefaults()
 	importantMatchCount := 0
 
+	if len(d.fileNameIndex) == 0 {
+		return nil, nil
+	}
+
 	var res SearchResult
 
 	q = d.simplify(q)

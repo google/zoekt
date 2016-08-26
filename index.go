@@ -251,6 +251,7 @@ func (data *indexData) getNgramDocIterator(query *query.Substring) (docIterator,
 	input := &ngramDocIterator{
 		query: query,
 	}
+
 	if query.FileName {
 		input.ends = data.fileNameIndex[1:]
 	} else {
