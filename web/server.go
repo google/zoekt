@@ -270,7 +270,28 @@ func (s *Server) serveListReposErr(q query.Q, qStr string, w http.ResponseWriter
 	res := RepoListInput{
 		Last:      LastInput{Query: qStr},
 		RepoCount: len(repos.Repos),
-		Repo:      repos.Repos,
+	}
+	for _, r := range repos.Repos {
+		t := s.getTemplate(r.CommitURLTemplate)
+
+		repo := Repository{
+			Name:      r.Name,
+			URL:       r.URL,
+			IndexTime: r.IndexTime,
+		}
+		for _, b := range r.Branches {
+			var buf bytes.Buffer
+			if err := t.Execute(&buf, b); err != nil {
+				return err
+			}
+			repo.Branches = append(repo.Branches,
+				Branch{
+					Name:    b.Name,
+					Version: b.Version,
+					URL:     buf.String(),
+				})
+		}
+		res.Repos = append(res.Repos, repo)
 	}
 
 	var buf bytes.Buffer

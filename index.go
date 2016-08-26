@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/google/zoekt/query"
 )
@@ -46,17 +47,28 @@ type indexData struct {
 	fileNameNgrams  map[ngram][]uint32
 
 	fileBranchMasks []uint32
-	branchNames     map[uint]string
-	branchIDs       map[string]uint
+
+	// mask (power of 2) => name
+	branchNames map[uint]string
+
+	// name => mask (power of 2)
+	branchIDs map[string]uint
 
 	unaryData indexUnaryData
 }
 
 type indexUnaryData struct {
-	RepoName           string
-	RepoURL            string
-	RepoLineFragment   string
-	IndexFormatVersion int
+	RepoName string
+	RepoURL  string
+
+	CommitURLTemplate        string
+	FileURLTemplate          string
+	RepoLineFragmentTemplate string
+	IndexFormatVersion       int
+
+	IndexTime      time.Time
+	BranchNames    []string
+	BranchVersions []string
 }
 
 func (d *indexData) memoryUse() int {

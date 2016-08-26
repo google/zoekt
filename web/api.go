@@ -71,7 +71,22 @@ type SearchBoxInput struct {
 type RepoListInput struct {
 	Last      LastInput
 	RepoCount int
-	Repo      []string
+	Repos     []Repository
+}
+
+// Branch holds the metadata for a indexed branch.
+type Branch struct {
+	Name    string
+	Version string
+	URL     string
+}
+
+// Repository holds the metadata for an indexed repository.
+type Repository struct {
+	Name      string
+	URL       string
+	IndexTime time.Time
+	Branches  []Branch
 }
 
 // PrintInput is provided to the server.Print template.

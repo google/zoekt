@@ -57,12 +57,16 @@ func searcherForTest(t *testing.T, b *zoekt.IndexBuilder) zoekt.Searcher {
 func TestBasic(t *testing.T) {
 	b := zoekt.NewIndexBuilder()
 	b.SetName("name")
-	b.SetRepoURL("url", "fragment")
-	b.AddFile("f2", []byte("to carry water in the no later bla"))
-	// -------------------- 0123456789012345678901234567890123456789
+	b.SetURLTemplates("repo-url", "{{.Version}}", "url", "line")
+	b.AddBranch("master", "1234")
+	b.Add(zoekt.Document{
+		Name:    "f2",
+		Content: []byte("to carry water in the no later bla"),
+		// ------------- 0123456789012345678901234567890123456789
+		Branches: []string{"master"},
+	})
 
 	s := searcherForTest(t, b)
-
 	srv := Server{
 		Searcher: s,
 		Top:      Top,
@@ -76,24 +80,31 @@ func TestBasic(t *testing.T) {
 	ts := httptest.NewServer(mux)
 	defer ts.Close()
 
-	res, err := http.Get(ts.URL + "/search?q=water")
-	if err != nil {
-		t.Fatal(err)
-	}
-	resultBytes, err := ioutil.ReadAll(res.Body)
-	res.Body.Close()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	result := string(resultBytes)
-	for _, want := range []string{
-		"href=\"url",
-		"#fragment\"",
-		"carry <b>water</b>",
+	for req, needles := range map[string][]string{
+		"/search?q=water": []string{
+			"href=\"url#line",
+			"carry <b>water</b>",
+		},
+		"/search?q=r:": []string{
+			"1234\">master",
+			"repo-url\">name",
+		},
 	} {
-		if !strings.Contains(result, want) {
-			t.Errorf("result did not have %q: %s", want, result)
+		res, err := http.Get(ts.URL + req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resultBytes, err := ioutil.ReadAll(res.Body)
+		res.Body.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		result := string(resultBytes)
+		for _, want := range needles {
+			if !strings.Contains(result, want) {
+				t.Errorf("result did not have %q: %s", want, result)
+			}
 		}
 	}
 }

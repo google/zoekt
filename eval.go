@@ -642,10 +642,10 @@ nextFileMatch:
 	}
 	sortFilesByScore(res.Files)
 	res.RepoURLs = map[string]string{
-		d.unaryData.RepoName: d.unaryData.RepoURL,
+		d.unaryData.RepoName: d.unaryData.FileURLTemplate,
 	}
 	res.LineFragments = map[string]string{
-		d.unaryData.RepoName: d.unaryData.RepoLineFragment,
+		d.unaryData.RepoName: d.unaryData.RepoLineFragmentTemplate,
 	}
 	return &res, nil
 }
@@ -769,7 +769,19 @@ func (d *indexData) List(ctx context.Context, q query.Q) (*RepoList, error) {
 
 	l := &RepoList{}
 	if c.Value {
-		l.Repos = append(l.Repos, d.unaryData.RepoName)
+		repo := &Repository{
+			Name:              d.unaryData.RepoName,
+			IndexTime:         d.unaryData.IndexTime,
+			URL:               d.unaryData.RepoURL,
+			CommitURLTemplate: d.unaryData.CommitURLTemplate,
+		}
+		for i, n := range d.unaryData.BranchNames {
+			repo.Branches = append(repo.Branches, RepositoryBranch{
+				Name:    n,
+				Version: d.unaryData.BranchVersions[i]})
+		}
+
+		l.Repos = append(l.Repos, repo)
 	}
 	return l, nil
 }

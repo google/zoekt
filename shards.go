@@ -312,21 +312,25 @@ func (ss *shardedSearcher) List(ctx context.Context, r query.Q) (*RepoList, erro
 	}
 	<-ss.throttle
 
-	uniq := map[string]struct{}{}
+	uniq := map[string]*Repository{}
 	for i := 0; i < shardCount; i++ {
 		r := <-all
 		if r.err != nil {
 			return nil, r.err
 		}
 		for _, r := range r.rl.Repos {
-			uniq[r] = struct{}{}
+			uniq[r.Name] = r
 		}
 	}
-	var aggregate []string
+	var names []string
 	for k := range uniq {
-		aggregate = append(aggregate, k)
+		names = append(names, k)
 	}
+	sort.Strings(names)
 
-	sort.Strings(aggregate)
+	var aggregate []*Repository
+	for _, k := range names {
+		aggregate = append(aggregate, uniq[k])
+	}
 	return &RepoList{aggregate}, nil
 }

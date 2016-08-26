@@ -26,7 +26,6 @@ import (
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
-	"github.com/libgit2/git2go"
 )
 
 // RepoModTime returns the time of last fetch of a git repository.
@@ -95,59 +94,69 @@ func FindGitRepos(arg string) (map[string]string, error) {
 	return gitDirs, nil
 }
 
-// GuessRepoURL guesses the URL template for a repo mirrored from a
+type templates struct {
+	repo, commit, file, line string
+}
+
+// guessRepoURL guesses the URL template for a repo mirrored from a
 // well-known git hosting site.
-func GuessRepoURL(repoDir string) (string, string, error) {
+func guessRepoURL(repoDir string) (*templates, error) {
 	base, err := git.NewConfig()
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 	cfg, err := git.OpenOndisk(base, filepath.Join(repoDir, "config"))
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 
 	remoteURL, err := cfg.LookupString("remote.origin.url")
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 
 	parsed, err := url.Parse(remoteURL)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 
 	if strings.HasSuffix(parsed.Host, "googlesource.com") {
 		/// eg. https://gerrit.googlesource.com/gitiles/+/master/tools/run_dev.sh#20
-		return remoteURL + "/+/{{.Branch}}/{{.Path}}", "{{.LineNumber}}", nil
+		return &templates{
+			repo:   remoteURL,
+			commit: remoteURL + "/+/{{.Version}}",
+			file:   remoteURL + "/+/{{.Branch}}/{{.Path}}",
+			line:   "{{.LineNumber}}",
+		}, nil
 	} else if parsed.Host == "github.com" {
 		// CloneURL from the JSON API has .git
 		parsed.Path = strings.TrimSuffix(parsed.Path, ".git")
 
 		// eg. https://github.com/hanwen/go-fuse/blob/notify/genversion.sh#L10
-		return parsed.String() + "/blob/{{.Branch}}/{{.Path}}", "L{{.LineNumber}}", nil
+		return &templates{
+			repo:   parsed.String(),
+			commit: parsed.String() + "/commit/{{.Version}}",
+			file:   parsed.String() + "/blob/{{.Branch}}/{{.Path}}",
+			line:   "L{{.LineNumber}}",
+		}, nil
 	}
 
-	return "", "", fmt.Errorf("scheme unknown for URL %s", remoteURL)
+	return nil, fmt.Errorf("scheme unknown for URL %s", remoteURL)
 }
 
-// GetTree returns a tree object for the given reference.
-func getTree(repo *git.Repository, ref string) (*git.Tree, error) {
+// getCommit returns a tree object for the given reference.
+func getCommit(repo *git.Repository, ref string) (*git.Commit, error) {
 	obj, err := repo.RevparseSingle(ref)
 	if err != nil {
 		return nil, err
 	}
 	defer obj.Free()
 
-	treeObj, err := obj.Peel(git.ObjectTree)
+	commitObj, err := obj.Peel(git.ObjectCommit)
 	if err != nil {
 		return nil, err
 	}
-	tree, err := treeObj.AsTree()
-	if err != nil {
-		return nil, err
-	}
-	return tree, nil
+	return commitObj.AsCommit()
 }
 
 // IndexGitRepo indexes the git repository as specified by the options and arguments.
@@ -157,17 +166,13 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 		return err
 	}
 
-	url, fragment, err := GuessRepoURL(opts.RepoDir)
-	if err != nil {
+	if tpl, err := guessRepoURL(opts.RepoDir); err != nil {
 		log.Printf("guessRepoURL(%s): %s", opts.RepoDir, err)
 	} else {
-		opts.RepoURL = url
-		opts.RepoLineFragment = fragment
-	}
-
-	builder, err := build.NewBuilder(opts)
-	if err != nil {
-		return err
+		opts.RepoURL = tpl.repo
+		opts.FileURLTemplate = tpl.file
+		opts.CommitURLTemplate = tpl.commit
+		opts.LineFragmentTemplate = tpl.line
 	}
 
 	// name => branch
@@ -179,7 +184,16 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 	data := map[string]map[string]git.Oid{}
 	repos := map[git.Oid]*git.Repository{}
 	for _, b := range branches {
-		tree, err := getTree(repo, filepath.Join(branchPrefix, b))
+		commit, err := getCommit(repo, filepath.Join(branchPrefix, b))
+		if err != nil {
+			return err
+		}
+		opts.Branches = append(opts.Branches, build.Branch{
+			Name:    b,
+			Version: commit.Id().String(),
+		})
+
+		tree, err := commit.Tree()
 		if err != nil {
 			return err
 		}
@@ -196,6 +210,11 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 			allfiles[f] = append(allfiles[f], b)
 		}
 		data[b] = fs
+	}
+
+	builder, err := build.NewBuilder(opts)
+	if err != nil {
+		return err
 	}
 
 	for n := range allfiles {

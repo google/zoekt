@@ -62,6 +62,7 @@ func (r *reader) readTOC(toc *indexTOC) error {
 	}
 
 	secs := toc.sections()
+
 	if len(secs) != int(sectionCount) {
 		return fmt.Errorf("section count mismatch: got %d want %d", len(secs), sectionCount)
 	}
@@ -103,8 +104,8 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 		file:           r.r,
 		ngrams:         map[ngram]simpleSection{},
 		fileNameNgrams: map[ngram][]uint32{},
-		branchNames:    map[uint]string{},
 		branchIDs:      map[string]uint{},
+		branchNames:    map[uint]string{},
 	}
 	blob, err := d.readSectionBlob(toc.unaryData)
 	if err != nil {
@@ -170,21 +171,10 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 		d.fileNameNgrams[bytesToNGram(nameNgramText[i:i+ngramSize])] = fromDeltas(fileNamePostingsData[off:end], nil)
 	}
 
-	branchNameContent, err := d.readSectionBlob(toc.branchNames.data)
-	if err != nil {
-		return nil, err
-	}
-
-	if branchNameIndex := toc.branchNames.relativeIndex(); len(branchNameIndex) > 0 {
-		var last uint32
-		id := uint(1)
-		for _, end := range branchNameIndex[1:] {
-			n := string(branchNameContent[last:end])
-			d.branchIDs[n] = id
-			d.branchNames[id] = n
-			id <<= 1
-			last = end
-		}
+	for j, br := range d.unaryData.BranchNames {
+		id := uint(1) << uint(j)
+		d.branchIDs[br] = id
+		d.branchNames[id] = br
 	}
 	return &d, nil
 }
@@ -233,7 +223,9 @@ func NewSearcher(r IndexFile) (Searcher, error) {
 	rd := &reader{r: r}
 
 	var toc indexTOC
-	rd.readTOC(&toc)
+	if err := rd.readTOC(&toc); err != nil {
+		return nil, err
+	}
 	indexData, err := rd.readIndexData(&toc)
 	if err != nil {
 		return nil, err

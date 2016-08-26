@@ -41,7 +41,6 @@ func TestBasic(t *testing.T) {
 		ShardMax:    1024,
 		RepoName:    "repo",
 		RepoDir:     "/repo",
-		RepoURL:     "url",
 		Parallelism: 2,
 		SizeMax:     1 << 20,
 	}
@@ -93,12 +92,12 @@ func TestUpdate(t *testing.T) {
 	}
 
 	opts := Options{
-		IndexDir:    dir,
-		ShardMax:    1024,
-		RepoName:    "repo",
-		RepoURL:     "url",
-		Parallelism: 2,
-		SizeMax:     1 << 20,
+		IndexDir:        dir,
+		ShardMax:        1024,
+		RepoName:        "repo",
+		FileURLTemplate: "url",
+		Parallelism:     2,
+		SizeMax:         1 << 20,
 
 		RepoDir: "/a",
 	}
@@ -130,7 +129,7 @@ func TestUpdate(t *testing.T) {
 	}
 
 	opts.RepoName = "repo2"
-	opts.RepoURL = "url2"
+	opts.FileURLTemplate = "url2"
 	opts.RepoDir = "/b"
 	if b, err := NewBuilder(opts); err != nil {
 		t.Fatalf("NewBuilder: %v", err)
@@ -176,12 +175,12 @@ func TestDeleteOldShards(t *testing.T) {
 	}
 
 	opts := Options{
-		IndexDir: dir,
-		ShardMax: 1024,
-		RepoName: "repo",
-		RepoURL:  "url",
-		RepoDir:  "/a",
-		SizeMax:  1 << 20,
+		IndexDir:        dir,
+		ShardMax:        1024,
+		RepoName:        "repo",
+		FileURLTemplate: "url",
+		RepoDir:         "/a",
+		SizeMax:         1 << 20,
 	}
 	opts.SetDefaults()
 

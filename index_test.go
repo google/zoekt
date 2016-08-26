@@ -692,7 +692,7 @@ func TestRepoURL(t *testing.T) {
 	content := []byte("blablabla")
 	b.AddFile("f1", content)
 	b.SetName("name")
-	b.SetRepoURL("URL", "fragment")
+	b.SetURLTemplates("repo", "commit", "URL", "fragment")
 	sres := searchForTest(t, b,
 		&query.Substring{Pattern: "bla"})
 
@@ -702,7 +702,6 @@ func TestRepoURL(t *testing.T) {
 	if sres.LineFragments["name"] != "fragment" {
 		t.Errorf("got URLs %v, want {name: URL}", sres.LineFragments)
 	}
-
 }
 
 func TestRegexpCaseSensitive(t *testing.T) {
@@ -877,7 +876,7 @@ func TestListRepos(t *testing.T) {
 	if err != nil {
 		t.Fatalf("List(%v): %v", q, err)
 	}
-	if len(res.Repos) != 1 || res.Repos[0] != "reponame" {
+	if len(res.Repos) != 1 || res.Repos[0].Name != "reponame" {
 		t.Fatalf("got %v, want 1 matches", res)
 	}
 	q = &query.Repo{Pattern: "bla"}

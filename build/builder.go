@@ -33,6 +33,12 @@ import (
 
 var DefaultDir = filepath.Join(os.Getenv("HOME"), ".zoekt")
 
+// Branch describes a single branch version.
+type Branch struct {
+	Name    string
+	Version string
+}
+
 // Options sets options for the index building.
 type Options struct {
 	// IndexDir is a directory that holds *.zoekt index files.
@@ -50,20 +56,29 @@ type Options struct {
 	// RepoName is name of the repository.
 	RepoName string
 
-	// RepoDir is the path to the repository
+	// RepoDir is the path to the repository on the indexing machine.
 	RepoDir string
 
-	// RepoURL is the URL template for the repository.
+	// RepoURL is an URL to the repository.
 	RepoURL string
 
-	// RepoLineFragment is the URL fragment template for the line number.
-	RepoLineFragment string
+	// CommitURLTemplate is the URL template for the commit.
+	CommitURLTemplate string
+
+	// FileURLTemplate is the URL template for the repository.
+	FileURLTemplate string
+
+	// LineFragmentTemplate is the URL fragment template for the line number.
+	LineFragmentTemplate string
 
 	// Path to exuberant ctags binary to run
 	CTags string
 
 	// Path to namespace-sandbox from Bazel
 	NamespaceSandbox string
+
+	// Branches sets the version IDs for each branch
+	Branches []Branch
 }
 
 // Builder manages (parallel) creation of uniformly sized shards.
@@ -233,7 +248,14 @@ func (b *Builder) buildShard(todo []*zoekt.Document, nextShardNum int) error {
 
 	shardBuilder := zoekt.NewIndexBuilder()
 	shardBuilder.SetName(b.opts.RepoName)
-	shardBuilder.SetRepoURL(b.opts.RepoURL, b.opts.RepoLineFragment)
+	shardBuilder.SetURLTemplates(
+		b.opts.RepoURL,
+		b.opts.CommitURLTemplate, b.opts.FileURLTemplate, b.opts.LineFragmentTemplate)
+	for _, b := range b.opts.Branches {
+		if err := shardBuilder.AddBranch(b.Name, b.Version); err != nil {
+			return err
+		}
+	}
 	for _, t := range todo {
 		shardBuilder.Add(*t)
 	}

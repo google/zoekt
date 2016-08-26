@@ -120,8 +120,31 @@ type SearchResult struct {
 	LineFragments map[string]string
 }
 
+// RepositoryBranch describes an indexed branch, which is a name
+// combined with a version.
+type RepositoryBranch struct {
+	Name    string
+	Version string
+}
+
+// Repository holds repository metadata.
+type Repository struct {
+	Name string
+	URL  string
+
+	// The branches indexed in this repo.
+	Branches []RepositoryBranch
+
+	// Timestamp of indexing
+	IndexTime time.Time
+
+	// URL template to link to the commit of a branch
+	CommitURLTemplate string
+}
+
+// RepoList holds a set of Repository metadata.
 type RepoList struct {
-	Repos []string
+	Repos []*Repository
 }
 
 type Searcher interface {

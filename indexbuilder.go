@@ -69,17 +69,26 @@ type IndexBuilder struct {
 	// like postings, but for filenames
 	namePostings map[ngram][]uint32
 
-	// Branch name => ID
-	branches map[string]uint
+	// Branch names; first is the default.
+	branches []string
+
+	// Branch versions. Length matches branches.
+	versions []string
 
 	// The repository name
 	repoName string
 
-	// The repository URL
+	// The repository URL.
 	repoURL string
 
+	// The repository URL.
+	fileURLTemplate string
+
 	// The URL fragment for line numbers.
-	repoLineFragment string
+	lineFragmentTemplate string
+
+	// The URL template for a branch.
+	commitURLTemplate string
 }
 
 // ContentSize returns the number of content bytes so far ingested.
@@ -94,7 +103,6 @@ func NewIndexBuilder() *IndexBuilder {
 	return &IndexBuilder{
 		contentPostings: make(map[ngram][]uint32),
 		namePostings:    make(map[ngram][]uint32),
-		branches:        make(map[string]uint),
 	}
 }
 
@@ -102,17 +110,19 @@ func (b *IndexBuilder) SetName(nm string) {
 	b.repoName = nm
 }
 
-// SetRepoURL sets the repository URL template for linking back to
-// files.
-func (b *IndexBuilder) SetRepoURL(url, fragment string) error {
-	if _, err := template.New("url").Parse(url); err != nil {
-		return err
+// SetURLTemplates sets the repository URL templates for linking back to
+// files. The fileURL has access to {{Branch}}, {{Path}} and fragment
+// to {{LineNumber}}.
+func (b *IndexBuilder) SetURLTemplates(repoURL, commitURL, fileURL, fragment string) error {
+	for _, t := range []string{commitURL, fileURL, fragment} {
+		if _, err := template.New("").Parse(t); err != nil {
+			return err
+		}
 	}
-	if _, err := template.New("fragment").Parse(fragment); err != nil {
-		return err
-	}
-	b.repoURL = url
-	b.repoLineFragment = fragment
+	b.repoURL = repoURL
+	b.commitURLTemplate = commitURL
+	b.fileURLTemplate = fileURL
+	b.lineFragmentTemplate = fragment
 	return nil
 }
 
@@ -140,20 +150,26 @@ func (b *IndexBuilder) AddFile(name string, content []byte) {
 	b.Add(Document{Name: name, Content: content})
 }
 
-func (b *IndexBuilder) addBranch(br string) uint {
-	id, ok := b.branches[br]
-	if !ok {
-		id = uint(1) << uint(len(b.branches))
-		b.branches[br] = id
+// addBranch adds a branch (if new) and returns its index.
+func (b *IndexBuilder) addBranch(br, v string) int {
+	for i, n := range b.branches {
+		if n == br {
+			return i
+		}
 	}
-
-	return id
+	b.branches = append(b.branches, br)
+	b.versions = append(b.versions, v)
+	return len(b.branches) - 1
 }
 
 // AddBranch registers a branch name.  The first is assumed to be the
 // default.
-func (b *IndexBuilder) AddBranch(branch string) {
-	b.addBranch(branch)
+func (b *IndexBuilder) AddBranch(br, version string) error {
+	idx := b.addBranch(br, version)
+	if idx >= 32 {
+		return fmt.Errorf("branch %q: branch counts are limited to 32")
+	}
+	return nil
 }
 
 const maxTrigramCount = 20000
@@ -192,7 +208,7 @@ func (b *IndexBuilder) Add(doc Document) error {
 
 	var mask uint32
 	for _, br := range doc.Branches {
-		mask |= uint32(b.addBranch(br))
+		mask |= uint32(1 << uint(b.addBranch(br, "")))
 	}
 
 	b.branchMasks = append(b.branchMasks, mask)

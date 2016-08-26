@@ -20,11 +20,12 @@ import (
 	"io"
 	"log"
 	"sort"
+	"time"
 )
 
 // FormatVersion is a version number. It is increased every time the
 // on-disk index format is changed.
-const IndexFormatVersion = 2
+const IndexFormatVersion = 3
 
 var _ = log.Println
 
@@ -37,7 +38,6 @@ type indexTOC struct {
 	ngramText    simpleSection
 
 	branchMasks simpleSection
-	branchNames compoundSection
 
 	nameNgramText simpleSection
 	namePostings  compoundSection
@@ -58,7 +58,6 @@ func (t *indexTOC) sections() []section {
 		&t.nameNgramText,
 		&t.namePostings,
 		&t.branchMasks,
-		&t.branchNames,
 	}
 }
 
@@ -144,32 +143,22 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 	}
 	toc.namePostings.end(w)
 
-	var intKeys []int
-	inv := map[uint]string{}
-	for k, v := range b.branches {
-		inv[v] = k
-		intKeys = append(intKeys, int(v))
-	}
-	sort.Ints(intKeys)
-
-	toc.branchNames.start(w)
-	for _, k := range intKeys {
-		toc.branchNames.addItem(w, []byte(inv[uint(k)]))
-	}
-	toc.branchNames.end(w)
-
 	unaryData := indexUnaryData{
-		RepoName:           b.repoName,
-		RepoURL:            b.repoURL,
-		RepoLineFragment:   b.repoLineFragment,
-		IndexFormatVersion: IndexFormatVersion,
+		BranchNames:              b.branches,
+		BranchVersions:           b.versions,
+		RepoName:                 b.repoName,
+		RepoURL:                  b.repoURL,
+		CommitURLTemplate:        b.commitURLTemplate,
+		FileURLTemplate:          b.fileURLTemplate,
+		RepoLineFragmentTemplate: b.lineFragmentTemplate,
+		IndexFormatVersion:       IndexFormatVersion,
+		IndexTime:                time.Now(),
 	}
 
 	blob, err := json.Marshal(&unaryData)
 	if err != nil {
 		return err
 	}
-
 	toc.unaryData.start(w)
 	w.Write(blob)
 	toc.unaryData.end(w)

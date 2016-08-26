@@ -141,8 +141,14 @@ var RepoListTemplate = template.Must(Top.New("repolist").Parse(`<html>
  <hr>
   Found {{.RepoCount}} repositories:
   <p>
-  {{range .Repo}}
-    <li><tt>{{.}}</tt></li>
+  {{range .Repos}}
+    <li>
+      <tt>{{if .URL}}<a href="{{.URL}}">{{end}}{{.Name}}{{if .URL}}</a>{{end}}
+      </tt> (<small>{{.IndexTime.Format "Jan 02, 2006 15:04"}}</small>). Branches:
+      {{range .Branches}}
+         {{if .URL}}<a href="{{.URL}}">{{end}}{{.Name}}{{if .URL}}</a>{{end}},
+      {{end}}
+   </li>
   {{end}}
   </ul>
 </body>
