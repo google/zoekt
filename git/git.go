@@ -26,6 +26,8 @@ import (
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
+
+	git "github.com/libgit2/git2go"
 )
 
 // RepoModTime returns the time of last fetch of a git repository.

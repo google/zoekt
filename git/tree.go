@@ -17,7 +17,7 @@ package gitindex
 import (
 	"path/filepath"
 
-	"github.com/libgit2/git2go"
+	git "github.com/libgit2/git2go"
 )
 
 type repoWalker struct {
