@@ -24,6 +24,8 @@ import (
 	"testing"
 
 	"github.com/google/zoekt"
+	"github.com/google/zoekt/query"
+	"golang.org/x/net/context"
 )
 
 // TODO(hanwen): cut & paste from ../ . Should create internal test
@@ -39,6 +41,9 @@ func (s *memSeeker) Read(off, sz uint32) ([]byte, error) {
 
 func (s *memSeeker) Size() (uint32, error) {
 	return uint32(len(s.data)), nil
+}
+func (s *memSeeker) Name() string {
+	return "memSeeker"
 }
 
 func searcherForTest(t *testing.T, b *zoekt.IndexBuilder) zoekt.Searcher {
@@ -80,6 +85,17 @@ func TestBasic(t *testing.T) {
 	ts := httptest.NewServer(mux)
 	defer ts.Close()
 
+	res, err := http.Get(ts.URL + "/search?q=water")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resultBytes, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+
+	result := string(resultBytes)
 	for req, needles := range map[string][]string{
 		"/search?q=water": []string{
 			"href=\"url#line",
@@ -106,5 +122,48 @@ func TestBasic(t *testing.T) {
 				t.Errorf("result did not have %q: %s", want, result)
 			}
 		}
+	}
+	if notWant := "crashed"; strings.Contains(result, notWant) {
+		t.Errorf("result has %q: %s", notWant, result)
+	}
+}
+
+type crashSearcher struct {
+	zoekt.Searcher
+}
+
+func (s *crashSearcher) Search(ctx context.Context, q query.Q, opts *zoekt.SearchOptions) (*zoekt.SearchResult, error) {
+	res := zoekt.SearchResult{}
+	res.Stats.Crashes = 1
+	return &res, nil
+}
+
+func TestCrash(t *testing.T) {
+	srv := Server{
+		Searcher: &crashSearcher{},
+		Top:      Top,
+	}
+
+	mux, err := NewMux(&srv)
+	if err != nil {
+		t.Fatalf("NewMux: %v", err)
+	}
+
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+
+	res, err := http.Get(ts.URL + "/search?q=water")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resultBytes, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result := string(resultBytes)
+	if want := "1 shards crashed"; !strings.Contains(result, want) {
+		t.Errorf("result did not have %q: %s", want, result)
 	}
 }

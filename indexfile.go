@@ -54,3 +54,7 @@ func (f indexFileFromOS) Size() (uint32, error) {
 func (f indexFileFromOS) Close() {
 	f.f.Close()
 }
+
+func (f indexFileFromOS) Name() string {
+	return f.f.Name()
+}

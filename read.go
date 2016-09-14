@@ -216,6 +216,7 @@ type IndexFile interface {
 	Read(off uint32, sz uint32) ([]byte, error)
 	Size() (uint32, error)
 	Close()
+	Name() string
 }
 
 // NewSearcher creates a Searcher for a single index file.

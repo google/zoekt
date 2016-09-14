@@ -96,6 +96,10 @@ type memSeeker struct {
 	data []byte
 }
 
+func (s *memSeeker) Name() string {
+	return "memseeker"
+}
+
 func (s *memSeeker) Close() {}
 func (s *memSeeker) Read(off, sz uint32) ([]byte, error) {
 	return s.data[off : off+sz], nil

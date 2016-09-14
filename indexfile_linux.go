@@ -29,6 +29,10 @@ func (f *mmapedIndexFile) Read(off, sz uint32) ([]byte, error) {
 	return f.data[off : off+sz], nil
 }
 
+func (f *mmapedIndexFile) Name() string {
+	return f.f.Name()
+}
+
 func (f *mmapedIndexFile) Size() (uint32, error) {
 	fi, err := f.f.Stat()
 	if err != nil {

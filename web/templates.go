@@ -112,6 +112,7 @@ var ResultsTemplate = template.Must(Top.New("results").Parse(`<html>
 <body>
   {{template "box" .Last}}
 <hr>
+  {{if .Stats.Crashes}}<br><b>{{.Stats.Crashes}} shards crashed</b><br>{{end}}
   Found {{.Stats.MatchCount}} results in {{.Stats.FileCount}} files ({{.Stats.NgramMatches}} ngram matches,
     {{.Stats.FilesConsidered}} docs considered, {{.Stats.FilesLoaded}} docs ({{HumanUnit .Stats.BytesLoaded}}B) loaded,
     {{.Stats.FilesSkipped}} docs skipped): for

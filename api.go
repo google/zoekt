@@ -67,8 +67,17 @@ type MatchFragment struct {
 
 // Stats contains interesting numbers on the search
 type Stats struct {
-	// Number of candidate matches as a result of searching ngrams.
-	NgramMatches int
+	// Total length of files loaded.
+	BytesLoaded int64
+
+	// Number of search shards that had a crash.
+	Crashes int
+
+	// Wall clock time for this search
+	Duration time.Duration
+
+	// Number of files containing a match.
+	FileCount int
 
 	// Files that we evaluated. Equivalent to files for which all
 	// atom matches (including negations) evaluated to true.
@@ -77,34 +86,29 @@ type Stats struct {
 	// Files for which we loaded file content to verify substring matches
 	FilesLoaded int
 
-	// Total length of files thus loaded.
-	BytesLoaded int64
-
-	// Number of files containing a match.
-	FileCount int
+	// Candidate files whose contents weren't examined because we
+	// gathered enough matches.
+	FilesSkipped int
 
 	// Number of non-overlapping matches
 	MatchCount int
 
-	// Wall clock time for this search
-	Duration time.Duration
+	// Number of candidate matches as a result of searching ngrams.
+	NgramMatches int
 
 	// Wall clock time for queued search.
 	Wait time.Duration
-
-	// Candidate files whose contents weren't examined because we
-	// gathered enough matches.
-	FilesSkipped int
 }
 
 func (s *Stats) Add(o Stats) {
-	s.NgramMatches += o.NgramMatches
-	s.FilesLoaded += o.FilesLoaded
-	s.MatchCount += o.MatchCount
+	s.BytesLoaded += o.BytesLoaded
+	s.Crashes += o.Crashes
 	s.FileCount += o.FileCount
 	s.FilesConsidered += o.FilesConsidered
-	s.BytesLoaded += o.BytesLoaded
+	s.FilesLoaded += o.FilesLoaded
 	s.FilesSkipped += o.FilesSkipped
+	s.MatchCount += o.MatchCount
+	s.NgramMatches += o.NgramMatches
 }
 
 // SearchResult contains search matches and extra data
@@ -144,7 +148,8 @@ type Repository struct {
 
 // RepoList holds a set of Repository metadata.
 type RepoList struct {
-	Repos []*Repository
+	Repos   []*Repository
+	Crashes int
 }
 
 type Searcher interface {
@@ -155,6 +160,9 @@ type Searcher interface {
 	List(ctx context.Context, q query.Q) (*RepoList, error)
 	Stats() (*RepoStats, error)
 	Close()
+
+	// Describe the searcher for debug messages.
+	String() string
 }
 
 type RepoStats struct {
