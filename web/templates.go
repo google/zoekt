@@ -87,9 +87,12 @@ dt {
 
 <div>
 
-<p> Used {{HumanUnit .Stats.IndexBytes}} memory for
+<p>
+Used {{HumanUnit .Stats.IndexBytes}} memory for
 {{.Stats.Documents}} documents ({{HumanUnit .Stats.ContentBytes}})
 from {{len .Stats.Repos}} repositories.
+
+<p><small>{{if .Version}}<em>Zoekt</em> version {{.Version}}, uptime{{else}}Uptime{{end}} {{.Uptime}}</small>
 
 <p>
 To list repositories, try:

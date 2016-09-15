@@ -63,8 +63,10 @@ type Fragment struct {
 
 // SearchBoxInput is provided to the SearchBox template.
 type SearchBoxInput struct {
-	Last  LastInput
-	Stats *zoekt.RepoStats
+	Last    LastInput
+	Stats   *zoekt.RepoStats
+	Version string
+	Uptime  time.Duration
 }
 
 // RepoListInput is provided to the RepoList template.

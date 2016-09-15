@@ -31,6 +31,9 @@ import (
 
 const logFormat = "2006-01-02T15-04-05.999999999Z07"
 
+// To be set from the linker.
+var Version string
+
 func divertLogs(dir string, interval time.Duration) {
 	t := time.NewTicker(interval)
 	var last *os.File
@@ -84,6 +87,7 @@ func main() {
 	s := &web.Server{
 		Searcher: searcher,
 		Top:      web.Top,
+		Version:  Version,
 	}
 	if *print {
 		s.Print = true

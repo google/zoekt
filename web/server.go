@@ -55,6 +55,9 @@ type Server struct {
 	// If set, show files from the index.
 	Print bool
 
+	// Version string for this server.
+	Version string
+
 	// This should contain the following templates: "didyoumean"
 	// (for suggestions), "repolist" (for the repo search result
 	// page), "result" for the search results, "search" (for the
@@ -67,6 +70,8 @@ type Server struct {
 	search     *template.Template
 	result     *template.Template
 	print      *template.Template
+
+	startTime time.Time
 
 	mu            sync.Mutex
 	templateCache map[string]*template.Template
@@ -109,6 +114,7 @@ func NewMux(s *Server) (*http.ServeMux, error) {
 	}
 
 	s.templateCache = map[string]*template.Template{}
+	s.startTime = time.Now()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/search", s.serveSearch)
@@ -245,7 +251,9 @@ func (s *Server) serveSearchBoxErr(w http.ResponseWriter, r *http.Request) error
 	}
 	sort.Strings(stats.Repos)
 	d := SearchBoxInput{
-		Stats: stats,
+		Stats:   stats,
+		Version: s.Version,
+		Uptime:  time.Now().Sub(s.startTime),
 	}
 	if err := s.search.Execute(&buf, &d); err != nil {
 		return err
