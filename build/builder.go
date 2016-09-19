@@ -24,6 +24,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"runtime/pprof"
 	"strings"
 	"sync"
 	"time"
@@ -79,6 +81,9 @@ type Options struct {
 
 	// Branches sets the version IDs for each branch
 	Branches []Branch
+
+	// Write memory profiles to this file.
+	MemProfile string
 }
 
 // Builder manages (parallel) creation of uniformly sized shards.
@@ -219,28 +224,58 @@ func (b *Builder) flush() {
 
 	shard := b.nextShardNum
 	b.nextShardNum++
-	b.building.Add(1)
-	go func() {
-		b.throttle <- 1
-		if b.opts.CTags != "" {
-			if err := ctagsAddSymbols(todo, b.opts.CTags, b.opts.NamespaceSandbox); err != nil {
-				log.Printf("ignoring %s error: %v", b.opts.CTags, err)
+
+	if b.opts.Parallelism > 1 {
+		b.building.Add(1)
+		go func() {
+			b.throttle <- 1
+			err := b.buildShard(todo, shard)
+			<-b.throttle
+
+			b.errMu.Lock()
+			defer b.errMu.Unlock()
+			if err != nil && b.buildError == nil {
+				b.buildError = err
 			}
-		}
+			b.building.Done()
+		}()
+	} else {
+		// No goroutines when we're not parallel. This
+		// simplifies memory profiling.
+		b.buildError = b.buildShard(todo, shard)
 
-		err := b.buildShard(todo, shard)
-		<-b.throttle
-
-		b.errMu.Lock()
-		defer b.errMu.Unlock()
-		if err != nil && b.buildError == nil {
-			b.buildError = err
+		if b.opts.MemProfile != "" {
+			// drop memory, and profile.
+			todo = nil
+			b.writeMemProfile(b.opts.MemProfile)
 		}
-		b.building.Done()
-	}()
+	}
+}
+
+var profileNumber int
+
+func (b *Builder) writeMemProfile(name string) {
+	nm := fmt.Sprintf("%s.%d", name, profileNumber)
+	profileNumber++
+	f, err := os.Create(nm)
+	if err != nil {
+		log.Fatal("could not create memory profile: ", err)
+	}
+	runtime.GC() // get up-to-date statistics
+	if err := pprof.WriteHeapProfile(f); err != nil {
+		log.Fatal("could not write memory profile: ", err)
+	}
+	f.Close()
+	log.Printf("wrote mem profile %q", nm)
 }
 
 func (b *Builder) buildShard(todo []*zoekt.Document, nextShardNum int) error {
+	if b.opts.CTags != "" {
+		if err := ctagsAddSymbols(todo, b.opts.CTags, b.opts.NamespaceSandbox); err != nil {
+			log.Printf("ignoring %s error: %v", b.opts.CTags, err)
+		}
+	}
+
 	name, err := shardName(b.opts.IndexDir, b.opts.RepoDir, nextShardNum)
 	if err != nil {
 		return err
