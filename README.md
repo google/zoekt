@@ -28,6 +28,18 @@ Indexing git repositories (requires libgit2 + git2go):
     go install github.com/google/zoekt/cmd/zoekt-git-index
     $GOPATH/bin/zoekt-git-index -branches master,stable-1.4 -prefix origin/ .
 
+Indexing repo repositories (requires libgit2 + git2go):
+
+    go install github.com/google/zoekt/cmd/zoekt-{repo-index,mirror-gitiles}
+    zoekt-mirror-gitiles -dest ~/repos/ https://gfiber.googlesource.com
+    zoekt-repo-index \
+       -name gfiber \
+       -base_url https://gfiber.googlesource.com/ \
+       -manifest_repo ~/repos/gfiber.googlesource.com/manifests.git \
+       -repo_cache ~/repos \
+       -manifest_rev_prefix=refs/heads/ --rev_prefix= \
+       master:default_unrestricted.xml
+
 Starting the web interface
 
     go install github.com/google/zoekt/cmd/zoekt-webserver

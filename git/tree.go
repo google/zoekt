@@ -38,10 +38,10 @@ func newRepoWalker(r *git.Repository, submodules bool) *repoWalker {
 	}
 }
 
-// treeToFiles fetches the SHA1s for a tree, recursing into
+// TreeToFiles fetches the SHA1s for a tree, recursing into
 // submodules. In addition, it returns a mapping that indicates in
 // which repo each SHA1 can be found.
-func treeToFiles(r *git.Repository, t *git.Tree, submodules bool) (map[string]git.Oid, map[git.Oid]*git.Repository, error) {
+func TreeToFiles(r *git.Repository, t *git.Tree, submodules bool) (map[string]git.Oid, map[git.Oid]*git.Repository, error) {
 	ref := newRepoWalker(r, submodules)
 	t.Walk(ref.cbInt)
 	return ref.tree, ref.repos, ref.err
@@ -71,7 +71,7 @@ func (r *repoWalker) cb(n string, e *git.TreeEntry) error {
 		if err != nil {
 			return err
 		}
-		subFiles, subRepos, err := treeToFiles(subRepo, tree, r.submodules)
+		subFiles, subRepos, err := TreeToFiles(subRepo, tree, r.submodules)
 		if err != nil {
 			return err
 		}

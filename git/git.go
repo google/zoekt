@@ -203,7 +203,7 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 			return err
 		}
 		defer tree.Free()
-		fs, subRepos, err := treeToFiles(repo, tree, submodules)
+		fs, subRepos, err := TreeToFiles(repo, tree, submodules)
 		if err != nil {
 			return err
 		}
