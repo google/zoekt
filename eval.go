@@ -410,6 +410,7 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*substrMatchTree]struct{}) (m
 		st := &substrMatchTree{
 			query:         s,
 			caseSensitive: s.CaseSensitive,
+			fileName:      s.FileName,
 			coversContent: iter.coversContent(),
 			cands:         iter.next(),
 		}

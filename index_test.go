@@ -356,7 +356,7 @@ func TestFileCase(t *testing.T) {
 	}
 }
 
-func TestFileSearchBruteForce(t *testing.T) {
+func TestFileRegexpSearchBruteForce(t *testing.T) {
 	b := NewIndexBuilder()
 
 	b.AddFile("banzana", []byte("x orange y"))
@@ -371,6 +371,22 @@ func TestFileSearchBruteForce(t *testing.T) {
 	if len(matches) != 1 || matches[0].Name != "banzana" {
 		t.Fatalf("got %v, want 1 match on 'banzana'", matches)
 	}
+}
+
+func TestFileSubstringSearchBruteForce(t *testing.T) {
+	b := NewIndexBuilder()
+
+	b.AddFile("banzana", []byte("x orange y"))
+	b.AddFile("banana", []byte("x apple y"))
+
+	searcher := searcherForTest(t, b)
+	q := &query.Substring{
+		Pattern:  "z",
+		FileName: true,
+	}
+
+	// doesn't crash.
+	searcher.Search(context.Background(), q, &SearchOptions{})
 }
 
 func TestSearchMatchAll(t *testing.T) {
