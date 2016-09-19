@@ -107,10 +107,12 @@ func guessRepoURL(repoDir string) (*templates, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer base.Free()
 	cfg, err := git.OpenOndisk(base, filepath.Join(repoDir, "config"))
 	if err != nil {
 		return nil, err
 	}
+	defer cfg.Free()
 
 	remoteURL, err := cfg.LookupString("remote.origin.url")
 	if err != nil {
