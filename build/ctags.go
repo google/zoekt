@@ -38,7 +38,13 @@ func runCTags(bin string, sandboxBin string, inputs map[string][]byte) ([]*ctags
 	defer os.RemoveAll(dir)
 
 	args := []string{bin, "-n", "-f", "-"}
+
+	fileCount := 0
 	for n, c := range inputs {
+		if len(c) == 0 {
+			continue
+		}
+
 		full := filepath.Join(dir, n)
 		if err := os.MkdirAll(filepath.Dir(full), 0700); err != nil {
 			return nil, err
@@ -48,6 +54,10 @@ func runCTags(bin string, sandboxBin string, inputs map[string][]byte) ([]*ctags
 			return nil, err
 		}
 		args = append(args, n)
+		fileCount++
+	}
+	if fileCount == 0 {
+		return nil, nil
 	}
 
 	if sandboxBin != "" {
