@@ -192,6 +192,7 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 		if err != nil {
 			return err
 		}
+		defer commit.Free()
 		opts.Branches = append(opts.Branches, build.Branch{
 			Name:    b,
 			Version: commit.Id().String(),
@@ -201,7 +202,7 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 		if err != nil {
 			return err
 		}
-
+		defer tree.Free()
 		fs, subRepos, err := treeToFiles(repo, tree, submodules)
 		if err != nil {
 			return err
