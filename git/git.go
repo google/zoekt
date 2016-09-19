@@ -240,8 +240,7 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 				return err
 			}
 
-			const maxSz = 128 << 10
-			if blob.Size() > maxSz {
+			if blob.Size() > int64(opts.SizeMax) {
 				continue
 			}
 
