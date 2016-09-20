@@ -131,6 +131,16 @@ func (q *And) String() string {
 	return fmt.Sprintf("(and %s)", strings.Join(sub, " "))
 }
 
+// NewAnd is syntactic sugar for constructing And queries.
+func NewAnd(qs ...Q) Q {
+	return &And{Children: qs}
+}
+
+// NewOr is syntactic sugar for constructing Or queries.
+func NewOr(qs ...Q) Q {
+	return &Or{Children: qs}
+}
+
 // Branch limits search to a specific branch.
 type Branch struct {
 	Pattern string

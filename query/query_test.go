@@ -44,36 +44,34 @@ func TestSimplify(t *testing.T) {
 
 	cases := []testcase{
 		{
-			in: &Or{[]Q{
-				&Or{[]Q{
-					&And{[]Q{
-						&Substring{Pattern: "hoi"},
-						&Not{&Substring{Pattern: "hai"}},
-					}},
-					&Or{[]Q{
+			in: NewOr(
+				NewOr(
+					NewAnd(&Substring{Pattern: "hoi"},
+						&Not{&Substring{Pattern: "hai"}}),
+					NewOr(
 						&Substring{Pattern: "zip"},
 						&Substring{Pattern: "zap"},
-					}},
-				}}}},
-			want: &Or{[]Q{
-				&And{[]Q{
+					))),
+			want: NewOr(
+				NewAnd(
 					&Substring{Pattern: "hoi"},
-					&Not{&Substring{Pattern: "hai"}},
-				}},
+					&Not{&Substring{Pattern: "hai"}}),
 				&Substring{Pattern: "zip"},
-				&Substring{Pattern: "zap"}},
-			}},
+				&Substring{Pattern: "zap"}),
+		},
 		{in: &And{}, want: &Const{true}},
 		{in: &Or{}, want: &Const{false}},
-		{in: &And{[]Q{&Const{true}, &Const{false}}}, want: &Const{false}},
-		{in: &Or{[]Q{&Const{false}, &Const{true}}}, want: &Const{true}},
+		{in: NewAnd(&Const{true}, &Const{false}), want: &Const{false}},
+		{in: NewOr(&Const{false}, &Const{true}), want: &Const{true}},
 		{in: &Not{&Const{true}}, want: &Const{false}},
-		{in: &And{[]Q{
-			&Substring{Pattern: "byte"},
-			&Not{&And{[]Q{&Substring{Pattern: "byte"}}}}}},
-			want: &And{[]Q{
+		{
+			in: NewAnd(
 				&Substring{Pattern: "byte"},
-				&Not{&Substring{Pattern: "byte"}}}}},
+				&Not{NewAnd(&Substring{Pattern: "byte"})}),
+			want: NewAnd(
+				&Substring{Pattern: "byte"},
+				&Not{&Substring{Pattern: "byte"}}),
+		},
 	}
 
 	for _, c := range cases {
@@ -85,8 +83,8 @@ func TestSimplify(t *testing.T) {
 }
 
 func TestMap(t *testing.T) {
-	in := &And{[]Q{&Substring{Pattern: "bla"}, &Not{&Repo{"foo"}}}}
-	out := &And{[]Q{&Substring{Pattern: "bla"}, &Not{&Const{false}}}}
+	in := NewAnd(&Substring{Pattern: "bla"}, &Not{&Repo{"foo"}})
+	out := NewAnd(&Substring{Pattern: "bla"}, &Not{&Const{false}})
 
 	f := func(q Q) Q {
 		if _, ok := q.(*Repo); ok {
@@ -101,8 +99,7 @@ func TestMap(t *testing.T) {
 }
 
 func TestVisitAtoms(t *testing.T) {
-	in := &And{[]Q{&Substring{}, &Repo{},
-		&Not{&Const{}}}}
+	in := NewAnd(&Substring{}, &Repo{}, &Not{&Const{}})
 	count := 0
 	VisitAtoms(in, func(q Q) {
 		count++

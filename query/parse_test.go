@@ -38,29 +38,24 @@ func TestParseQuery(t *testing.T) {
 	for _, c := range []testcase{
 		{`\bword\b`, &Regexp{Regexp: mustParseRE(`\bword\b`)}},
 		{"fi\"le:bla\"", &Substring{Pattern: "file:bla"}},
-		{"abc or def", &Or{[]Q{&Substring{Pattern: "abc"}, &Substring{Pattern: "def"}}}},
-		{"(abc or def)", &Or{[]Q{&Substring{Pattern: "abc"}, &Substring{Pattern: "def"}}}},
-		{"(ppp qqq or rrr sss)", &Or{[]Q{
-			&And{[]Q{&Substring{Pattern: "ppp"}, &Substring{Pattern: "qqq"}}},
-			&And{[]Q{&Substring{Pattern: "rrr"}, &Substring{Pattern: "sss"}}},
-		}}},
-
-		{"((x) ora b(z(d)))", &And{[]Q{
+		{"abc or def", NewOr(&Substring{Pattern: "abc"}, &Substring{Pattern: "def"})},
+		{"(abc or def)", NewOr(&Substring{Pattern: "abc"}, &Substring{Pattern: "def"})},
+		{"(ppp qqq or rrr sss)", NewOr(
+			NewAnd(&Substring{Pattern: "ppp"}, &Substring{Pattern: "qqq"}),
+			NewAnd(&Substring{Pattern: "rrr"}, &Substring{Pattern: "sss"}))},
+		{"((x) ora b(z(d)))", NewAnd(
 			&Regexp{Regexp: mustParseRE("(x)")},
 			&Substring{Pattern: "ora"},
-			&Regexp{Regexp: mustParseRE("b(z(d))")},
-		}}},
-
+			&Regexp{Regexp: mustParseRE("b(z(d))")})},
 		{"( )", &Const{Value: true}},
 		{"(abc)(de)", &Regexp{Regexp: mustParseRE("(abc)(de)")}},
 		{"sub-pixel", &Substring{Pattern: "sub-pixel"}},
 		{"abc", &Substring{Pattern: "abc"}},
 		{"ABC", &Substring{Pattern: "ABC", CaseSensitive: true}},
 		{"\"abc bcd\"", &Substring{Pattern: "abc bcd"}},
-		{"abc bcd", &And{[]Q{
+		{"abc bcd", NewAnd(
 			&Substring{Pattern: "abc"},
-			&Substring{Pattern: "bcd"},
-		}}},
+			&Substring{Pattern: "bcd"})},
 		{"f:fs", &Substring{Pattern: "fs", FileName: true}},
 		{"fs", &Substring{Pattern: "fs"}},
 		{"-abc", &Not{&Substring{Pattern: "abc"}}},
@@ -68,14 +63,12 @@ func TestParseQuery(t *testing.T) {
 		{"file:abc", &Substring{Pattern: "abc", FileName: true}},
 		{"branch:pqr", &Branch{Pattern: "pqr"}},
 		{"((x) )", &Regexp{Regexp: mustParseRE("(x)")}},
-		{"file:helpers\\.go byte", &And{[]Q{
+		{"file:helpers\\.go byte", NewAnd(
 			&Substring{Pattern: "helpers.go", FileName: true},
-			&Substring{Pattern: "byte"},
-		}}},
-		{"(abc def)", &And{[]Q{
+			&Substring{Pattern: "byte"})},
+		{"(abc def)", NewAnd(
 			&Substring{Pattern: "abc"},
-			&Substring{Pattern: "def"},
-		}}},
+			&Substring{Pattern: "def"})},
 		{"(abc def", nil},
 		{"regex:abc[p-q]", &Regexp{Regexp: mustParseRE("abc[p-q]")}},
 		{"aBc[p-q]", &Regexp{Regexp: mustParseRE("aBc[p-q]"), CaseSensitive: true}},

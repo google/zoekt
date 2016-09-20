@@ -222,16 +222,14 @@ func TestAndSearch(t *testing.T) {
 	b.AddFile("f2", []byte("x apple y"))
 	b.AddFile("f3", []byte("x banana apple y"))
 	// ---------------------0123456789012345
-	sres := searchForTest(t, b, &query.And{
-		Children: []query.Q{
-			&query.Substring{
-				Pattern: "banana",
-			},
-			&query.Substring{
-				Pattern: "apple",
-			},
+	sres := searchForTest(t, b, query.NewAnd(
+		&query.Substring{
+			Pattern: "banana",
 		},
-	})
+		&query.Substring{
+			Pattern: "apple",
+		},
+	))
 	matches := sres.Files
 	if len(matches) != 1 || len(matches[0].Matches) != 1 || len(matches[0].Matches[0].Fragments) != 2 {
 		t.Fatalf("got %#v, want 1 match with 2 fragments", matches)
@@ -260,16 +258,13 @@ func TestAndNegateSearch(t *testing.T) {
 	b.AddFile("f1", []byte("x banana y"))
 	b.AddFile("f4", []byte("x banana apple y"))
 	// ---------------------0123456789012345
-	sres := searchForTest(t, b, &query.And{
-		Children: []query.Q{
-			&query.Substring{
-				Pattern: "banana",
-			},
-			&query.Not{&query.Substring{
-				Pattern: "apple",
-			}},
+	sres := searchForTest(t, b, query.NewAnd(
+		&query.Substring{
+			Pattern: "banana",
 		},
-	})
+		&query.Not{&query.Substring{
+			Pattern: "apple",
+		}}))
 
 	matches := sres.Files
 
@@ -293,16 +288,13 @@ func TestNegativeMatchesOnlyShortcut(t *testing.T) {
 	b.AddFile("f3", []byte("x appelmoes y"))
 	b.AddFile("f3", []byte("x appelmoes y"))
 
-	sres := searchForTest(t, b, &query.And{
-		Children: []query.Q{
-			&query.Substring{
-				Pattern: "banana",
-			},
-			&query.Not{&query.Substring{
-				Pattern: "appel",
-			}},
+	sres := searchForTest(t, b, query.NewAnd(
+		&query.Substring{
+			Pattern: "banana",
 		},
-	})
+		&query.Not{&query.Substring{
+			Pattern: "appel",
+		}}))
 
 	if sres.Stats.FilesConsidered != 1 {
 		t.Errorf("got %#v, want FilesConsidered: 1", sres.Stats)
@@ -441,15 +433,14 @@ func TestFileRestriction(t *testing.T) {
 	// --------------------------0123456879
 	b.AddFile("banana2", []byte("x apple y"))
 	b.AddFile("orange", []byte("x apple y"))
-	sres := searchForTest(t, b, &query.And{[]query.Q{
+	sres := searchForTest(t, b, query.NewAnd(
 		&query.Substring{
 			Pattern:  "banana",
 			FileName: true,
 		},
 		&query.Substring{
 			Pattern: "apple",
-		},
-	}})
+		}))
 
 	matches := sres.Files
 	if len(matches) != 1 || len(matches[0].Matches) != 1 {
@@ -515,14 +506,13 @@ func TestBranchMask(t *testing.T) {
 	b.Add(Document{Name: "f3", Content: []byte("needle"), Branches: []string{"stable", "master"}})
 	b.Add(Document{Name: "f4", Content: []byte("needle"), Branches: []string{"bonzai"}})
 
-	sres := searchForTest(t, b, &query.And{[]query.Q{
+	sres := searchForTest(t, b, query.NewAnd(
 		&query.Substring{
 			Pattern: "needle",
 		},
 		&query.Branch{
 			Pattern: "table",
-		},
-	}})
+		}))
 
 	if len(sres.Files) != 2 || sres.Files[0].Name != "f3" || sres.Files[1].Name != "f2" {
 		t.Fatalf("got %v, want 1 result from f2", sres.Files)
@@ -558,16 +548,13 @@ func TestCoversContent(t *testing.T) {
 	b.Add(Document{Name: "f1", Content: []byte("needle the bla"), Branches: branches})
 
 	sres := searchForTest(t, b,
-		&query.And{
-			Children: []query.Q{
-				&query.Substring{
-					Pattern: "needle",
-				},
-				&query.Not{&query.Substring{
-					Pattern: "the",
-				}},
+		query.NewAnd(
+			&query.Substring{
+				Pattern: "needle",
 			},
-		})
+			&query.Not{&query.Substring{
+				Pattern: "the",
+			}}))
 
 	if len(sres.Files) > 0 {
 		t.Fatalf("got %v, want no results", sres.Files)
@@ -671,10 +658,10 @@ func TestRepoName(t *testing.T) {
 	b.SetName("bla")
 
 	sres := searchForTest(t, b,
-		&query.And{[]query.Q{
+		query.NewAnd(
 			&query.Substring{Pattern: "needle"},
 			&query.Repo{Pattern: "foo"},
-		}})
+		))
 
 	if len(sres.Files) != 0 {
 		t.Fatalf("got %v, want 0 matches", sres.Files)
@@ -685,10 +672,10 @@ func TestRepoName(t *testing.T) {
 	}
 
 	sres = searchForTest(t, b,
-		&query.And{[]query.Q{
+		query.NewAnd(
 			&query.Substring{Pattern: "needle"},
 			&query.Repo{Pattern: "bla"},
-		}})
+		))
 	if len(sres.Files) != 1 {
 		t.Fatalf("got %v, want 1 match", sres.Files)
 	}
@@ -780,7 +767,7 @@ func TestNegativeRegexp(t *testing.T) {
 	content := []byte("BLABLABLA needle bla")
 	b.AddFile("f1", content)
 	res := searchForTest(t, b,
-		&query.And{[]query.Q{
+		query.NewAnd(
 			&query.Substring{
 				Pattern: "needle",
 			},
@@ -788,8 +775,7 @@ func TestNegativeRegexp(t *testing.T) {
 				&query.Regexp{
 					Regexp: mustParseRE(".cs"),
 				},
-			}},
-		})
+			}))
 
 	if len(res.Files) != 1 {
 		t.Fatalf("got %v, want 1 match", res.Files)
@@ -871,10 +857,10 @@ func TestNegativeRepo(t *testing.T) {
 	b.SetName("bla")
 
 	sres := searchForTest(t, b,
-		&query.And{[]query.Q{
+		query.NewAnd(
 			&query.Substring{Pattern: "needle"},
 			&query.Not{&query.Repo{Pattern: "bla"}},
-		}})
+		))
 
 	if len(sres.Files) != 0 {
 		t.Fatalf("got %v, want 0 matches", sres.Files)
@@ -914,10 +900,9 @@ func TestOr(t *testing.T) {
 
 	b.Add(Document{Name: "f1", Content: []byte("needle")})
 	b.Add(Document{Name: "f2", Content: []byte("banana")})
-	sres := searchForTest(t, b,
-		&query.Or{[]query.Q{
-			&query.Substring{Pattern: "needle"},
-			&query.Substring{Pattern: "banana"}}})
+	sres := searchForTest(t, b, query.NewOr(
+		&query.Substring{Pattern: "needle"},
+		&query.Substring{Pattern: "banana"}))
 
 	if len(sres.Files) != 2 {
 		t.Fatalf("got %v, want 2 files", sres.Files)
@@ -931,11 +916,11 @@ func TestAtomCountScore(t *testing.T) {
 	b.Add(Document{Name: "needle-file-branch", Content: []byte("needle content"), Branches: []string{"needle"}})
 	b.Add(Document{Name: "needle-file", Content: []byte("needle content"), Branches: []string{"branches"}})
 	sres := searchForTest(t, b,
-		&query.Or{[]query.Q{
+		query.NewOr(
 			&query.Substring{Pattern: "needle"},
 			&query.Substring{Pattern: "needle", FileName: true},
 			&query.Branch{Pattern: "needle"},
-		}})
+		))
 	var got []string
 	for _, f := range sres.Files {
 		got = append(got, f.Name)
