@@ -82,30 +82,30 @@ func (s *Server) formatResults(result *zoekt.SearchResult, localPrint bool) ([]*
 
 	for _, f := range result.Files {
 		fMatch := FileMatch{
-			FileName: f.Name,
-			Repo:     f.Repo,
+			FileName: f.FileName,
+			Repo:     f.Repository,
 			Branches: f.Branches,
-			URL:      getURL(f.Repo, f.Name, f.Branches),
+			URL:      getURL(f.Repository, f.FileName, f.Branches),
 		}
 
-		for _, m := range f.Matches {
+		for _, m := range f.LineMatches {
 			md := Match{
-				FileName: f.Name,
-				LineNum:  m.LineNum,
-				URL:      fMatch.URL + "#" + getFragment(f.Repo, m.LineNum),
+				FileName: f.FileName,
+				LineNum:  m.LineNumber,
+				URL:      fMatch.URL + "#" + getFragment(f.Repository, m.LineNumber),
 			}
 
 			lastEnd := 0
 			line := m.Line
-			for i, f := range m.Fragments {
-				l := f.LineOff
+			for i, f := range m.LineFragments {
+				l := f.LineOffset
 				e := l + f.MatchLength
 
 				frag := Fragment{
 					Pre:   string(line[lastEnd:l]),
 					Match: string(line[l:e]),
 				}
-				if i == len(m.Fragments)-1 {
+				if i == len(m.LineFragments)-1 {
 					frag.Post = string(m.Line[e:])
 				}
 

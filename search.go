@@ -84,23 +84,23 @@ func (p *contentProvider) matchContent(m *candidateMatch) bool {
 	return m.matchContent(p.data(m.fileName))
 }
 
-func (p *contentProvider) fillMatches(ms []*candidateMatch) []Match {
-	var result []Match
+func (p *contentProvider) fillMatches(ms []*candidateMatch) []LineMatch {
+	var result []LineMatch
 	if ms[0].fileName {
 		// There is only "line" in a filename.
-		res := Match{
+		res := LineMatch{
 			Line:     p.id.fileName(p.idx),
 			FileName: true,
 		}
 
 		for _, m := range ms {
-			res.Fragments = append(res.Fragments, MatchFragment{
-				LineOff:     int(m.offset),
+			res.LineFragments = append(res.LineFragments, LineFragmentMatch{
+				LineOffset:  int(m.offset),
 				MatchLength: int(m.matchSz),
 				Offset:      m.offset,
 			})
 
-			result = []Match{res}
+			result = []LineMatch{res}
 		}
 	} else {
 		result = p.fillContentMatches(ms)
@@ -114,8 +114,8 @@ func (p *contentProvider) fillMatches(ms []*candidateMatch) []Match {
 	return result
 }
 
-func (p *contentProvider) fillContentMatches(ms []*candidateMatch) []Match {
-	var result []Match
+func (p *contentProvider) fillContentMatches(ms []*candidateMatch) []LineMatch {
+	var result []LineMatch
 	for len(ms) > 0 {
 		m := ms[0]
 		num, lineStart, lineEnd := m.line(p.newlines(), p.fileSize)
@@ -158,20 +158,20 @@ func (p *contentProvider) fillContentMatches(ms []*candidateMatch) []Match {
 			}
 		}
 
-		finalMatch := Match{
-			LineStart: lineStart,
-			LineEnd:   lineEnd,
-			LineNum:   num,
+		finalMatch := LineMatch{
+			LineStart:  lineStart,
+			LineEnd:    lineEnd,
+			LineNumber: num,
 		}
 		finalMatch.Line = p.data(false)[lineStart:lineEnd]
 
 		for _, m := range lineCands {
-			fragment := MatchFragment{
+			fragment := LineFragmentMatch{
 				Offset:      m.offset,
-				LineOff:     int(m.offset) - lineStart,
+				LineOffset:  int(m.offset) - lineStart,
 				MatchLength: int(m.matchSz),
 			}
-			finalMatch.Fragments = append(finalMatch.Fragments, fragment)
+			finalMatch.LineFragments = append(finalMatch.LineFragments, fragment)
 		}
 		result = append(result, finalMatch)
 	}
@@ -204,12 +204,12 @@ func findSection(secs []DocumentSection, off, sz uint32) *DocumentSection {
 	return nil
 }
 
-func matchScore(secs []DocumentSection, m *Match) float64 {
+func matchScore(secs []DocumentSection, m *LineMatch) float64 {
 	var maxScore float64
-	for _, f := range m.Fragments {
-		startBoundary := f.LineOff < len(m.Line) && (f.LineOff == 0 || byteClass(m.Line[f.LineOff-1]) != byteClass(m.Line[f.LineOff]))
+	for _, f := range m.LineFragments {
+		startBoundary := f.LineOffset < len(m.Line) && (f.LineOffset == 0 || byteClass(m.Line[f.LineOffset-1]) != byteClass(m.Line[f.LineOffset]))
 
-		end := int(f.LineOff) + f.MatchLength
+		end := int(f.LineOffset) + f.MatchLength
 		endBoundary := end > 0 && (end == len(m.Line) || byteClass(m.Line[end-1]) != byteClass(m.Line[end]))
 
 		score := 0.0
@@ -238,7 +238,7 @@ func matchScore(secs []DocumentSection, m *Match) float64 {
 	return maxScore
 }
 
-type matchScoreSlice []Match
+type matchScoreSlice []LineMatch
 
 func (m matchScoreSlice) Len() int           { return len(m) }
 func (m matchScoreSlice) Swap(i, j int)      { m[i], m[j] = m[j], m[i] }
@@ -250,7 +250,7 @@ func (m fileMatchSlice) Len() int           { return len(m) }
 func (m fileMatchSlice) Swap(i, j int)      { m[i], m[j] = m[j], m[i] }
 func (m fileMatchSlice) Less(i, j int) bool { return m[i].Score > m[j].Score }
 
-func sortMatchesByScore(ms []Match) {
+func sortMatchesByScore(ms []LineMatch) {
 	sort.Sort(matchScoreSlice(ms))
 }
 

@@ -360,8 +360,8 @@ func (s *Server) servePrintErr(w http.ResponseWriter, r *http.Request) error {
 
 	f := result.Files[0]
 	d := PrintInput{
-		Name:    f.Name,
-		Repo:    f.Repo,
+		Name:    f.FileName,
+		Repo:    f.Repository,
 		Content: string(f.Content),
 		Last:    LastInput{Query: queryStr},
 	}

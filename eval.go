@@ -597,8 +597,8 @@ nextFileMatch:
 		}
 
 		fileMatch := FileMatch{
-			Repo: d.unaryData.RepoName,
-			Name: string(d.fileName(nextDoc)),
+			Repository: d.unaryData.RepoName,
+			FileName:   string(d.fileName(nextDoc)),
 			// Maintain ordering of input files. This
 			// strictly dominates the in-file ordering of
 			// the matches.
@@ -612,17 +612,17 @@ nextFileMatch:
 		fileMatch.Score += float64(atomMatchCount) / float64(totalAtomCount) * scoreFactorAtomMatch
 		finalCands := gatherMatches(mt, known)
 
-		fileMatch.Matches = cp.fillMatches(finalCands)
+		fileMatch.LineMatches = cp.fillMatches(finalCands)
 
 		maxFileScore := 0.0
-		for i := range fileMatch.Matches {
-			if maxFileScore < fileMatch.Matches[i].Score {
-				maxFileScore = fileMatch.Matches[i].Score
+		for i := range fileMatch.LineMatches {
+			if maxFileScore < fileMatch.LineMatches[i].Score {
+				maxFileScore = fileMatch.LineMatches[i].Score
 
 			}
 
 			// Order by ordering in file.
-			fileMatch.Matches[i].Score += 1.0 - (float64(i) / float64(len(fileMatch.Matches)))
+			fileMatch.LineMatches[i].Score += 1.0 - (float64(i) / float64(len(fileMatch.LineMatches)))
 		}
 		fileMatch.Score += maxFileScore
 
@@ -631,13 +631,13 @@ nextFileMatch:
 		}
 		fileMatch.Branches = d.gatherBranches(nextDoc, mt, known)
 
-		sortMatchesByScore(fileMatch.Matches)
+		sortMatchesByScore(fileMatch.LineMatches)
 		if opts.Whole {
 			fileMatch.Content = cp.data(false)
 		}
 
 		res.Files = append(res.Files, fileMatch)
-		res.Stats.MatchCount += len(fileMatch.Matches)
+		res.Stats.MatchCount += len(fileMatch.LineMatches)
 		res.Stats.FileCount++
 	}
 	sortFilesByScore(res.Files)

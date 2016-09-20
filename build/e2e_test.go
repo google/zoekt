@@ -79,7 +79,7 @@ func TestBasic(t *testing.T) {
 		t.Fatalf("Parse(111): %v", err)
 	}
 
-	if len(result.Files) != 1 || result.Files[0].Name != "F1" {
+	if len(result.Files) != 1 || result.Files[0].FileName != "F1" {
 		t.Errorf("got %v, want 1 file.", result.Files)
 	}
 	defer ss.Close()

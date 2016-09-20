@@ -122,20 +122,20 @@ func (s *Server) serveSearchAPI(w http.ResponseWriter, r *http.Request) {
 	var resp SearchResponse
 	for _, f := range result.Files {
 		srf := SearchResponseFile{
-			Repo:     f.Repo,
+			Repo:     f.Repository,
 			Branches: f.Branches,
-			FileName: f.Name,
+			FileName: f.FileName,
 			// TODO - set version
 		}
-		for _, m := range f.Matches {
+		for _, m := range f.LineMatches {
 			srl := &SearchResponseLine{
-				LineNumber: m.LineNum,
+				LineNumber: m.LineNumber,
 				Line:       string(m.Line),
 			}
-			for _, fr := range m.Fragments {
+			for _, fr := range m.LineFragments {
 				srfr := SearchResponseMatch{
-					Start: fr.LineOff,
-					End:   fr.LineOff + fr.MatchLength,
+					Start: fr.LineOffset,
+					End:   fr.LineOffset + fr.MatchLength,
 				}
 				srl.Matches = append(srl.Matches, &srfr)
 			}

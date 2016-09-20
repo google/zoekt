@@ -32,8 +32,8 @@ const CONTEXT = 20
 
 func displayMatches(files []zoekt.FileMatch, pat string) {
 	for _, f := range files {
-		for _, m := range f.Matches {
-			fmt.Printf("%s:%d:%s\n", f.Name, m.LineNum, m.Line)
+		for _, m := range f.LineMatches {
+			fmt.Printf("%s:%d:%s\n", f.FileName, m.LineNumber, m.Line)
 		}
 	}
 }

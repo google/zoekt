@@ -26,37 +26,37 @@ import (
 // FileMatch contains all the matches within a file.
 type FileMatch struct {
 	// Ranking; the higher, the better.
-	Score    float64 // TODO - hide this field?
-	Name     string
-	Repo     string
-	Branches []string
-	Matches  []Match
+	Score       float64 // TODO - hide this field?
+	FileName    string
+	Repository  string
+	Branches    []string
+	LineMatches []LineMatch
 
 	// Only set if requested
 	Content []byte
 }
 
-// Match holds the matches within a single line in a file.
-type Match struct {
+// LineMatch holds the matches within a single line in a file.
+type LineMatch struct {
 	// The line in which a match was found.
-	Line      []byte
-	LineStart int
-	LineEnd   int
-	LineNum   int
+	Line       []byte
+	LineStart  int
+	LineEnd    int
+	LineNumber int
 
 	// If set, this was a match on the filename.
 	FileName bool
 
 	// The higher the better. Only ranks the quality of the match
 	// within the file, does not take rank of file into account
-	Score     float64
-	Fragments []MatchFragment
+	Score         float64
+	LineFragments []LineFragmentMatch
 }
 
-// MatchFragment holds a segment of matching text within a line.
-type MatchFragment struct {
+// LineFragmentMatch a segment of matching text within a line.
+type LineFragmentMatch struct {
 	// Offset within the line.
-	LineOff int
+	LineOffset int
 
 	// Offset from file start
 	Offset uint32
