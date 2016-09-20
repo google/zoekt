@@ -349,9 +349,6 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*substrMatchTree]struct{}) (m
 	switch s := q.(type) {
 	case *query.Regexp:
 		sz := ngramSize
-		if s.FileName {
-			sz = 1
-		}
 		subQ := query.RegexpToQuery(s.Regexp, sz)
 		subQ = query.Map(subQ, func(q query.Q) query.Q {
 			if sub, ok := q.(*query.Substring); ok {

@@ -15,9 +15,9 @@
 package zoekt
 
 import (
-	"bytes"
 	"fmt"
 	"log"
+	"regexp"
 	"strings"
 	"time"
 
@@ -112,8 +112,7 @@ func (data *indexData) getDocIterator(q query.Q) (docIterator, error) {
 				return nil, fmt.Errorf("pattern %q less than %d bytes", s.Pattern, ngramSize)
 			}
 
-			// TODO - fix this.
-			return nil, fmt.Errorf("filename pattern %q less than %d bytes", s.Pattern, ngramSize)
+			return data.getBruteForceFileNameDocIterator(s), nil
 		}
 
 		return data.getNgramDocIterator(s)
@@ -166,25 +165,43 @@ func (data *indexData) matchAllDocIterator() docIterator {
 }
 
 func (data *indexData) getBruteForceFileNameDocIterator(query *query.Substring) docIterator {
-	lowerStr := toLower([]byte(query.Pattern))
-	last := uint32(0)
+	quoted := regexp.QuoteMeta(query.Pattern)
+	if !query.CaseSensitive {
+		quoted = "(?i)" + quoted
+	}
+
+	lowerPat := toLower([]byte(query.Pattern))
+
+	re := regexp.MustCompile(quoted)
+
+	fileID := 0
+	startName := data.fileNameIndex[fileID]
+	endName := data.fileNameIndex[fileID+1]
 
 	var cands []*candidateMatch
-	for i, off := range data.fileNameIndex[1:] {
-		name := data.fileNameContent[last:off]
-		last = off
-		idx := bytes.Index(name, lowerStr)
-		if idx == -1 {
+	for _, match := range re.FindAllIndex(data.fileNameContent, -1) {
+		start := uint32(match[0])
+		end := uint32(match[1])
+
+		for endName < end {
+			fileID++
+			startName = data.fileNameIndex[fileID]
+			endName = data.fileNameIndex[fileID+1]
+		}
+
+		if start < startName {
+			// straddles a filename boundary.
 			continue
 		}
+
 		cands = append(cands, &candidateMatch{
 			caseSensitive: query.CaseSensitive,
 			fileName:      true,
 			substrBytes:   []byte(query.Pattern),
-			substrLowered: lowerStr,
-			file:          uint32(i),
-			offset:        uint32(idx),
-			matchSz:       uint32(len(lowerStr)),
+			substrLowered: lowerPat,
+			file:          uint32(fileID),
+			offset:        uint32(start),
+			matchSz:       uint32(end - start),
 		})
 	}
 

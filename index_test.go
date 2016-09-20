@@ -365,20 +365,36 @@ func TestFileRegexpSearchBruteForce(t *testing.T) {
 	}
 }
 
+func TestFileRegexpSearchShortString(t *testing.T) {
+	b := NewIndexBuilder()
+
+	b.AddFile("banana.py", []byte("x orange y"))
+	sres := searchForTest(t, b, &query.Regexp{
+		Regexp:   mustParseRE("ana.py"),
+		FileName: true,
+	})
+
+	matches := sres.Files
+	if len(matches) != 1 || matches[0].FileName != "banana.py" {
+		t.Fatalf("got %v, want 1 match on 'banana.py'", matches)
+	}
+}
+
 func TestFileSubstringSearchBruteForce(t *testing.T) {
 	b := NewIndexBuilder()
 
-	b.AddFile("banzana", []byte("x orange y"))
+	b.AddFile("BANZANA", []byte("x orange y"))
 	b.AddFile("banana", []byte("x apple y"))
 
-	searcher := searcherForTest(t, b)
 	q := &query.Substring{
 		Pattern:  "z",
 		FileName: true,
 	}
 
-	// doesn't crash.
-	searcher.Search(context.Background(), q, &SearchOptions{})
+	res := searchForTest(t, b, q)
+	if len(res.Files) != 1 || res.Files[0].FileName != "BANZANA" {
+		t.Fatalf("got %v, want 1 match on 'BANZANA''", res.Files)
+	}
 }
 
 func TestSearchMatchAll(t *testing.T) {
