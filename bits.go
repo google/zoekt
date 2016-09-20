@@ -14,6 +14,8 @@
 
 package zoekt
 
+import "log"
+
 func toLower(in []byte) []byte {
 	out := make([]byte, len(in))
 	for i, c := range in {
@@ -23,6 +25,24 @@ func toLower(in []byte) []byte {
 		out[i] = c
 	}
 	return out
+}
+
+func caseFoldingEquals(lower, mixed []byte) bool {
+	if len(lower) != len(mixed) {
+		log.Panic("lengths", len(lower), len(mixed))
+	}
+
+	for i, c := range lower {
+		d := mixed[i]
+		if d >= 'A' && d <= 'Z' {
+			d = d - 'A' + 'a'
+		}
+
+		if d != c {
+			return false
+		}
+	}
+	return true
 }
 
 type ngram uint32

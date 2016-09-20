@@ -47,9 +47,7 @@ func (m *candidateMatch) matchContent(content []byte) bool {
 		comp := bytes.Compare(content[m.offset:m.offset+uint32(m.matchSz)], m.substrBytes) == 0
 		return comp
 	} else {
-		// TODO(hanwen): do this without generating garbage.
-		l := toLower(content[m.offset : m.offset+uint32(m.matchSz)])
-		return bytes.Compare(l, m.substrLowered) == 0
+		return caseFoldingEquals(m.substrLowered, content[m.offset:m.offset+uint32(m.matchSz)])
 	}
 }
 
