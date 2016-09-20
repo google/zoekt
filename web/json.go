@@ -17,6 +17,7 @@ package web
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 
@@ -62,38 +63,67 @@ type SearchResponseMatch struct {
 
 const jsonContentType = "application/json; charset=utf-8"
 
+type httpError struct {
+	msg    string
+	status int
+}
+
+func (e *httpError) Error() string { return fmt.Sprintf("%d: %s", e.status, e.msg) }
+
 func (s *Server) serveSearchAPI(w http.ResponseWriter, r *http.Request) {
+	if err := s.serveSearchAPIErr(w, r); err != nil {
+		if e, ok := err.(*httpError); ok {
+			http.Error(w, e.msg, e.status)
+		}
+		http.Error(w, err.Error(), http.StatusTeapot)
+	}
+}
+
+func (s *Server) serveSearchAPIErr(w http.ResponseWriter, r *http.Request) error {
 	if r.Method != http.MethodPost {
-		http.Error(w, "must use POST", http.StatusMethodNotAllowed)
-		return
+		return &httpError{"must use POST", http.StatusMethodNotAllowed}
 	}
 
 	if got := r.Header.Get("Content-Type"); got != jsonContentType {
-		http.Error(w, "must use "+jsonContentType, http.StatusNotAcceptable)
-		return
+		return &httpError{"must use " + jsonContentType, http.StatusNotAcceptable}
+
 	}
 
 	content, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		return &httpError{err.Error(), http.StatusBadRequest}
 	}
 
 	var req SearchRequest
 	if err := json.Unmarshal(content, &req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		return &httpError{err.Error(), http.StatusBadRequest}
 	}
 
+	rep, err := serveSearchAPIStructured(s.Searcher, &req)
+	if err != nil {
+		return err
+	}
+	content, err = json.Marshal(rep)
+	if err != nil {
+		return &httpError{err.Error(), http.StatusInternalServerError}
+
+	}
+
+	w.Header().Set("Content-Type", jsonContentType)
+	if _, err := w.Write(content); err != nil {
+		return &httpError{err.Error(), http.StatusInternalServerError}
+	}
+	return nil
+}
+
+func serveSearchAPIStructured(searcher zoekt.Searcher, req *SearchRequest) (*SearchResponse, error) {
 	q, err := query.Parse(req.Query)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		return nil, &httpError{err.Error(), http.StatusBadRequest}
 	}
 
 	var restrictions []query.Q
 	for _, r := range req.Restrict {
-
 		var branchQs []query.Q
 		for _, b := range r.Branches {
 			branchQs = append(branchQs, &query.Branch{b})
@@ -108,10 +138,10 @@ func (s *Server) serveSearchAPI(w http.ResponseWriter, r *http.Request) {
 	options.SetDefaults()
 
 	ctx := context.Background()
-	result, err := s.Searcher.Search(ctx, finalQ, &options)
+	result, err := searcher.Search(ctx, finalQ, &options)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return nil, &httpError{err.Error(), http.StatusInternalServerError}
+
 	}
 
 	// TODO - make this tunable. Use a query param or a JSON struct?
@@ -144,15 +174,5 @@ func (s *Server) serveSearchAPI(w http.ResponseWriter, r *http.Request) {
 		resp.Files = append(resp.Files, &srf)
 	}
 
-	content, err = json.Marshal(resp)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", jsonContentType)
-	if _, err := w.Write(content); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	return &resp, nil
 }
