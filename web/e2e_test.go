@@ -222,3 +222,37 @@ func TestCrash(t *testing.T) {
 		t.Errorf("result did not have %q: %s", want, result)
 	}
 }
+
+func TestUnicodeOffset(t *testing.T) {
+	b := zoekt.NewIndexBuilder()
+	b.SetName("name")
+	b.Add(zoekt.Document{
+		Name:    "f2",
+		Content: []byte("orange\u2318apple"),
+		// --------------0123456     78901
+		Branches: []string{"master"},
+	})
+
+	s := searcherForTest(t, b)
+
+	rep, err := serveSearchAPIStructured(s, &SearchRequest{
+		Query: "orange.*apple",
+		Restrict: []SearchRequestRestriction{
+			{
+				Repo:     "name",
+				Branches: []string{"master"},
+			}},
+	})
+
+	if err != nil {
+		t.Fatalf("serveSearchAPIStructured: %v", err)
+	}
+
+	if len(rep.Files) != 1 || len(rep.Files[0].Lines) != 1 || len(rep.Files[0].Lines[0].Matches) != 1 {
+		t.Fatalf("got %#v, want 1 match", rep)
+	}
+
+	if end := rep.Files[0].Lines[0].Matches[0].End; end != 12 {
+		t.Errorf("got end %d, want 11", end)
+	}
+}

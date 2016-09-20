@@ -162,11 +162,21 @@ func serveSearchAPIStructured(searcher zoekt.Searcher, req *SearchRequest) (*Sea
 				LineNumber: m.LineNumber,
 				Line:       string(m.Line),
 			}
+			// Convert to unicode indices.
+			charOffsets := make([]int, len(m.Line), len(m.Line)+1)
+			j := 0
+			for i := range srl.Line {
+				charOffsets[i] = j
+				j++
+			}
+			charOffsets = append(charOffsets, j)
+
 			for _, fr := range m.LineFragments {
 				srfr := SearchResponseMatch{
-					Start: fr.LineOffset,
-					End:   fr.LineOffset + fr.MatchLength,
+					Start: charOffsets[fr.LineOffset],
+					End:   charOffsets[fr.LineOffset+fr.MatchLength],
 				}
+
 				srl.Matches = append(srl.Matches, &srfr)
 			}
 			srf.Lines = append(srf.Lines, srl)
