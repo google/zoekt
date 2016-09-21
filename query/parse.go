@@ -51,7 +51,7 @@ loop:
 		case '\\':
 			// TODO - other escape sequences.
 			if len(left) == 0 {
-				return nil, 0, fmt.Errorf("missing char after \\")
+				return nil, 0, fmt.Errorf("query: missing char after \\")
 			}
 			c = left[0]
 			left = left[1:]
@@ -62,7 +62,7 @@ loop:
 		}
 	}
 	if !found {
-		return nil, 0, fmt.Errorf("unterminated quoted string")
+		return nil, 0, fmt.Errorf("query: unterminated quoted string")
 	}
 	return lit, len(in) - len(left), nil
 }
@@ -159,7 +159,7 @@ func parseExpr(in []byte) (Q, int, error) {
 		case "no":
 		case "auto":
 		default:
-			return nil, 0, fmt.Errorf("unknown case argument %q, want {yes,no,auto}", text)
+			return nil, 0, fmt.Errorf("query: unknown case argument %q, want {yes,no,auto}", text)
 		}
 		expr = &caseQ{text}
 	case tokRepo:
@@ -195,7 +195,7 @@ func parseExpr(in []byte) (Q, int, error) {
 			return nil, 0, err
 		}
 		if pTok == nil || pTok.Type != tokParenClose {
-			return nil, 0, fmt.Errorf("missing close paren, got token %v", pTok)
+			return nil, 0, fmt.Errorf("query: missing close paren, got token %v", pTok)
 		}
 
 		b = b[len(pTok.Input):]
@@ -250,7 +250,7 @@ func parseOperators(in []Q) (Q, error) {
 		if _, ok := q.(*orOperator); ok {
 			seenOr = true
 			if len(cur.Children) == 0 {
-				return nil, fmt.Errorf("OR operator should have operand")
+				return nil, fmt.Errorf("query: OR operator should have operand")
 			}
 			top.Children = append(top.Children, cur)
 			cur = &And{}
@@ -260,7 +260,7 @@ func parseOperators(in []Q) (Q, error) {
 	}
 
 	if seenOr && len(cur.Children) == 0 {
-		return nil, fmt.Errorf("OR operator should have operand")
+		return nil, fmt.Errorf("query: OR operator should have operand")
 	}
 	top.Children = append(top.Children, cur)
 	return top, nil
@@ -476,7 +476,7 @@ loop:
 		case '\\':
 			left = left[1:]
 			if len(left) == 0 {
-				return nil, fmt.Errorf("lone \\ at end")
+				return nil, fmt.Errorf("query: lone \\ at end")
 			}
 			c := left[0]
 			cur.Text = append(cur.Text, '\\', c)
