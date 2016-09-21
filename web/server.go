@@ -29,6 +29,7 @@ import (
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/query"
+	"github.com/google/zoekt/rest"
 )
 
 var Funcmap = template.FuncMap{
@@ -81,6 +82,10 @@ type Server struct {
 
 	mu            sync.Mutex
 	templateCache map[string]*template.Template
+}
+
+func (s *Server) serveSearchAPI(w http.ResponseWriter, r *http.Request) {
+	rest.Search(s.Searcher, w, r)
 }
 
 func (s *Server) getTemplate(str string) *template.Template {

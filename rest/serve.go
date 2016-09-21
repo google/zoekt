@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package web
+package rest
 
 import (
 	"context"
@@ -25,43 +25,6 @@ import (
 	"github.com/google/zoekt/query"
 )
 
-// SearchRequest is the entry point for the /api/search POST endpoint.
-type SearchRequest struct {
-	Query string
-
-	// A list of OR'd restrictions.
-	Restrict []SearchRequestRestriction
-}
-
-type SearchRequestRestriction struct {
-	Repo     string
-	Branches []string
-}
-
-// SearchResponse is the return type for /api/search endpoint
-type SearchResponse struct {
-	Files []*SearchResponseFile
-	Error *string
-}
-
-type SearchResponseFile struct {
-	Repo     string
-	Branches []string
-	FileName string
-	Lines    []*SearchResponseLine
-}
-
-type SearchResponseLine struct {
-	LineNumber int
-	Line       string
-	Matches    []*SearchResponseMatch
-}
-
-type SearchResponseMatch struct {
-	Start int
-	End   int
-}
-
 const jsonContentType = "application/json; charset=utf-8"
 
 type httpError struct {
@@ -71,8 +34,8 @@ type httpError struct {
 
 func (e *httpError) Error() string { return fmt.Sprintf("%d: %s", e.status, e.msg) }
 
-func (s *Server) serveSearchAPI(w http.ResponseWriter, r *http.Request) {
-	if err := s.serveSearchAPIErr(w, r); err != nil {
+func Search(s zoekt.Searcher, w http.ResponseWriter, r *http.Request) {
+	if err := serveSearchAPIErr(s, w, r); err != nil {
 		if e, ok := err.(*httpError); ok {
 			http.Error(w, e.msg, e.status)
 		}
@@ -80,7 +43,7 @@ func (s *Server) serveSearchAPI(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) serveSearchAPIErr(w http.ResponseWriter, r *http.Request) error {
+func serveSearchAPIErr(s zoekt.Searcher, w http.ResponseWriter, r *http.Request) error {
 	if r.Method != http.MethodPost {
 		return &httpError{"must use POST", http.StatusMethodNotAllowed}
 	}
@@ -100,7 +63,7 @@ func (s *Server) serveSearchAPIErr(w http.ResponseWriter, r *http.Request) error
 		return &httpError{err.Error(), http.StatusBadRequest}
 	}
 
-	rep, err := serveSearchAPIStructured(s.Searcher, &req)
+	rep, err := serveSearchAPIStructured(s, &req)
 	if err != nil {
 		return err
 	}
@@ -163,6 +126,7 @@ func serveSearchAPIStructured(searcher zoekt.Searcher, req *SearchRequest) (*Sea
 				LineNumber: m.LineNumber,
 				Line:       string(m.Line),
 			}
+
 			// Convert to unicode indices.
 			charOffsets := make([]int, len(m.Line), len(m.Line)+1)
 			j := 0
