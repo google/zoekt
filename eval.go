@@ -416,12 +416,15 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*substrMatchTree]struct{}) (m
 
 	case *query.Branch:
 		mask := uint32(0)
-		for nm, m := range d.branchIDs {
-			if strings.Contains(nm, s.Pattern) {
-				mask |= uint32(m)
+		if s.Pattern == "HEAD" {
+			mask = 1
+		} else {
+			for nm, m := range d.branchIDs {
+				if strings.Contains(nm, s.Pattern) {
+					mask |= uint32(m)
+				}
 			}
 		}
-
 		return &branchQueryMatchTree{
 			mask:      mask,
 			fileMasks: d.fileBranchMasks,

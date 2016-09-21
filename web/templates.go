@@ -81,6 +81,7 @@ dt {
     <dt>phone r:droid</dt><dd>search for "phone" to repositories whose name contains "droid"</dd>
     <dt>r:droid</dt><dd>list repositories whose name contains "droid"</dd>
     <dt>phone branch:aster</dt><dd>for Git repos, find "phone" in files in branches whose name contains "aster".</dd>
+    <dt>phone b:HEAD</dt><dd>for Git repos, find "phone" in the default ('HEAD') branch.</dd>
   </dl>
   </div>
 </div>
