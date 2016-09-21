@@ -33,7 +33,7 @@ func main() {
 	var parallelism = flag.Int("parallelism", 4, "maximum number of parallel indexing processes.")
 	var recursive = flag.Bool("recursive", false, "recurse into directories to index all git repos")
 	submodules := flag.Bool("submodules", true, "if set to false, do not recurse into submodules")
-	branchesStr := flag.String("branches", "master", "git branches to index. If set, arguments should be bare git repositories.")
+	branchesStr := flag.String("branches", "HEAD", "git branches to index.")
 	branchPrefix := flag.String("prefix", "refs/heads/", "prefix for branch names")
 
 	indexDir := flag.String("index", build.DefaultDir, "index directory for *.zoekt files.")
@@ -83,6 +83,7 @@ func main() {
 			gitRepos[repoDir] = name
 		}
 	}
+
 	exitStatus := 0
 	for dir, name := range gitRepos {
 		opts.RepoName = name

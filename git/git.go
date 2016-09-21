@@ -188,7 +188,19 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 	data := map[string]map[string]git.Oid{}
 	repos := map[git.Oid]*git.Repository{}
 	for _, b := range branches {
-		commit, err := getCommit(repo, filepath.Join(branchPrefix, b))
+		fullName := b
+		if b != "HEAD" {
+			fullName = filepath.Join(branchPrefix, b)
+		} else {
+			_, ref, err := repo.RevparseExt(b)
+			if err != nil {
+				return err
+			}
+
+			fullName = ref.Name()
+			b = strings.TrimPrefix(fullName, branchPrefix)
+		}
+		commit, err := getCommit(repo, fullName)
 		if err != nil {
 			return err
 		}
