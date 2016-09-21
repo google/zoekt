@@ -41,6 +41,7 @@ type SearchRequestRestriction struct {
 // SearchResponse is the return type for /api/search endpoint
 type SearchResponse struct {
 	Files []*SearchResponseFile
+	Error *string
 }
 
 type SearchResponseFile struct {
@@ -119,7 +120,8 @@ func (s *Server) serveSearchAPIErr(w http.ResponseWriter, r *http.Request) error
 func serveSearchAPIStructured(searcher zoekt.Searcher, req *SearchRequest) (*SearchResponse, error) {
 	q, err := query.Parse(req.Query)
 	if err != nil {
-		return nil, &httpError{err.Error(), http.StatusBadRequest}
+		msg := "parse error: " + err.Error()
+		return &SearchResponse{Error: &msg}, nil
 	}
 
 	var restrictions []query.Q
@@ -141,7 +143,6 @@ func serveSearchAPIStructured(searcher zoekt.Searcher, req *SearchRequest) (*Sea
 	result, err := searcher.Search(ctx, finalQ, &options)
 	if err != nil {
 		return nil, &httpError{err.Error(), http.StatusInternalServerError}
-
 	}
 
 	// TODO - make this tunable. Use a query param or a JSON struct?

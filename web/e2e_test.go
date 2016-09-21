@@ -112,6 +112,33 @@ func TestJSON(t *testing.T) {
 	}
 }
 
+func TestJSONParseError(t *testing.T) {
+	srv := Server{
+		Top:     Top,
+		RESTAPI: true,
+	}
+
+	mux, err := NewMux(&srv)
+	if err != nil {
+		t.Fatalf("NewMux: %v", err)
+	}
+
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+
+	req := `{"Query": "apple\"", "Restrict":[{"Repo": "name", "Branches": ["master"]}]}`
+	res, err := http.Post(ts.URL+"/api/search", jsonContentType, bytes.NewBufferString(req))
+
+	if err != nil {
+		t.Fatalf("POST: %v", err)
+	}
+
+	body, _ := ioutil.ReadAll(res.Body)
+	if want := `"Error":"parse error`; !strings.Contains(string(body), want) {
+		t.Errorf("got %q, want substring %q", body, want)
+	}
+}
+
 func TestBasic(t *testing.T) {
 	b := zoekt.NewIndexBuilder()
 	b.SetName("name")
