@@ -383,13 +383,14 @@ var tokNames = map[int]string{
 }
 
 var prefixes = map[string]int{
-	"file:":   tokFile,
-	"f:":      tokFile,
-	"r:":      tokRepo,
-	"repo:":   tokRepo,
-	"case:":   tokCase,
+	"b:":      tokBranch,
 	"branch:": tokBranch,
+	"case:":   tokCase,
+	"f:":      tokFile,
+	"file:":   tokFile,
+	"r:":      tokRepo,
 	"regex:":  tokRegex,
+	"repo:":   tokRepo,
 }
 
 var reservedWords = map[string]int{
