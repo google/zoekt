@@ -15,7 +15,6 @@
 package rest
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -23,6 +22,7 @@ import (
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/query"
+	"golang.org/x/net/context"
 )
 
 const jsonContentType = "application/json; charset=utf-8"
