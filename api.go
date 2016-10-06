@@ -133,8 +133,10 @@ type RepositoryBranch struct {
 
 // Repository holds repository metadata.
 type Repository struct {
+	// The repository name
 	Name string
-	URL  string
+	// The repository URL.
+	URL string
 
 	// The branches indexed in this repo.
 	Branches []RepositoryBranch
@@ -144,6 +146,14 @@ type Repository struct {
 
 	// URL template to link to the commit of a branch
 	CommitURLTemplate string
+
+	// The repository URL for getting to a file.  Has access to
+	// {{Branch}}, {{Path}}
+	FileURLTemplate string
+
+	// The URL fragment to add to a file URL for line numbers.
+	// has access to {{LineNumber}}.
+	LineFragmentTemplate string
 }
 
 // RepoList holds a set of Repository metadata.

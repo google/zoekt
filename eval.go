@@ -452,7 +452,7 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*substrMatchTree]struct{}) (m
 func (d *indexData) simplify(in query.Q) query.Q {
 	eval := query.Map(in, func(q query.Q) query.Q {
 		if r, ok := q.(*query.Repo); ok {
-			return &query.Const{strings.Contains(d.unaryData.RepoName, r.Pattern)}
+			return &query.Const{strings.Contains(d.unaryData.Repository.Name, r.Pattern)}
 		}
 		return q
 	})
@@ -591,13 +591,13 @@ nextFileMatch:
 
 		if v, ok := evalMatchTree(known, mt); !ok {
 			log.Panicf("did not decide. Repo %s, doc %d, known %v",
-				d.unaryData.RepoName, nextDoc, known)
+				d.unaryData.Repository.Name, nextDoc, known)
 		} else if !v {
 			continue nextFileMatch
 		}
 
 		fileMatch := FileMatch{
-			Repository: d.unaryData.RepoName,
+			Repository: d.unaryData.Repository.Name,
 			FileName:   string(d.fileName(nextDoc)),
 			// Maintain ordering of input files. This
 			// strictly dominates the in-file ordering of
@@ -642,10 +642,10 @@ nextFileMatch:
 	}
 	sortFilesByScore(res.Files)
 	res.RepoURLs = map[string]string{
-		d.unaryData.RepoName: d.unaryData.FileURLTemplate,
+		d.unaryData.Repository.Name: d.unaryData.Repository.FileURLTemplate,
 	}
 	res.LineFragments = map[string]string{
-		d.unaryData.RepoName: d.unaryData.RepoLineFragmentTemplate,
+		d.unaryData.Repository.Name: d.unaryData.Repository.LineFragmentTemplate,
 	}
 	return &res, nil
 }
@@ -769,19 +769,8 @@ func (d *indexData) List(ctx context.Context, q query.Q) (*RepoList, error) {
 
 	l := &RepoList{}
 	if c.Value {
-		repo := &Repository{
-			Name:              d.unaryData.RepoName,
-			IndexTime:         d.unaryData.IndexTime,
-			URL:               d.unaryData.RepoURL,
-			CommitURLTemplate: d.unaryData.CommitURLTemplate,
-		}
-		for i, n := range d.unaryData.BranchNames {
-			repo.Branches = append(repo.Branches, RepositoryBranch{
-				Name:    n,
-				Version: d.unaryData.BranchVersions[i]})
-		}
-
-		l.Repos = append(l.Repos, repo)
+		repo := d.unaryData.Repository
+		l.Repos = append(l.Repos, &repo)
 	}
 	return l, nil
 }

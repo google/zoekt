@@ -125,8 +125,10 @@ func main() {
 		SizeMax:     *sizeMax,
 		ShardMax:    *shardLimit,
 		IndexDir:    *indexDir,
-		RepoName:    *repoName,
-		RepoURL:     *repoURL,
+		RepositoryDescription: zoekt.Repository{
+			Name: *repoName,
+			URL:  *repoURL,
+		},
 	}
 	opts.SetDefaults()
 	baseURL, err := url.Parse(*baseURLStr)

@@ -69,26 +69,16 @@ type IndexBuilder struct {
 	// like postings, but for filenames
 	namePostings map[ngram][]uint32
 
-	// Branch names; first is the default.
-	branches []string
+	repo Repository
+}
 
-	// Branch versions. Length matches branches.
-	versions []string
-
-	// The repository name
-	repoName string
-
-	// The repository URL.
-	repoURL string
-
-	// The repository URL.
-	fileURLTemplate string
-
-	// The URL fragment for line numbers.
-	lineFragmentTemplate string
-
-	// The URL template for a branch.
-	commitURLTemplate string
+func (d *Repository) verify() error {
+	for _, t := range []string{d.FileURLTemplate, d.LineFragmentTemplate, d.CommitURLTemplate} {
+		if _, err := template.New("").Parse(t); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // ContentSize returns the number of content bytes so far ingested.
@@ -106,23 +96,14 @@ func NewIndexBuilder() *IndexBuilder {
 	}
 }
 
-func (b *IndexBuilder) SetName(nm string) {
-	b.repoName = nm
-}
-
-// SetURLTemplates sets the repository URL templates for linking back to
-// files. The fileURL has access to {{Branch}}, {{Path}} and fragment
-// to {{LineNumber}}.
-func (b *IndexBuilder) SetURLTemplates(repoURL, commitURL, fileURL, fragment string) error {
-	for _, t := range []string{commitURL, fileURL, fragment} {
-		if _, err := template.New("").Parse(t); err != nil {
-			return err
-		}
+// AddRepository adds repository metadata. The Branches field is ignored.
+func (b *IndexBuilder) AddRepository(desc *Repository) error {
+	if err := desc.verify(); err != nil {
+		return err
 	}
-	b.repoURL = repoURL
-	b.commitURLTemplate = commitURL
-	b.fileURLTemplate = fileURL
-	b.lineFragmentTemplate = fragment
+	before := b.repo.Branches
+	b.repo = *desc
+	b.repo.Branches = before
 	return nil
 }
 
@@ -152,14 +133,16 @@ func (b *IndexBuilder) AddFile(name string, content []byte) {
 
 // addBranch adds a branch (if new) and returns its index.
 func (b *IndexBuilder) addBranch(br, v string) int {
-	for i, n := range b.branches {
-		if n == br {
+	for i, b := range b.repo.Branches {
+		if br == b.Name {
 			return i
 		}
 	}
-	b.branches = append(b.branches, br)
-	b.versions = append(b.versions, v)
-	return len(b.branches) - 1
+	b.repo.Branches = append(b.repo.Branches, RepositoryBranch{
+		Name:    br,
+		Version: v,
+	})
+	return len(b.repo.Branches) - 1
 }
 
 // AddBranch registers a branch name.  The first is assumed to be the

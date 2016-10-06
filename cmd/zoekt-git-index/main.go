@@ -86,7 +86,7 @@ func main() {
 
 	exitStatus := 0
 	for dir, name := range gitRepos {
-		opts.RepoName = name
+		opts.RepositoryDescription.Name = name
 		opts.RepoDir = filepath.Clean(dir)
 
 		if mod, err := gitindex.RepoModTime(opts.RepoDir); *incremental && err == nil && mod.Before(opts.Timestamp()) {

@@ -63,8 +63,13 @@ func searcherForTest(t *testing.T, b *zoekt.IndexBuilder) zoekt.Searcher {
 
 func TestJSON(t *testing.T) {
 	b := zoekt.NewIndexBuilder()
-	b.SetName("name")
-	b.SetURLTemplates("repo-url", "{{.Version}}", "url", "line")
+	b.AddRepository(&zoekt.Repository{
+		Name:                 "name",
+		URL:                  "repo-url",
+		CommitURLTemplate:    "{{.Version}}",
+		FileURLTemplate:      "url",
+		LineFragmentTemplate: "line",
+	})
 	b.AddBranch("master", "1234")
 
 	line := "abc apple orange"
@@ -143,8 +148,13 @@ func TestJSONParseError(t *testing.T) {
 
 func TestBasic(t *testing.T) {
 	b := zoekt.NewIndexBuilder()
-	b.SetName("name")
-	b.SetURLTemplates("repo-url", "{{.Version}}", "url", "line")
+	b.AddRepository(&zoekt.Repository{
+		Name:                 "name",
+		URL:                  "repo-url",
+		CommitURLTemplate:    "{{.Version}}",
+		FileURLTemplate:      "file-url",
+		LineFragmentTemplate: "line",
+	})
 	b.AddBranch("master", "1234")
 	b.Add(zoekt.Document{
 		Name:    "f2",
@@ -181,7 +191,7 @@ func TestBasic(t *testing.T) {
 	result := string(resultBytes)
 	for req, needles := range map[string][]string{
 		"/search?q=water": []string{
-			"href=\"url#line",
+			"href=\"file-url#line",
 			"carry <b>water</b>",
 		},
 		"/search?q=r:": []string{

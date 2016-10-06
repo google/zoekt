@@ -25,7 +25,7 @@ import (
 
 // FormatVersion is a version number. It is increased every time the
 // on-disk index format is changed.
-const IndexFormatVersion = 3
+const IndexFormatVersion = 4
 
 var _ = log.Println
 
@@ -144,15 +144,9 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 	toc.namePostings.end(w)
 
 	unaryData := indexUnaryData{
-		BranchNames:              b.branches,
-		BranchVersions:           b.versions,
-		RepoName:                 b.repoName,
-		RepoURL:                  b.repoURL,
-		CommitURLTemplate:        b.commitURLTemplate,
-		FileURLTemplate:          b.fileURLTemplate,
-		RepoLineFragmentTemplate: b.lineFragmentTemplate,
-		IndexFormatVersion:       IndexFormatVersion,
-		IndexTime:                time.Now(),
+		Repository:         b.repo,
+		IndexFormatVersion: IndexFormatVersion,
+		IndexTime:          time.Now(),
 	}
 
 	blob, err := json.Marshal(&unaryData)

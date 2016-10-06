@@ -101,7 +101,7 @@ func indexArg(arg string, opts build.Options, ignore map[string]struct{}) error 
 	}
 
 	opts.RepoDir = dir
-	opts.RepoName = filepath.Base(dir)
+	opts.RepositoryDescription.Name = filepath.Base(dir)
 	builder, err := build.NewBuilder(opts)
 	if err != nil {
 		return err

@@ -46,7 +46,7 @@ type Options struct {
 	// IndexDir is a directory that holds *.zoekt index files.
 	IndexDir string
 
-	// Maximum file size
+	// SizeMax is the maximum file size
 	SizeMax int
 
 	// Parallelism is the maximum number of shards to index in parallel
@@ -55,32 +55,17 @@ type Options struct {
 	// ShardMax sets the maximum corpus size for a single shard
 	ShardMax int
 
-	// RepoName is name of the repository.
-	RepoName string
+	// RepositoryDescription holds names and URLs for the repository.
+	RepositoryDescription zoekt.Repository
 
 	// RepoDir is the path to the repository on the indexing machine.
 	RepoDir string
-
-	// RepoURL is an URL to the repository.
-	RepoURL string
-
-	// CommitURLTemplate is the URL template for the commit.
-	CommitURLTemplate string
-
-	// FileURLTemplate is the URL template for the repository.
-	FileURLTemplate string
-
-	// LineFragmentTemplate is the URL fragment template for the line number.
-	LineFragmentTemplate string
 
 	// Path to exuberant ctags binary to run
 	CTags string
 
 	// Path to namespace-sandbox from Bazel
 	NamespaceSandbox string
-
-	// Branches sets the version IDs for each branch
-	Branches []Branch
 
 	// Write memory profiles to this file.
 	MemProfile string
@@ -282,11 +267,9 @@ func (b *Builder) buildShard(todo []*zoekt.Document, nextShardNum int) error {
 	}
 
 	shardBuilder := zoekt.NewIndexBuilder()
-	shardBuilder.SetName(b.opts.RepoName)
-	shardBuilder.SetURLTemplates(
-		b.opts.RepoURL,
-		b.opts.CommitURLTemplate, b.opts.FileURLTemplate, b.opts.LineFragmentTemplate)
-	for _, b := range b.opts.Branches {
+	shardBuilder.AddRepository(&b.opts.RepositoryDescription)
+
+	for _, b := range b.opts.RepositoryDescription.Branches {
 		if err := shardBuilder.AddBranch(b.Name, b.Version); err != nil {
 			return err
 		}

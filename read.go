@@ -171,10 +171,10 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 		d.fileNameNgrams[bytesToNGram(nameNgramText[i:i+ngramSize])] = fromDeltas(fileNamePostingsData[off:end], nil)
 	}
 
-	for j, br := range d.unaryData.BranchNames {
+	for j, br := range d.unaryData.Repository.Branches {
 		id := uint(1) << uint(j)
-		d.branchIDs[br] = id
-		d.branchNames[id] = br
+		d.branchIDs[br.Name] = id
+		d.branchNames[id] = br.Name
 	}
 	return &d, nil
 }

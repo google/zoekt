@@ -102,7 +102,7 @@ type templates struct {
 
 // guessRepoURL guesses the URL template for a repo mirrored from a
 // well-known git hosting site.
-func guessRepoURL(repoDir string) (*templates, error) {
+func guessRepoURL(repoDir string) (*zoekt.Repository, error) {
 	base, err := git.NewConfig()
 	if err != nil {
 		return nil, err
@@ -126,22 +126,22 @@ func guessRepoURL(repoDir string) (*templates, error) {
 
 	if strings.HasSuffix(parsed.Host, "googlesource.com") {
 		/// eg. https://gerrit.googlesource.com/gitiles/+/master/tools/run_dev.sh#20
-		return &templates{
-			repo:   remoteURL,
-			commit: remoteURL + "/+/{{.Version}}",
-			file:   remoteURL + "/+/{{.Branch}}/{{.Path}}",
-			line:   "{{.LineNumber}}",
+		return &zoekt.Repository{
+			URL:                  remoteURL,
+			CommitURLTemplate:    remoteURL + "/+/{{.Version}}",
+			FileURLTemplate:      remoteURL + "/+/{{.Branch}}/{{.Path}}",
+			LineFragmentTemplate: "{{.LineNumber}}",
 		}, nil
 	} else if parsed.Host == "github.com" {
 		// CloneURL from the JSON API has .git
 		parsed.Path = strings.TrimSuffix(parsed.Path, ".git")
 
 		// eg. https://github.com/hanwen/go-fuse/blob/notify/genversion.sh#L10
-		return &templates{
-			repo:   parsed.String(),
-			commit: parsed.String() + "/commit/{{.Version}}",
-			file:   parsed.String() + "/blob/{{.Branch}}/{{.Path}}",
-			line:   "L{{.LineNumber}}",
+		return &zoekt.Repository{
+			URL:                  parsed.String(),
+			CommitURLTemplate:    parsed.String() + "/commit/{{.Version}}",
+			FileURLTemplate:      parsed.String() + "/blob/{{.Branch}}/{{.Path}}",
+			LineFragmentTemplate: "L{{.LineNumber}}",
 		}, nil
 	}
 
@@ -170,13 +170,13 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 		return err
 	}
 
-	if tpl, err := guessRepoURL(opts.RepoDir); err != nil {
+	if desc, err := guessRepoURL(opts.RepoDir); err != nil {
 		log.Printf("guessRepoURL(%s): %s", opts.RepoDir, err)
 	} else {
-		opts.RepoURL = tpl.repo
-		opts.FileURLTemplate = tpl.file
-		opts.CommitURLTemplate = tpl.commit
-		opts.LineFragmentTemplate = tpl.line
+		opts.RepositoryDescription.URL = desc.URL
+		opts.RepositoryDescription.CommitURLTemplate = desc.CommitURLTemplate
+		opts.RepositoryDescription.FileURLTemplate = desc.FileURLTemplate
+		opts.RepositoryDescription.LineFragmentTemplate = desc.LineFragmentTemplate
 	}
 
 	// name => branch
@@ -205,7 +205,7 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 			return err
 		}
 		defer commit.Free()
-		opts.Branches = append(opts.Branches, build.Branch{
+		opts.RepositoryDescription.Branches = append(opts.RepositoryDescription.Branches, zoekt.RepositoryBranch{
 			Name:    b,
 			Version: commit.Id().String(),
 		})

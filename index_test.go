@@ -671,7 +671,7 @@ func TestRepoName(t *testing.T) {
 	content := []byte("bla the needle")
 	// ----------------01234567890123
 	b.AddFile("f1", content)
-	b.SetName("bla")
+	b.AddRepository(&Repository{Name: "bla"})
 
 	sres := searchForTest(t, b,
 		query.NewAnd(
@@ -714,13 +714,17 @@ func TestRepoURL(t *testing.T) {
 
 	content := []byte("blablabla")
 	b.AddFile("f1", content)
-	b.SetName("name")
-	b.SetURLTemplates("repo", "commit", "URL", "fragment")
-	sres := searchForTest(t, b,
-		&query.Substring{Pattern: "bla"})
+	b.AddRepository(&Repository{
+		Name:                 "name",
+		URL:                  "URL",
+		CommitURLTemplate:    "commit",
+		FileURLTemplate:      "file-url",
+		LineFragmentTemplate: "fragment",
+	})
+	sres := searchForTest(t, b, &query.Substring{Pattern: "bla"})
 
-	if sres.RepoURLs["name"] != "URL" {
-		t.Errorf("got URLs %v, want {name: URL}", sres.RepoURLs)
+	if sres.RepoURLs["name"] != "file-url" {
+		t.Errorf("got RepoURLs %v, want {name: URL}", sres.RepoURLs)
 	}
 	if sres.LineFragments["name"] != "fragment" {
 		t.Errorf("got URLs %v, want {name: URL}", sres.LineFragments)
@@ -870,7 +874,9 @@ func TestNegativeRepo(t *testing.T) {
 	content := []byte("bla the needle")
 	// ----------------01234567890123
 	b.AddFile("f1", content)
-	b.SetName("bla")
+	b.AddRepository(&Repository{
+		Name: "bla",
+	})
 
 	sres := searchForTest(t, b,
 		query.NewAnd(
@@ -890,7 +896,9 @@ func TestListRepos(t *testing.T) {
 	// ----------------01234567890123
 	b.AddFile("f1", content)
 	b.AddFile("f2", content)
-	b.SetName("reponame")
+	b.AddRepository(&Repository{
+		Name: "reponame",
+	})
 
 	searcher := searcherForTest(t, b)
 	q := &query.Repo{Pattern: "epo"}
