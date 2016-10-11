@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"sort"
 )
 
 // reader is a stateful file
@@ -176,6 +177,20 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 		d.branchIDs[br.Name] = id
 		d.branchNames[id] = br.Name
 	}
+
+	if blob, err := d.readSectionBlob(toc.subRepos); err != nil {
+		return nil, err
+	} else {
+		d.subRepos = fromDeltas(blob, nil)
+	}
+
+	var keys []string
+	for k := range d.unaryData.SubRepoMap {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	d.subRepoPaths = keys
+
 	return &d, nil
 }
 

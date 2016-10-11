@@ -25,7 +25,7 @@ import (
 
 // FormatVersion is a version number. It is increased every time the
 // on-disk index format is changed.
-const IndexFormatVersion = 4
+const IndexFormatVersion = 5
 
 var _ = log.Println
 
@@ -38,6 +38,7 @@ type indexTOC struct {
 	ngramText    simpleSection
 
 	branchMasks simpleSection
+	subRepos    simpleSection
 
 	nameNgramText simpleSection
 	namePostings  compoundSection
@@ -58,6 +59,7 @@ func (t *indexTOC) sections() []section {
 		&t.nameNgramText,
 		&t.namePostings,
 		&t.branchMasks,
+		&t.subRepos,
 	}
 }
 
@@ -143,10 +145,15 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 	}
 	toc.namePostings.end(w)
 
+	toc.subRepos.start(w)
+	w.Write(toDeltas(b.subRepos))
+	toc.subRepos.end(w)
+
 	unaryData := indexUnaryData{
 		Repository:         b.repo,
 		IndexFormatVersion: IndexFormatVersion,
 		IndexTime:          time.Now(),
+		SubRepoMap:         b.subRepoMap,
 	}
 
 	blob, err := json.Marshal(&unaryData)

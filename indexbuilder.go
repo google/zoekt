@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"path/filepath"
 	"sort"
 )
 
@@ -62,6 +63,7 @@ type IndexBuilder struct {
 	docSections [][]DocumentSection
 
 	branchMasks []uint32
+	subRepos    []uint32
 
 	// ngram => posting.
 	contentPostings map[ngram][]uint32
@@ -69,7 +71,14 @@ type IndexBuilder struct {
 	// like postings, but for filenames
 	namePostings map[ngram][]uint32
 
+	// root repository
 	repo Repository
+
+	// subRepositories
+	subRepoMap map[string]*Repository
+
+	// name to index.
+	subRepoIndices map[string]uint32
 }
 
 func (d *Repository) verify() error {
@@ -93,18 +102,33 @@ func NewIndexBuilder() *IndexBuilder {
 	return &IndexBuilder{
 		contentPostings: make(map[ngram][]uint32),
 		namePostings:    make(map[ngram][]uint32),
+		subRepoMap:      map[string]*Repository{},
 	}
 }
 
-// AddRepository adds repository metadata. The Branches field is ignored.
-func (b *IndexBuilder) AddRepository(desc *Repository) error {
+// AddRepository adds repository metadata. The Branches field is
+// ignored.
+func (b *IndexBuilder) AddSubRepository(path string, desc *Repository) error {
+	if len(b.files) > 0 {
+		return fmt.Errorf("AddRepository called after adding files.")
+	}
 	if err := desc.verify(); err != nil {
 		return err
 	}
-	before := b.repo.Branches
-	b.repo = *desc
-	b.repo.Branches = before
+	if path == "" {
+		before := b.repo.Branches
+		b.repo = *desc
+		b.repo.Branches = before
+	} else {
+		r := *desc
+		r.Branches = nil
+		b.subRepoMap[path] = &r
+	}
 	return nil
+}
+
+func (b *IndexBuilder) AddRepository(desc *Repository) error {
+	return b.AddSubRepository("", desc)
 }
 
 type DocumentSection struct {
@@ -113,9 +137,10 @@ type DocumentSection struct {
 
 // Document holds a document (file) to index.
 type Document struct {
-	Name     string
-	Content  []byte
-	Branches []string
+	Name              string
+	Content           []byte
+	Branches          []string
+	SubRepositoryPath string
 
 	Symbols []DocumentSection
 }
@@ -127,8 +152,8 @@ func (m docSectionSlice) Swap(i, j int)      { m[i], m[j] = m[j], m[i] }
 func (m docSectionSlice) Less(i, j int) bool { return m[i].Start < m[j].Start }
 
 // AddFile is a convenience wrapper for Add
-func (b *IndexBuilder) AddFile(name string, content []byte) {
-	b.Add(Document{Name: name, Content: content})
+func (b *IndexBuilder) AddFile(name string, content []byte) error {
+	return b.Add(Document{Name: name, Content: content})
 }
 
 // addBranch adds a branch (if new) and returns its index.
@@ -157,6 +182,22 @@ func (b *IndexBuilder) AddBranch(br, version string) error {
 
 const maxTrigramCount = 20000
 
+func (b *IndexBuilder) populateSubRepoIndices() {
+	if b.subRepoIndices != nil {
+		return
+	}
+	b.subRepoMap[""] = &b.repo
+	var paths []string
+	for k := range b.subRepoMap {
+		paths = append(paths, k)
+	}
+	sort.Strings(paths)
+	b.subRepoIndices = make(map[string]uint32, len(paths))
+	for i, p := range paths {
+		b.subRepoIndices[p] = uint32(i)
+	}
+}
+
 // Add a file which only occurs in certain branches.
 func (b *IndexBuilder) Add(doc Document) error {
 	if len(doc.Content) >= ngramSize {
@@ -182,6 +223,21 @@ func (b *IndexBuilder) Add(doc Document) error {
 		}
 		last = s
 	}
+
+	b.populateSubRepoIndices()
+	if doc.SubRepositoryPath != "" {
+		rel, err := filepath.Rel(doc.SubRepositoryPath, doc.Name)
+		if err != nil || rel == doc.Name {
+			return fmt.Errorf("path %q must start subrepo path %q", doc.Name, doc.SubRepositoryPath)
+		}
+	}
+
+	i, ok := b.subRepoIndices[doc.SubRepositoryPath]
+	if !ok {
+		return fmt.Errorf("unknown subrepo path %q", doc.SubRepositoryPath)
+	}
+
+	b.subRepos = append(b.subRepos, i)
 
 	b.files = append(b.files, newSearchableString(doc.Content, b.contentEnd, b.contentPostings))
 	b.fileNames = append(b.fileNames, newSearchableString([]byte(doc.Name), b.nameEnd, b.namePostings))

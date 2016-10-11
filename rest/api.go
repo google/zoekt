@@ -26,12 +26,16 @@ type SearchRequest struct {
 type SearchRequestRestriction struct {
 	Repo     string
 	Branches []string
+
+	// TODO - provide way to set number of search results.
 }
 
 // SearchResponse is the return type for /api/search endpoint
 type SearchResponse struct {
 	Files []*SearchResponseFile
 	Error *string
+
+	// TODO - provide statistics.
 }
 
 // SearchResponseFile holds the matches within a single file.

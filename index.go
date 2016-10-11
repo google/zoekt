@@ -55,14 +55,16 @@ type indexData struct {
 	branchIDs map[string]uint
 
 	unaryData indexUnaryData
+
+	subRepos     []uint32
+	subRepoPaths []string
 }
 
 type indexUnaryData struct {
-	Repository Repository
-
+	Repository         Repository
+	SubRepoMap         map[string]*Repository
 	IndexFormatVersion int
-
-	IndexTime time.Time
+	IndexTime          time.Time
 }
 
 func (d *indexData) String() string {

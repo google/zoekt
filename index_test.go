@@ -53,8 +53,11 @@ var _ = log.Println
 func TestBasic(t *testing.T) {
 	b := NewIndexBuilder()
 
-	b.AddFile("f2", []byte("to carry water in the no later bla"))
-	// -------------------- 0123456789012345678901234567890123456789
+	if err := b.AddFile(
+		// ---------- 0123456789012345678901234567890123456789
+		"f2", []byte("to carry water in the no later bla")); err != nil {
+		t.Fatalf("AddFile: %v", err)
+	}
 
 	res := searchForTest(t, b, &query.Substring{Pattern: "water"})
 	fmatches := res.Files
@@ -670,8 +673,10 @@ func TestRepoName(t *testing.T) {
 
 	content := []byte("bla the needle")
 	// ----------------01234567890123
+	if err := b.AddRepository(&Repository{Name: "bla"}); err != nil {
+		t.Fatalf("AddRepository: %v", err)
+	}
 	b.AddFile("f1", content)
-	b.AddRepository(&Repository{Name: "bla"})
 
 	sres := searchForTest(t, b,
 		query.NewAnd(
@@ -713,14 +718,17 @@ func TestRepoURL(t *testing.T) {
 	b := NewIndexBuilder()
 
 	content := []byte("blablabla")
-	b.AddFile("f1", content)
-	b.AddRepository(&Repository{
+	if err := b.AddRepository(&Repository{
 		Name:                 "name",
 		URL:                  "URL",
 		CommitURLTemplate:    "commit",
 		FileURLTemplate:      "file-url",
 		LineFragmentTemplate: "fragment",
-	})
+	}); err != nil {
+		t.Fatalf("AddRepository: %v", err)
+	}
+	b.AddFile("f1", content)
+
 	sres := searchForTest(t, b, &query.Substring{Pattern: "bla"})
 
 	if sres.RepoURLs["name"] != "file-url" {
@@ -873,10 +881,10 @@ func TestNegativeRepo(t *testing.T) {
 
 	content := []byte("bla the needle")
 	// ----------------01234567890123
-	b.AddFile("f1", content)
 	b.AddRepository(&Repository{
 		Name: "bla",
 	})
+	b.AddFile("f1", content)
 
 	sres := searchForTest(t, b,
 		query.NewAnd(
@@ -894,11 +902,11 @@ func TestListRepos(t *testing.T) {
 
 	content := []byte("bla the needle")
 	// ----------------01234567890123
-	b.AddFile("f1", content)
-	b.AddFile("f2", content)
 	b.AddRepository(&Repository{
 		Name: "reponame",
 	})
+	b.AddFile("f1", content)
+	b.AddFile("f2", content)
 
 	searcher := searcherForTest(t, b)
 	q := &query.Repo{Pattern: "epo"}
@@ -1011,5 +1019,34 @@ func TestMatchNewline(t *testing.T) {
 		t.Errorf("got %v, wanted 1 matches", sres.Files)
 	} else if l := sres.Files[0].LineMatches[0].Line; bytes.Compare(l, content) != 0 {
 		t.Errorf("got match line %q, want %q", l, content)
+	}
+}
+
+func TestSubRepo(t *testing.T) {
+	b := NewIndexBuilder()
+	b.AddSubRepository("sub", &Repository{
+		Name:                 "sub-name",
+		LineFragmentTemplate: "sub-line",
+	})
+
+	content := []byte("pqr\nalex")
+	// ----------------0123 4567
+	b.Add(Document{
+		Name:              "sub/f1",
+		Content:           content,
+		SubRepositoryPath: "sub",
+	})
+	sres := searchForTest(t, b, &query.Substring{Pattern: "alex"})
+	if len(sres.Files) != 1 {
+		t.Fatalf("got %v, wanted 1 matches", sres.Files)
+	}
+
+	f := sres.Files[0]
+	if f.SubRepositoryPath != "sub" || f.SubRepositoryName != "sub-name" {
+		t.Errorf("got %#v, want SubRepository{Path,Name} = {'sub', 'sub-name'}", f)
+	}
+
+	if sres.LineFragments["sub-name"] != "sub-line" {
+		t.Errorf("got LineFragmentTemplate %v, want {'sub':'sub-line'}", sres.LineFragments)
 	}
 }

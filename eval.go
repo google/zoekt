@@ -605,6 +605,16 @@ nextFileMatch:
 			Score: 10 * float64(nextDoc) / float64(len(d.boundaries)),
 		}
 
+		if s := d.subRepos[nextDoc]; s > 0 {
+			if s >= uint32(len(d.subRepoPaths)) {
+				panic(fmt.Sprintf("corrupt index: subrepo %d beyond %v", s, d.subRepoPaths))
+			}
+			path := d.subRepoPaths[s]
+			fileMatch.SubRepositoryPath = path
+			sr := d.unaryData.SubRepoMap[path]
+			fileMatch.SubRepositoryName = sr.Name
+		}
+
 		atomMatchCount := 0
 		visitMatches(mt, known, func(mt matchTree) {
 			atomMatchCount++
@@ -641,13 +651,24 @@ nextFileMatch:
 		res.Stats.FileCount++
 	}
 	sortFilesByScore(res.Files)
-	res.RepoURLs = map[string]string{
-		d.unaryData.Repository.Name: d.unaryData.Repository.FileURLTemplate,
-	}
-	res.LineFragments = map[string]string{
-		d.unaryData.Repository.Name: d.unaryData.Repository.LineFragmentTemplate,
+
+	addRepo(&res, &d.unaryData.Repository)
+	for _, v := range d.unaryData.SubRepoMap {
+		addRepo(&res, v)
 	}
 	return &res, nil
+}
+
+func addRepo(res *SearchResult, repo *Repository) {
+	if res.RepoURLs == nil {
+		res.RepoURLs = map[string]string{}
+	}
+	res.RepoURLs[repo.Name] = repo.FileURLTemplate
+
+	if res.LineFragments == nil {
+		res.LineFragments = map[string]string{}
+	}
+	res.LineFragments[repo.Name] = repo.LineFragmentTemplate
 }
 
 func extractSubstringQueries(q query.Q) []*query.Substring {

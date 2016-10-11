@@ -26,14 +26,25 @@ import (
 // FileMatch contains all the matches within a file.
 type FileMatch struct {
 	// Ranking; the higher, the better.
-	Score       float64 // TODO - hide this field?
-	FileName    string
+	Score    float64 // TODO - hide this field?
+	FileName string
+
+	// Repository is the globally unique name of the repo of the
+	// match
 	Repository  string
 	Branches    []string
 	LineMatches []LineMatch
 
 	// Only set if requested
 	Content []byte
+
+	// SubRepositoryName is the globally unique name of the repo,
+	// if it came from a subrepository
+	SubRepositoryName string
+
+	// SubRepositoryPath holds the prefix where the subrepository
+	// was mounted.
+	SubRepositoryPath string
 }
 
 // LineMatch holds the matches within a single line in a file.
