@@ -100,9 +100,9 @@ type templates struct {
 	repo, commit, file, line string
 }
 
-// guessRepoURL guesses the URL template for a repo mirrored from a
-// well-known git hosting site.
-func guessRepoURL(repoDir string) (*zoekt.Repository, error) {
+// RepoURL returns the canonical URL for a repo, based on its
+// configured remotes.
+func RepoURL(repoDir string) (*url.URL, error) {
 	base, err := git.NewConfig()
 	if err != nil {
 		return nil, err
@@ -124,28 +124,36 @@ func guessRepoURL(repoDir string) (*zoekt.Repository, error) {
 		return nil, err
 	}
 
-	if strings.HasSuffix(parsed.Host, "googlesource.com") {
+	return parsed, nil
+}
+
+// Templates fills in URL templates for known git hosting sites.
+func Templates(u *url.URL) (*zoekt.Repository, error) {
+	if strings.HasSuffix(u.Host, "googlesource.com") {
 		/// eg. https://gerrit.googlesource.com/gitiles/+/master/tools/run_dev.sh#20
 		return &zoekt.Repository{
-			URL:                  remoteURL,
-			CommitURLTemplate:    remoteURL + "/+/{{.Version}}",
-			FileURLTemplate:      remoteURL + "/+/{{.Branch}}/{{.Path}}",
-			LineFragmentTemplate: "{{.LineNumber}}",
+			Name:                 filepath.Join(u.Host, u.Path),
+			URL:                  u.String(),
+			CommitURLTemplate:    u.String() + "/+/{{.Version}}",
+			FileURLTemplate:      u.String() + "/+/{{.Branch}}/{{.Path}}",
+			LineFragmentTemplate: u.String() + "{{.LineNumber}}",
 		}, nil
-	} else if parsed.Host == "github.com" {
+	} else if u.Host == "github.com" {
+		t := *u
 		// CloneURL from the JSON API has .git
-		parsed.Path = strings.TrimSuffix(parsed.Path, ".git")
+		t.Path = strings.TrimSuffix(t.Path, ".git")
 
 		// eg. https://github.com/hanwen/go-fuse/blob/notify/genversion.sh#L10
 		return &zoekt.Repository{
-			URL:                  parsed.String(),
-			CommitURLTemplate:    parsed.String() + "/commit/{{.Version}}",
-			FileURLTemplate:      parsed.String() + "/blob/{{.Branch}}/{{.Path}}",
+			Name:                 filepath.Join(t.Host, t.Path),
+			URL:                  t.String(),
+			CommitURLTemplate:    t.String() + "/commit/{{.Version}}",
+			FileURLTemplate:      t.String() + "/blob/{{.Branch}}/{{.Path}}",
 			LineFragmentTemplate: "L{{.LineNumber}}",
 		}, nil
 	}
 
-	return nil, fmt.Errorf("scheme unknown for URL %s", remoteURL)
+	return nil, fmt.Errorf("scheme unknown for URL %s", u)
 }
 
 // getCommit returns a tree object for the given reference.
@@ -170,8 +178,10 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 		return err
 	}
 
-	if desc, err := guessRepoURL(opts.RepoDir); err != nil {
-		log.Printf("guessRepoURL(%s): %s", opts.RepoDir, err)
+	if url, err := RepoURL(opts.RepoDir); err != nil {
+		log.Printf("RepoURL(%s): %s", opts.RepoDir, err)
+	} else if desc, err := Templates(url); err != nil {
+		log.Printf("Templates(%s): %s", url, err)
 	} else {
 		opts.RepositoryDescription.URL = desc.URL
 		opts.RepositoryDescription.CommitURLTemplate = desc.CommitURLTemplate

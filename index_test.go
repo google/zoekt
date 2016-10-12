@@ -1024,10 +1024,12 @@ func TestMatchNewline(t *testing.T) {
 
 func TestSubRepo(t *testing.T) {
 	b := NewIndexBuilder()
-	b.AddSubRepository("sub", &Repository{
+	if err := b.AddSubRepository("sub", &Repository{
 		Name:                 "sub-name",
 		LineFragmentTemplate: "sub-line",
-	})
+	}); err != nil {
+		t.Fatalf("AddSubRepository: %v", err)
+	}
 
 	content := []byte("pqr\nalex")
 	// ----------------0123 4567

@@ -91,6 +91,7 @@ func parseBranches(manifestRepo, revPrefix string, args []string) ([]branchFile,
 			}
 
 			branches = append(branches, branchFile{
+				branch:       "HEAD",
 				file:         filepath.Base(f),
 				mf:           mf,
 				manifestPath: f,
@@ -146,15 +147,23 @@ func main() {
 
 	opts.RepoDir = branches[0].manifestPath
 	perBranch := map[string]map[locationKey]locator{}
+	opts.SubRepositories = map[string]*zoekt.Repository{}
 	for _, br := range branches {
 		br.mf.Filter()
-		files, err := iterateManifest(br.mf, *baseURL, *revPrefix, repoCache)
+		files, repoMap, err := iterateManifest(br.mf, *baseURL, *revPrefix, repoCache)
 		if err != nil {
-			log.Fatal("iterateManifest", err)
+			log.Fatalf("iterateManifest: %v", err)
 		}
 
-		key := br.branch + ":" + br.file
-		perBranch[key] = files
+		perBranch[br.branch] = files
+
+		// This can be incorrect: if the layout of manifests
+		// changes across branches, then the same file could
+		// be in different subRepos. We'll pretend this is not
+		// a problem.
+		for k, v := range repoMap {
+			opts.SubRepositories[k] = v
+		}
 	}
 
 	// key => branch
@@ -169,16 +178,17 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	for k, branches := range all {
 		loc := perBranch[branches[0]][k]
 		data, err := loc.Blob(&k.id)
 		if err != nil {
 			log.Fatal(err)
 		}
+
 		doc := zoekt.Document{
-			Name:    k.path,
-			Content: data,
+			Name:              k.fullPath(),
+			Content:           data,
+			SubRepositoryPath: k.subRepoPath,
 		}
 
 		for _, br := range branches {
@@ -263,15 +273,22 @@ func (rc *repoCacheImpl) open(u *url.URL) (*git.Repository, error) {
 // locationKey is a single file version (possibly from multiple
 // branches).
 type locationKey struct {
-	path string
-	id   git.Oid
+	subRepoPath string
+	path        string
+	id          git.Oid
+}
+
+func (k *locationKey) fullPath() string {
+	return filepath.Join(k.subRepoPath, k.path)
 }
 
 // iterateManifest constructs a complete tree from the given Manifest.
 func iterateManifest(mf *manifest.Manifest,
 	baseURL url.URL, revPrefix string,
-	cache repoCache) (map[locationKey]locator, error) {
+	cache repoCache) (map[locationKey]locator, map[string]*zoekt.Repository, error) {
 	allFiles := map[locationKey]locator{}
+	repoMap := map[string]*zoekt.Repository{}
+
 	for _, p := range mf.Project {
 		rev := mf.ProjectRevision(&p)
 
@@ -280,34 +297,42 @@ func iterateManifest(mf *manifest.Manifest,
 
 		repo, err := cache.open(&projURL)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
+		subRepo, err := gitindex.Templates(&projURL)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		repoMap[*p.Path] = subRepo
+
+		// provide ':' to get the tree.
 		obj, err := repo.RevparseSingle(revPrefix + rev + ":")
 		if err != nil {
-			return nil, fmt.Errorf("RevparseSingle(%s, %s): %v", p.Name, rev, err)
+			return nil, nil, fmt.Errorf("RevparseSingle(%s, %s): %v", p.Name, rev, err)
 		}
+
 		// Since the number of projects is small, it's OK to
 		// free this at the end of the function.
 		defer obj.Free()
 		tree, err := obj.AsTree()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		submodules := false
 		files, _, err := gitindex.TreeToFiles(repo, tree, submodules)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		for path, sha := range files {
-			fullPath := filepath.Join(p.GetPath(), path)
-			allFiles[locationKey{fullPath, sha}] = locator{
+			allFiles[locationKey{p.GetPath(), path, sha}] = locator{
 				repo: repo,
 			}
 		}
 	}
 
-	return allFiles, nil
+	return allFiles, repoMap, nil
 }

@@ -106,29 +106,35 @@ func NewIndexBuilder() *IndexBuilder {
 	}
 }
 
-// AddRepository adds repository metadata. The Branches field is
-// ignored.
+// AddSubRepository adds repository metadata for a subrepository. The
+// Branches field is ignored.
 func (b *IndexBuilder) AddSubRepository(path string, desc *Repository) error {
 	if len(b.files) > 0 {
-		return fmt.Errorf("AddRepository called after adding files.")
+		return fmt.Errorf("AddSubRepository called after adding files.")
 	}
 	if err := desc.verify(); err != nil {
 		return err
 	}
-	if path == "" {
-		before := b.repo.Branches
-		b.repo = *desc
-		b.repo.Branches = before
-	} else {
-		r := *desc
-		r.Branches = nil
-		b.subRepoMap[path] = &r
-	}
+
+	r := *desc
+	b.subRepoMap[path] = &r
 	return nil
 }
 
+// AddRepository adds repository metadata. The Branches field is
+// ignored.
 func (b *IndexBuilder) AddRepository(desc *Repository) error {
-	return b.AddSubRepository("", desc)
+	if len(b.files) > 0 {
+		return fmt.Errorf("AddSubRepository called after adding files.")
+	}
+	if err := desc.verify(); err != nil {
+		return err
+	}
+
+	before := b.repo.Branches
+	b.repo = *desc
+	b.repo.Branches = before
+	return nil
 }
 
 type DocumentSection struct {

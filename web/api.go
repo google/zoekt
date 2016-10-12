@@ -39,6 +39,7 @@ type ResultInput struct {
 type FileMatch struct {
 	FileName string
 	Repo     string
+
 	Branches []string
 	Matches  []Match
 	URL      string

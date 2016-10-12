@@ -20,6 +20,7 @@ import (
 	"log"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/google/zoekt"
 )
@@ -85,7 +86,13 @@ func (s *Server) formatResults(result *zoekt.SearchResult, localPrint bool) ([]*
 			FileName: f.FileName,
 			Repo:     f.Repository,
 			Branches: f.Branches,
-			URL:      getURL(f.Repository, f.FileName, f.Branches),
+		}
+
+		if f.SubRepositoryName != "" {
+			fn := strings.TrimPrefix(fMatch.FileName[len(f.SubRepositoryPath):], "/")
+			fMatch.URL = getURL(f.SubRepositoryName, fn, f.Branches)
+		} else {
+			fMatch.URL = getURL(f.Repository, f.FileName, f.Branches)
 		}
 
 		for _, m := range f.LineMatches {

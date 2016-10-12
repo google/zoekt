@@ -58,6 +58,9 @@ type Options struct {
 	// RepositoryDescription holds names and URLs for the repository.
 	RepositoryDescription zoekt.Repository
 
+	// SubRepositories is a path => sub repository map.
+	SubRepositories map[string]*zoekt.Repository
+
 	// RepoDir is the path to the repository on the indexing machine.
 	RepoDir string
 
@@ -267,8 +270,14 @@ func (b *Builder) buildShard(todo []*zoekt.Document, nextShardNum int) error {
 	}
 
 	shardBuilder := zoekt.NewIndexBuilder()
-	shardBuilder.AddRepository(&b.opts.RepositoryDescription)
-
+	if err := shardBuilder.AddRepository(&b.opts.RepositoryDescription); err != nil {
+		return err
+	}
+	for k, v := range b.opts.SubRepositories {
+		if err := shardBuilder.AddSubRepository(k, v); err != nil {
+			return err
+		}
+	}
 	for _, b := range b.opts.RepositoryDescription.Branches {
 		if err := shardBuilder.AddBranch(b.Name, b.Version); err != nil {
 			return err
