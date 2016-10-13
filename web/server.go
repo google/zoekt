@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"net"
 	"net/http"
-	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -64,6 +64,13 @@ type Server struct {
 
 	// Version string for this server.
 	Version string
+
+	// Depending on the Host header, add a query to the entry
+	// page. For example, when serving on "search.myproject.org"
+	// we could add "r:myproject" automatically.  This allows a
+	// single instance to serve as search engine for multiple
+	// domains.
+	HostCustomQueries map[string]string
 
 	// This should contain the following templates: "didyoumean"
 	// (for suggestions), "repolist" (for the repo search result
@@ -263,15 +270,23 @@ func (s *Server) serveSearchBoxErr(w http.ResponseWriter, r *http.Request) error
 	}
 
 	stats.Repos = stats.Repos[:0]
-	for k := range uniq {
-		stats.Repos = append(stats.Repos, k)
-	}
-	sort.Strings(stats.Repos)
+
 	d := SearchBoxInput{
 		Stats:   stats,
 		Version: s.Version,
 		Uptime:  time.Now().Sub(s.startTime),
 	}
+
+	custom := s.HostCustomQueries[r.Host]
+	if custom == "" {
+		host, _, _ := net.SplitHostPort(r.Host)
+		custom = s.HostCustomQueries[host]
+	}
+
+	if custom != "" {
+		d.Last.Query = custom + " "
+	}
+
 	if err := s.search.Execute(&buf, &d); err != nil {
 		return err
 	}

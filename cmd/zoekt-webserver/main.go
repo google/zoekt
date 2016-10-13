@@ -22,6 +22,7 @@ import (
 	"net/http/pprof"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/zoekt"
@@ -69,6 +70,9 @@ func main() {
 	enablePprof := flag.Bool("pprof", false, "set to enable remote profiling.")
 	sslCert := flag.String("ssl_cert", "", "set path to SSL .pem holding certificate.")
 	sslKey := flag.String("ssl_key", "", "set path to SSL .pem holding key.")
+	hostCustomization := flag.String(
+		"host_customization", "",
+		"specify host customization, as HOST1=QUERY,HOST2=QUERY")
 	flag.Parse()
 
 	if *logDir != "" {
@@ -91,9 +95,25 @@ func main() {
 		Top:      web.Top,
 		Version:  Version,
 	}
+
 	s.Print = *print
 	s.HTML = *html
 	s.RESTAPI = *restAPI
+
+	if *hostCustomization != "" {
+		s.HostCustomQueries = map[string]string{}
+		for _, h := range strings.SplitN(*hostCustomization, ",", -1) {
+			if len(h) == 0 {
+				continue
+			}
+			fields := strings.SplitN(h, "=", 2)
+			if len(fields) < 2 {
+				log.Fatal("invalid host_customization %q", h)
+			}
+
+			s.HostCustomQueries[fields[0]] = fields[1]
+		}
+	}
 
 	handler, err := web.NewMux(s)
 	if err != nil {

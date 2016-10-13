@@ -261,3 +261,51 @@ func TestCrash(t *testing.T) {
 		t.Errorf("result did not have %q: %s", want, result)
 	}
 }
+
+func TestHostCustomization(t *testing.T) {
+	b := zoekt.NewIndexBuilder()
+	b.AddRepository(&zoekt.Repository{
+		Name: "name",
+	})
+	b.Add(zoekt.Document{
+		Name:    "file",
+		Content: []byte("bla"),
+	})
+
+	s := searcherForTest(t, b)
+	srv := Server{
+		Searcher: s,
+		Top:      Top,
+		HTML:     true,
+		HostCustomQueries: map[string]string{
+			"myproject.io": "r:myproject",
+		},
+	}
+
+	mux, err := NewMux(&srv)
+	if err != nil {
+		t.Fatalf("NewMux: %v", err)
+	}
+
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+
+	req, err := http.NewRequest("GET", ts.URL, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("NewRequest: %v", err)
+	}
+	req.Host = "myproject.io"
+	res, err := (&http.Client{}).Do(req)
+	if err != nil {
+		t.Fatal("Do(%v): %v", req, err)
+	}
+	resultBytes, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+
+	if got, want := string(resultBytes), "r:myproject"; !strings.Contains(got, want) {
+		t.Fatalf("got %s, want substring %q", got, want)
+	}
+}

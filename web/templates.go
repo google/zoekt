@@ -28,9 +28,14 @@ var DidYouMeanTemplate = template.Must(Top.New("didyoumean").Parse(`<html>
 </html>
 `))
 
+// QueryTemplate is the template for the search box.
 var QueryTemplate = template.Must(Top.New("box").Parse(`
   <form action="search">
-    Search some code: <input autofocus {{if .Query}}value={{.Query}} {{end}} type="text" name="q"> Max results:  <input style="width: 5em;" type="text" name="num" value="50"> <input type="submit" value="Search">
+    Search some code: <input
+      autofocus
+      onfocus="this.value = this.value;"
+      {{if .Query}}value={{.Query}}
+      {{end}}type="text" name="q"> Max results:  <input style="width: 5em;" type="text" name="num" value="50"> <input type="submit" value="Search">
   </form>
 `))
 
@@ -46,7 +51,7 @@ dt {
 <title>Zoekt, en gij zult spinazie eten</title>
 <body>
 <div style="margin: 3em; padding 3em; position: center;">
-{{template "box"}}
+{{template "box" .Last}}
 </div>
 
 <div style="display: flex; justify-content: space-around; flex-direction: row;">
