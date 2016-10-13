@@ -105,7 +105,7 @@ func deleteLogs(logDir string, maxAge time.Duration) {
 
 // runServer runs the webserver in a loop. The webserver runs as a subprocess so
 // any fatal bugs will be recorded in a log file.
-func runServer(logDir, indexDir string, port int, refresh time.Duration, key, cert string) {
+func runServer(logDir, indexDir string, refresh time.Duration, args []string) {
 	for {
 		start := time.Now()
 
@@ -118,12 +118,8 @@ func runServer(logDir, indexDir string, port int, refresh time.Duration, key, ce
 		}
 
 		log.Printf("restarting server, log in %s", nm)
-		cmd := exec.Command("zoekt-webserver", "-index", indexDir, "-log_dir", logDir, "-log_refresh", refresh.String(),
-			"-listen", fmt.Sprintf(":%d", port))
-
-		if key != "" || cert != "" {
-			cmd.Args = append(cmd.Args, "--ssl_key="+key, "--ssl_cert="+cert)
-		}
+		cmd := exec.Command("zoekt-webserver", "-index", indexDir, "-log_dir", logDir, "-log_refresh", refresh.String())
+		cmd.Args = append(cmd.Args, args...)
 		cmd.Stderr = f
 
 		if err := cmd.Start(); err != nil {
@@ -148,12 +144,9 @@ func main() {
 	fetchInterval := flag.Duration("fetch_interval", time.Hour, "run fetches this often")
 	dataDir := flag.String("data_dir",
 		filepath.Join(os.Getenv("HOME"), "zoekt-serving"), "directory holding all data.")
-	port := flag.Int("port", 6070, "port on which to serve HTTP")
 	mirrorConfig := flag.String("mirror_config",
 		"", "JSON file holding mirror configuration.")
 	mirrorInterval := flag.Duration("mirror_duration", 24*time.Hour, "clone new repos at this frequency.")
-	sslCert := flag.String("ssl_cert", "", "set path to SSL .pem holding certificate.")
-	sslKey := flag.String("ssl_key", "", "set path to SSL .pem holding key.")
 	flag.Parse()
 
 	if *dataDir == "" {
@@ -181,5 +174,5 @@ func main() {
 	}
 	go refresh(repoDir, indexDir, *fetchInterval)
 	go deleteLogs(logDir, *maxLogAge)
-	runServer(logDir, indexDir, *port, *maxLogAge/10, *sslKey, *sslCert)
+	runServer(logDir, indexDir, *maxLogAge/10, flag.Args())
 }
