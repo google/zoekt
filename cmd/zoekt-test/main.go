@@ -130,7 +130,7 @@ func compare(dir, patfile string, caseSensitive bool) error {
 		}
 
 		for _, f := range res.Files {
-			zFiles[f.Name] = struct{}{}
+			zFiles[f.FileName] = struct{}{}
 		}
 
 		// raw search
