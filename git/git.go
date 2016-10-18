@@ -56,14 +56,13 @@ func RepoModTime(dir string) (time.Time, error) {
 	return last, nil
 }
 
-// FindGitRepos finds git repositories and returns repodir => name map.
-func FindGitRepos(arg string) (map[string]string, error) {
+// FindGitRepos finds directories holding git repositories.
+func FindGitRepos(arg string) ([]string, error) {
 	arg, err := filepath.Abs(arg)
 	if err != nil {
 		return nil, err
 	}
 	var dirs []string
-	gitDirs := map[string]string{}
 	if err := filepath.Walk(arg, func(name string, fi os.FileInfo, err error) error {
 		if fi, err := os.Lstat(filepath.Join(name, ".git")); err == nil && fi.IsDir() {
 			dirs = append(dirs, filepath.Join(name, ".git"))
@@ -85,15 +84,7 @@ func FindGitRepos(arg string) (map[string]string, error) {
 		return nil, err
 	}
 
-	for _, dir := range dirs {
-		name := strings.TrimSuffix(dir, ".git")
-		name = strings.TrimSuffix(name, "/")
-		name = strings.TrimPrefix(name, arg)
-		name = strings.TrimPrefix(name, "/")
-		gitDirs[dir] = name
-	}
-
-	return gitDirs, nil
+	return dirs, nil
 }
 
 type templates struct {

@@ -63,7 +63,7 @@ func refresh(repoDir, indexDir string, fetchInterval time.Duration) {
 		if len(repos) == 0 {
 			log.Printf("no repos found under %s", repoDir)
 		}
-		for dir := range repos {
+		for _, dir := range repos {
 			cmd := exec.Command("git", "--git-dir", dir, "fetch", "origin")
 			// Prevent prompting
 			cmd.Stdin = &bytes.Buffer{}
@@ -76,10 +76,19 @@ func refresh(repoDir, indexDir string, fetchInterval time.Duration) {
 }
 
 func runIndexCommand(indexDir, repoDir string) {
-	cmd := exec.Command("zoekt-git-index",
-		"-parallelism", "1",
-		"-index", indexDir, "-incremental", "-recursive", repoDir)
-	loggedRun(cmd)
+	repos, err := gitindex.FindGitRepos(repoDir)
+	if err != nil {
+		log.Println("FindGitRepos", err)
+		return
+	}
+
+	for _, dir := range repos {
+		cmd := exec.Command("zoekt-git-index",
+			"-parallelism=1",
+			"-repo_cache_dir", repoDir,
+			"-index", indexDir, "-incremental", dir)
+		loggedRun(cmd)
+	}
 }
 
 // deleteLogs deletes old logs.

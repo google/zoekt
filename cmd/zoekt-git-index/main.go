@@ -31,15 +31,24 @@ func main() {
 	var sizeMax = flag.Int("file_limit", 128*1024, "maximum file size")
 	var shardLimit = flag.Int("shard_limit", 100<<20, "maximum corpus size for a shard")
 	var parallelism = flag.Int("parallelism", 4, "maximum number of parallel indexing processes.")
-	var recursive = flag.Bool("recursive", false, "recurse into directories to index all git repos")
 	submodules := flag.Bool("submodules", true, "if set to false, do not recurse into submodules")
 	branchesStr := flag.String("branches", "HEAD", "git branches to index.")
 	branchPrefix := flag.String("prefix", "refs/heads/", "prefix for branch names")
 
 	indexDir := flag.String("index", build.DefaultDir, "index directory for *.zoekt files.")
 	incremental := flag.Bool("incremental", true, "only index changed repositories")
+	repoCacheDir := flag.String("repo_cache", "", "directory holding bare git repos, named by URL. "+
+		"this is used to find repositories for submodules. "+
+		"It also affects name if the indexed repository is under this directory.")
 	flag.Parse()
 
+	if *repoCacheDir != "" {
+		dir, err := filepath.Abs(*repoCacheDir)
+		if err != nil {
+			log.Fatalf("Abs: %v", err)
+		}
+		*repoCacheDir = dir
+	}
 	opts := build.Options{
 		Parallelism: *parallelism,
 		SizeMax:     *sizeMax,
@@ -54,34 +63,24 @@ func main() {
 	}
 
 	gitRepos := map[string]string{}
-	if *recursive {
-		for _, arg := range flag.Args() {
-			repos, err := gitindex.FindGitRepos(arg)
-			if err != nil {
-				log.Fatal(err)
-			}
-			for k, v := range repos {
-				gitRepos[k] = v
-			}
+	for _, repoDir := range flag.Args() {
+		if _, err := os.Lstat(filepath.Join(repoDir, ".git")); err == nil {
+			repoDir = filepath.Join(repoDir, ".git")
 		}
-	} else {
-		for _, repoDir := range flag.Args() {
-			if _, err := os.Lstat(filepath.Join(repoDir, ".git")); err == nil {
-				repoDir = filepath.Join(repoDir, ".git")
-			}
-			repoDir, err := filepath.Abs(repoDir)
-			if err != nil {
-				log.Fatal(err)
-			}
+		repoDir, err := filepath.Abs(repoDir)
+		if err != nil {
+			log.Fatal(err)
+		}
+		repoDir = filepath.Clean(repoDir)
 
-			name := filepath.Base(repoDir)
-			if name == ".git" {
-				name = filepath.Base(filepath.Dir(repoDir))
-			}
+		name := strings.TrimSuffix(repoDir, "/.git")
+		if *repoCacheDir != "" && strings.HasPrefix(name, *repoCacheDir) {
+			name = strings.TrimPrefix(name, *repoCacheDir+"/")
 			name = strings.TrimSuffix(name, ".git")
-
-			gitRepos[repoDir] = name
+		} else {
+			name = strings.TrimSuffix(filepath.Base(name), ".git")
 		}
+		gitRepos[repoDir] = name
 	}
 
 	exitStatus := 0
