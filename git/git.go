@@ -163,7 +163,7 @@ func getCommit(repo *git.Repository, ref string) (*git.Commit, error) {
 }
 
 // IndexGitRepo indexes the git repository as specified by the options and arguments.
-func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, submodules bool) error {
+func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, submodules bool, repoCacheDir string) error {
 	repo, err := git.OpenRepository(opts.RepoDir)
 	if err != nil {
 		return err
@@ -179,6 +179,9 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 		opts.RepositoryDescription.FileURLTemplate = desc.FileURLTemplate
 		opts.RepositoryDescription.LineFragmentTemplate = desc.LineFragmentTemplate
 	}
+
+	repoCache := NewRepoCache(repoCacheDir)
+	defer repoCache.Close()
 
 	// name => branch
 	allfiles := map[string][]string{}
@@ -216,7 +219,8 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 			return err
 		}
 		defer tree.Free()
-		fs, subRepos, err := TreeToFiles(repo, tree, submodules)
+
+		fs, subRepos, err := TreeToFiles(repo, tree, opts.RepositoryDescription.URL, repoCache)
 		if err != nil {
 			return err
 		}

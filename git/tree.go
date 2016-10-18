@@ -15,7 +15,11 @@
 package gitindex
 
 import (
+	"fmt"
+	"net/url"
+	"path"
 	"path/filepath"
+	"strings"
 
 	git "github.com/libgit2/git2go"
 )
@@ -23,38 +27,61 @@ import (
 type repoWalker struct {
 	*git.Repository
 
-	repos      map[git.Oid]*git.Repository
-	tree       map[string]git.Oid
-	err        error
-	submodules bool
+	repoURL   *url.URL
+	repos     map[git.Oid]*git.Repository
+	tree      map[string]git.Oid
+	err       error
+	repoCache *RepoCache
 }
 
-func newRepoWalker(r *git.Repository, submodules bool) *repoWalker {
+func (w *repoWalker) subURL(relURL string) (*url.URL, error) {
+	if w.repoURL == nil {
+		return nil, fmt.Errorf("no URL for base repo.")
+	}
+	if strings.HasPrefix(relURL, "../") {
+		u := *w.repoURL
+		u.Path = path.Join(u.Path, relURL)
+		return &u, nil
+	}
+
+	return url.Parse(relURL)
+}
+
+func newRepoWalker(r *git.Repository, repoURL string, repoCache *RepoCache) *repoWalker {
+	u, _ := url.Parse(repoURL)
 	return &repoWalker{
 		Repository: r,
+		repoURL:    u,
 		tree:       map[string]git.Oid{},
 		repos:      map[git.Oid]*git.Repository{},
-		submodules: submodules,
+		repoCache:  repoCache,
 	}
 }
 
-// TreeToFiles fetches the SHA1s for a tree, recursing into
-// submodules. In addition, it returns a mapping that indicates in
-// which repo each SHA1 can be found.
-func TreeToFiles(r *git.Repository, t *git.Tree, submodules bool) (map[string]git.Oid, map[git.Oid]*git.Repository, error) {
-	ref := newRepoWalker(r, submodules)
+// TreeToFiles fetches the SHA1s for a tree. If repoCache is non-nil,
+// recurse into submodules. In addition, it returns a mapping that
+// indicates in which repo each SHA1 can be found.
+func TreeToFiles(r *git.Repository, t *git.Tree,
+	repoURL string, repoCache *RepoCache) (map[string]git.Oid, map[git.Oid]*git.Repository, error) {
+	ref := newRepoWalker(r, repoURL, repoCache)
 	t.Walk(ref.cbInt)
 	return ref.tree, ref.repos, ref.err
 }
 
 func (r *repoWalker) cb(n string, e *git.TreeEntry) error {
 	p := filepath.Join(n, e.Name)
-	if e.Type == git.ObjectCommit && r.submodules {
+	if e.Type == git.ObjectCommit && r.repoCache != nil {
 		sub, err := r.Repository.Submodules.Lookup(p)
 		if err != nil {
 			return err
 		}
-		subRepo, err := sub.Open()
+
+		subURL, err := r.subURL(sub.Url())
+		if err != nil {
+			return err
+		}
+
+		subRepo, err := r.repoCache.Open(subURL)
 		if err != nil {
 			return err
 		}
@@ -63,15 +90,19 @@ func (r *repoWalker) cb(n string, e *git.TreeEntry) error {
 		if err != nil {
 			return err
 		}
+		defer obj.Free()
 		treeObj, err := obj.Peel(git.ObjectTree)
 		if err != nil {
 			return err
+		}
+		if treeObj != obj {
+			defer treeObj.Free()
 		}
 		tree, err := treeObj.AsTree()
 		if err != nil {
 			return err
 		}
-		subFiles, subRepos, err := TreeToFiles(subRepo, tree, r.submodules)
+		subFiles, subRepos, err := TreeToFiles(subRepo, tree, subURL.String(), r.repoCache)
 		if err != nil {
 			return err
 		}

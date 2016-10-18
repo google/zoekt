@@ -37,6 +37,14 @@ func NewRepoCache(dir string) *RepoCache {
 	}
 }
 
+func (rc *RepoCache) Close() {
+	rc.reposMu.Lock()
+	defer rc.reposMu.Unlock()
+	for _, v := range rc.repos {
+		v.Free()
+	}
+}
+
 func (rc *RepoCache) Open(u *url.URL) (*git.Repository, error) {
 	key := filepath.Join(u.Host, u.Path)
 	if !strings.HasSuffix(key, ".git") {

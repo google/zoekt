@@ -229,8 +229,6 @@ func (l *locator) Blob(id *git.Oid) ([]byte, error) {
 	return blob.Contents(), nil
 }
 
-// locationKey is a single file version (possibly from multiple
-// branches).
 type locationKey struct {
 	subRepoPath string
 	path        string
@@ -280,8 +278,7 @@ func iterateManifest(mf *manifest.Manifest,
 			return nil, nil, err
 		}
 
-		submodules := false
-		files, _, err := gitindex.TreeToFiles(repo, tree, submodules)
+		files, _, err := gitindex.TreeToFiles(repo, tree, projURL.String(), cache)
 		if err != nil {
 			return nil, nil, err
 		}

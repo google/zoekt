@@ -93,7 +93,7 @@ func main() {
 		}
 
 		log.Printf("indexing %s (%s)", dir, name)
-		if err := gitindex.IndexGitRepo(opts, *branchPrefix, branches, *submodules); err != nil {
+		if err := gitindex.IndexGitRepo(opts, *branchPrefix, branches, *submodules, *repoCacheDir); err != nil {
 			log.Printf("indexGitRepo(%s): %v", dir, err)
 			exitStatus = 1
 		}
