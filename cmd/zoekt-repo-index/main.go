@@ -37,7 +37,6 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/google/slothfs/manifest"
 	"github.com/google/zoekt"
@@ -119,7 +118,7 @@ func main() {
 	if *repoCacheDir == "" {
 		log.Fatal("must set --repo_cache")
 	}
-	repoCache := newRepoCache(*repoCacheDir)
+	repoCache := gitindex.NewRepoCache(*repoCacheDir)
 
 	opts := build.Options{
 		Parallelism: *parallelism,
@@ -230,46 +229,6 @@ func (l *locator) Blob(id *git.Oid) ([]byte, error) {
 	return blob.Contents(), nil
 }
 
-type repoCache interface {
-	open(url *url.URL) (*git.Repository, error)
-}
-
-type repoCacheImpl struct {
-	baseDir string
-
-	reposMu sync.Mutex
-	repos   map[string]*git.Repository
-}
-
-func newRepoCache(dir string) *repoCacheImpl {
-	return &repoCacheImpl{
-		baseDir: dir,
-		repos:   make(map[string]*git.Repository),
-	}
-}
-
-func (rc *repoCacheImpl) open(u *url.URL) (*git.Repository, error) {
-	key := filepath.Join(u.Host, u.Path)
-	if !strings.HasSuffix(key, ".git") {
-		key += ".git"
-	}
-
-	rc.reposMu.Lock()
-	defer rc.reposMu.Unlock()
-
-	r := rc.repos[key]
-	if r != nil {
-		return r, nil
-	}
-
-	d := filepath.Join(rc.baseDir, key)
-	repo, err := git.OpenRepository(d)
-	if err == nil {
-		rc.repos[key] = repo
-	}
-	return repo, err
-}
-
 // locationKey is a single file version (possibly from multiple
 // branches).
 type locationKey struct {
@@ -285,7 +244,7 @@ func (k *locationKey) fullPath() string {
 // iterateManifest constructs a complete tree from the given Manifest.
 func iterateManifest(mf *manifest.Manifest,
 	baseURL url.URL, revPrefix string,
-	cache repoCache) (map[locationKey]locator, map[string]*zoekt.Repository, error) {
+	cache *gitindex.RepoCache) (map[locationKey]locator, map[string]*zoekt.Repository, error) {
 	allFiles := map[locationKey]locator{}
 	repoMap := map[string]*zoekt.Repository{}
 
@@ -295,7 +254,7 @@ func iterateManifest(mf *manifest.Manifest,
 		projURL := baseURL
 		projURL.Path = path.Join(projURL.Path, p.Name)
 
-		repo, err := cache.open(&projURL)
+		repo, err := cache.Open(&projURL)
 		if err != nil {
 			return nil, nil, err
 		}
