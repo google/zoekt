@@ -145,28 +145,37 @@ func main() {
 	}
 
 	opts.RepoDir = branches[0].manifestPath
-	perBranch := map[string]map[locationKey]locator{}
+	perBranch := map[string]map[gitindex.FileKey]gitindex.BlobLocation{}
 	opts.SubRepositories = map[string]*zoekt.Repository{}
 	for _, br := range branches {
 		br.mf.Filter()
-		files, repoMap, err := iterateManifest(br.mf, *baseURL, *revPrefix, repoCache)
+		files, err := iterateManifest(br.mf, *baseURL, *revPrefix, repoCache)
 		if err != nil {
 			log.Fatalf("iterateManifest: %v", err)
 		}
 
 		perBranch[br.branch] = files
+		for key, loc := range files {
+			_, ok := opts.SubRepositories[key.SubRepoPath]
+			if ok {
+				// This can be incorrect: if the layout of manifests
+				// changes across branches, then the same file could
+				// be in different subRepos. We'll pretend this is not
+				// a problem.
+				continue
+			}
 
-		// This can be incorrect: if the layout of manifests
-		// changes across branches, then the same file could
-		// be in different subRepos. We'll pretend this is not
-		// a problem.
-		for k, v := range repoMap {
-			opts.SubRepositories[k] = v
+			desc, err := gitindex.Templates(loc.URL)
+			if err != nil {
+				log.Fatalf("Templates: %v", err)
+			}
+
+			opts.SubRepositories[key.SubRepoPath] = desc
 		}
 	}
 
 	// key => branch
-	all := map[locationKey][]string{}
+	all := map[gitindex.FileKey][]string{}
 	for br, files := range perBranch {
 		for k := range files {
 			all[k] = append(all[k], br)
@@ -179,15 +188,15 @@ func main() {
 	}
 	for k, branches := range all {
 		loc := perBranch[branches[0]][k]
-		data, err := loc.Blob(&k.id)
+		data, err := loc.Blob(&k.ID)
 		if err != nil {
 			log.Fatal(err)
 		}
 
 		doc := zoekt.Document{
-			Name:              k.fullPath(),
+			Name:              k.FullPath(),
 			Content:           data,
-			SubRepositoryPath: k.subRepoPath,
+			SubRepositoryPath: k.SubRepoPath,
 		}
 
 		for _, br := range branches {
@@ -214,37 +223,11 @@ func getManifest(repo *git.Repository, branch, path string) (*manifest.Manifest,
 	return manifest.Parse(blob.Contents())
 }
 
-// locator holds data where a file can be found. It's a struct so we
-// can insert additional data into the index (eg. subrepository URLs).
-type locator struct {
-	repo *git.Repository
-}
-
-func (l *locator) Blob(id *git.Oid) ([]byte, error) {
-	blob, err := l.repo.LookupBlob(id)
-	if err != nil {
-		return nil, err
-	}
-	defer blob.Free()
-	return blob.Contents(), nil
-}
-
-type locationKey struct {
-	subRepoPath string
-	path        string
-	id          git.Oid
-}
-
-func (k *locationKey) fullPath() string {
-	return filepath.Join(k.subRepoPath, k.path)
-}
-
 // iterateManifest constructs a complete tree from the given Manifest.
 func iterateManifest(mf *manifest.Manifest,
 	baseURL url.URL, revPrefix string,
-	cache *gitindex.RepoCache) (map[locationKey]locator, map[string]*zoekt.Repository, error) {
-	allFiles := map[locationKey]locator{}
-	repoMap := map[string]*zoekt.Repository{}
+	cache *gitindex.RepoCache) (map[gitindex.FileKey]gitindex.BlobLocation, error) {
+	allFiles := map[gitindex.FileKey]gitindex.BlobLocation{}
 
 	for _, p := range mf.Project {
 		rev := mf.ProjectRevision(&p)
@@ -252,22 +235,15 @@ func iterateManifest(mf *manifest.Manifest,
 		projURL := baseURL
 		projURL.Path = path.Join(projURL.Path, p.Name)
 
-		repo, err := cache.Open(&projURL)
+		topRepo, err := cache.Open(&projURL)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
-
-		subRepo, err := gitindex.Templates(&projURL)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		repoMap[*p.Path] = subRepo
 
 		// provide ':' to get the tree.
-		obj, err := repo.RevparseSingle(revPrefix + rev + ":")
+		obj, err := topRepo.RevparseSingle(revPrefix + rev + ":")
 		if err != nil {
-			return nil, nil, fmt.Errorf("RevparseSingle(%s, %s): %v", p.Name, rev, err)
+			return nil, fmt.Errorf("RevparseSingle(%s, %s): %v", p.Name, rev, err)
 		}
 
 		// Since the number of projects is small, it's OK to
@@ -275,20 +251,22 @@ func iterateManifest(mf *manifest.Manifest,
 		defer obj.Free()
 		tree, err := obj.AsTree()
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
-		files, _, err := gitindex.TreeToFiles(repo, tree, projURL.String(), cache)
+		files, err := gitindex.TreeToFiles(topRepo, tree, projURL.String(), cache)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
-		for path, sha := range files {
-			allFiles[locationKey{p.GetPath(), path, sha}] = locator{
-				repo: repo,
-			}
+		for key, repo := range files {
+			allFiles[gitindex.FileKey{
+				SubRepoPath: filepath.Join(p.GetPath(), key.SubRepoPath),
+				Path:        key.Path,
+				ID:          key.ID,
+			}] = repo
 		}
 	}
 
-	return allFiles, repoMap, nil
+	return allFiles, nil
 }

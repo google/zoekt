@@ -24,16 +24,20 @@ import (
 	git "github.com/libgit2/git2go"
 )
 
+// repoWalker walks a tree, recursing into submodules.
 type repoWalker struct {
-	*git.Repository
+	repo *git.Repository
 
-	repoURL   *url.URL
-	repos     map[git.Oid]*git.Repository
-	tree      map[string]git.Oid
-	err       error
-	repoCache *RepoCache
+	repoURL *url.URL
+	tree    map[FileKey]BlobLocation
+
+	// Path => SubmoduleEntry
+	submodules map[string]*SubmoduleEntry
+	err        error
+	repoCache  *RepoCache
 }
 
+// subURL returns the URL for a submodule.
 func (w *repoWalker) subURL(relURL string) (*url.URL, error) {
 	if w.repoURL == nil {
 		return nil, fmt.Errorf("no URL for base repo.")
@@ -47,36 +51,66 @@ func (w *repoWalker) subURL(relURL string) (*url.URL, error) {
 	return url.Parse(relURL)
 }
 
+// newRepoWalker creates a new repoWalker.
 func newRepoWalker(r *git.Repository, repoURL string, repoCache *RepoCache) *repoWalker {
 	u, _ := url.Parse(repoURL)
 	return &repoWalker{
-		Repository: r,
-		repoURL:    u,
-		tree:       map[string]git.Oid{},
-		repos:      map[git.Oid]*git.Repository{},
-		repoCache:  repoCache,
+		repo:      r,
+		repoURL:   u,
+		tree:      map[FileKey]BlobLocation{},
+		repoCache: repoCache,
 	}
+}
+
+// parseModuleMap initializes rw.submodules.
+func (rw *repoWalker) parseModuleMap(t *git.Tree) error {
+	modEntry := t.EntryByName(".gitmodules")
+	if modEntry != nil {
+		blob, err := rw.repo.LookupBlob(modEntry.Id)
+		if err != nil {
+			return err
+		}
+
+		mods, err := ParseGitModules(blob.Contents())
+		if err != nil {
+			return err
+		}
+		rw.submodules = map[string]*SubmoduleEntry{}
+		for _, entry := range mods {
+			rw.submodules[entry.Path] = entry
+		}
+	}
+	return nil
 }
 
 // TreeToFiles fetches the SHA1s for a tree. If repoCache is non-nil,
 // recurse into submodules. In addition, it returns a mapping that
 // indicates in which repo each SHA1 can be found.
 func TreeToFiles(r *git.Repository, t *git.Tree,
-	repoURL string, repoCache *RepoCache) (map[string]git.Oid, map[git.Oid]*git.Repository, error) {
+	repoURL string, repoCache *RepoCache) (map[FileKey]BlobLocation, error) {
 	ref := newRepoWalker(r, repoURL, repoCache)
+
+	if err := ref.parseModuleMap(t); err != nil {
+		return nil, err
+	}
+
 	t.Walk(ref.cbInt)
-	return ref.tree, ref.repos, ref.err
+	if ref.err != nil {
+		return nil, ref.err
+	}
+	return ref.tree, nil
 }
 
+// cb is the git2go callback
 func (r *repoWalker) cb(n string, e *git.TreeEntry) error {
 	p := filepath.Join(n, e.Name)
 	if e.Type == git.ObjectCommit && r.repoCache != nil {
-		sub, err := r.Repository.Submodules.Lookup(p)
-		if err != nil {
-			return err
+		submod := r.submodules[p]
+		if submod == nil {
+			return fmt.Errorf("no entry for submodule path %q", p)
 		}
 
-		subURL, err := r.subURL(sub.Url())
+		subURL, err := r.subURL(submod.URL)
 		if err != nil {
 			return err
 		}
@@ -102,15 +136,16 @@ func (r *repoWalker) cb(n string, e *git.TreeEntry) error {
 		if err != nil {
 			return err
 		}
-		subFiles, subRepos, err := TreeToFiles(subRepo, tree, subURL.String(), r.repoCache)
+		subTree, err := TreeToFiles(subRepo, tree, subURL.String(), r.repoCache)
 		if err != nil {
 			return err
 		}
-		for k, v := range subRepos {
-			r.repos[k] = v
-		}
-		for k, v := range subFiles {
-			r.tree[filepath.Join(p, k)] = v
+		for k, repo := range subTree {
+			r.tree[FileKey{
+				SubRepoPath: filepath.Join(p, k.SubRepoPath),
+				Path:        k.Path,
+				ID:          k.ID,
+			}] = repo
 		}
 		return nil
 	}
@@ -124,11 +159,17 @@ func (r *repoWalker) cb(n string, e *git.TreeEntry) error {
 	if e.Type != git.ObjectBlob {
 		return nil
 	}
-	r.tree[p] = *e.Id
-	r.repos[*e.Id] = r.Repository
+	r.tree[FileKey{
+		Path: p,
+		ID:   *e.Id,
+	}] = BlobLocation{
+		Repo: r.repo,
+		URL:  r.repoURL,
+	}
 	return nil
 }
 
+// cbInt is the callback suitable for use with git2go.
 func (r *repoWalker) cbInt(n string, e *git.TreeEntry) int {
 	err := r.cb(n, e)
 	if err != nil {
@@ -136,4 +177,31 @@ func (r *repoWalker) cbInt(n string, e *git.TreeEntry) int {
 		return 1
 	}
 	return 0
+}
+
+// FileKey describes a blob at a location in the final tree. We also
+// record the subrepository from where it came.
+type FileKey struct {
+	SubRepoPath string
+	Path        string
+	ID          git.Oid
+}
+
+func (k *FileKey) FullPath() string {
+	return filepath.Join(k.SubRepoPath, k.Path)
+}
+
+// BlobLocation holds data where a blob can be found.
+type BlobLocation struct {
+	Repo *git.Repository
+	URL  *url.URL
+}
+
+func (l *BlobLocation) Blob(id *git.Oid) ([]byte, error) {
+	blob, err := l.Repo.LookupBlob(id)
+	if err != nil {
+		return nil, err
+	}
+	defer blob.Free()
+	return blob.Contents(), nil
 }

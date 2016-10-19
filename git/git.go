@@ -127,7 +127,7 @@ func Templates(u *url.URL) (*zoekt.Repository, error) {
 			URL:                  u.String(),
 			CommitURLTemplate:    u.String() + "/+/{{.Version}}",
 			FileURLTemplate:      u.String() + "/+/{{.Branch}}/{{.Path}}",
-			LineFragmentTemplate: u.String() + "{{.LineNumber}}",
+			LineFragmentTemplate: "{{.LineNumber}}",
 		}, nil
 	} else if u.Host == "github.com" {
 		t := *u
@@ -183,14 +183,12 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 	repoCache := NewRepoCache(repoCacheDir)
 	defer repoCache.Close()
 
-	// name => branch
-	allfiles := map[string][]string{}
+	// branch => (path, sha1) => repo.
+	repos := map[FileKey]BlobLocation{}
 
-	var names []string
+	// FileKey => branches
+	branchMap := map[FileKey][]string{}
 
-	// branch => name => sha1
-	data := map[string]map[string]git.Oid{}
-	repos := map[git.Oid]*git.Repository{}
 	for _, b := range branches {
 		fullName := b
 		if b != "HEAD" {
@@ -220,18 +218,29 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 		}
 		defer tree.Free()
 
-		fs, subRepos, err := TreeToFiles(repo, tree, opts.RepositoryDescription.URL, repoCache)
+		files, err := TreeToFiles(repo, tree, opts.RepositoryDescription.URL, repoCache)
 		if err != nil {
 			return err
 		}
-		for k, v := range subRepos {
+		for k, v := range files {
 			repos[k] = v
+			branchMap[k] = append(branchMap[k], b)
 		}
+	}
 
-		for f := range fs {
-			allfiles[f] = append(allfiles[f], b)
+	reposByPath := map[string]BlobLocation{}
+	for key, location := range repos {
+		reposByPath[key.SubRepoPath] = location
+	}
+
+	opts.SubRepositories = map[string]*zoekt.Repository{}
+	for path, location := range reposByPath {
+		tpl, err := Templates(location.URL)
+		if err != nil {
+			log.Printf("Templates(%s): %s", location.URL, err)
+			tpl = &zoekt.Repository{URL: location.URL.String()}
 		}
-		data[b] = fs
+		opts.SubRepositories[path] = tpl
 	}
 
 	builder, err := build.NewBuilder(opts)
@@ -239,23 +248,21 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 		return err
 	}
 
-	for n := range allfiles {
+	var names []string
+	fileKeys := map[string][]FileKey{}
+	for key := range repos {
+		n := key.FullPath()
+		fileKeys[n] = append(fileKeys[n], key)
 		names = append(names, n)
 	}
+	// not strictly necessary, but nice for reproducibility.
 	sort.Strings(names)
 
-	for _, n := range names {
-		shas := map[git.Oid][]string{}
-		for _, b := range allfiles[n] {
-			shas[data[b][n]] = append(shas[data[b][n]], b)
-		}
-
-		for sha, branches := range shas {
-			r := repos[sha]
-			if r == nil {
-				return fmt.Errorf("no repo found for %s (%s)", n, branches)
-			}
-			blob, err := r.LookupBlob(&sha)
+	for _, name := range names {
+		keys := fileKeys[name]
+		for _, key := range keys {
+			brs := branchMap[key]
+			blob, err := repos[key].Repo.LookupBlob(&key.ID)
 			if err != nil {
 				return err
 			}
@@ -265,9 +272,10 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 			}
 
 			builder.Add(zoekt.Document{
-				Name:     n,
-				Content:  blob.Contents(),
-				Branches: branches,
+				SubRepositoryPath: key.SubRepoPath,
+				Name:              key.FullPath(),
+				Content:           blob.Contents(),
+				Branches:          brs,
 			})
 		}
 	}
