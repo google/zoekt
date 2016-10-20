@@ -85,7 +85,7 @@ func runIndexCommand(indexDir, repoDir string) {
 	for _, dir := range repos {
 		cmd := exec.Command("zoekt-git-index",
 			"-parallelism=1",
-			"-repo_cache_dir", repoDir,
+			"-repo_cache", repoDir,
 			"-index", indexDir, "-incremental", dir)
 		loggedRun(cmd)
 	}
