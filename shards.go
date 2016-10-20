@@ -52,6 +52,10 @@ func loadShard(fn string) (*searchShard, error) {
 	if err != nil {
 		return nil, err
 	}
+	fi, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
 
 	iFile, err := NewIndexFile(f)
 	if err != nil {
@@ -62,10 +66,6 @@ func loadShard(fn string) (*searchShard, error) {
 		return nil, fmt.Errorf("NewSearcher(%s): %v", fn, err)
 	}
 
-	fi, err := f.Stat()
-	if err != nil {
-		return nil, err
-	}
 	return &searchShard{
 		mtime:    fi.ModTime(),
 		Searcher: s,

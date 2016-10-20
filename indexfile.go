@@ -21,7 +21,8 @@ import (
 	"os"
 )
 
-// NewIndexFile wraps a os.File to be an IndexFile.
+// NewIndexFile returns a new index file. The index file takes
+// ownership of the passed in file, and may close it.
 func NewIndexFile(f *os.File) (IndexFile, error) {
 	return &indexFileFromOS{f}, nil
 }

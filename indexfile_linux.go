@@ -21,7 +21,8 @@ import (
 )
 
 type mmapedIndexFile struct {
-	f    *os.File
+	name string
+	size uint32
 	data []byte
 }
 
@@ -30,36 +31,41 @@ func (f *mmapedIndexFile) Read(off, sz uint32) ([]byte, error) {
 }
 
 func (f *mmapedIndexFile) Name() string {
-	return f.f.Name()
+	return f.Name()
 }
 
 func (f *mmapedIndexFile) Size() (uint32, error) {
-	fi, err := f.f.Stat()
-	if err != nil {
-		return 0, err
-	}
-
-	sz := fi.Size()
-
-	if sz >= maxUInt32 {
-		return 0, fmt.Errorf("overflow")
-	}
-
-	return uint32(sz), nil
+	return f.size, nil
 }
 
 func (f *mmapedIndexFile) Close() {
-	f.f.Close()
+	syscall.Munmap(f.data)
 }
 
+// NewIndexFile returns a new index file. The index file takes
+// ownership of the passed in file, and may close it.
 func NewIndexFile(f *os.File) (IndexFile, error) {
-	r := &mmapedIndexFile{f: f}
+	defer f.Close()
 
-	rounded, err := r.Size()
+	fi, err := f.Stat()
 	if err != nil {
 		return nil, err
 	}
-	rounded = (rounded + 4095) &^ 4095
+
+	sz := fi.Size()
+	if sz >= maxUInt32 {
+		return nil, fmt.Errorf("file %s too large: %d", f.Name(), sz)
+	}
+	r := &mmapedIndexFile{
+		name: f.Name(),
+		size: uint32(sz),
+	}
+
+	rounded := (r.size + 4095) &^ 4095
 	r.data, err = syscall.Mmap(int(f.Fd()), 0, int(rounded), syscall.PROT_READ, syscall.MAP_SHARED)
+	if err != nil {
+		return nil, err
+	}
+
 	return r, err
 }
