@@ -34,7 +34,11 @@ func CloneRepos(destDir string, repos map[string]string) error {
 			continue
 		}
 
-		cmd := exec.Command("git", "clone", "--bare", "--verbose", "--progress", "--recursive", cloneURL, repoDest)
+		cmd := exec.Command(
+			"git", "clone", "--bare", "--verbose", "--progress",
+			// Only fetch branch heads, and ignore note branches.
+			"--config", "remote.origin.fetch=+refs/heads/*:refs/heads/*",
+			cloneURL, repoDest)
 		// Prevent prompting
 		cmd.Stdin = &bytes.Buffer{}
 		log.Println("running:", cmd.Args)
