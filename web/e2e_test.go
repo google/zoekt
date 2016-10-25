@@ -22,6 +22,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/query"
@@ -188,6 +189,7 @@ func TestBasic(t *testing.T) {
 		t.Fatalf("ReadAll: %v", err)
 	}
 
+	nowStr := time.Now().Format("Jan 02, 2006 15:04")
 	result := string(resultBytes)
 	for req, needles := range map[string][]string{
 		"/": []string{"from 1 repositories"},
@@ -197,6 +199,8 @@ func TestBasic(t *testing.T) {
 		},
 		"/search?q=r:": []string{
 			"1234\">master",
+			"Found 1 repositories",
+			nowStr,
 			"repo-url\">name",
 		},
 	} {

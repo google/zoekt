@@ -791,6 +791,7 @@ func (d *indexData) List(ctx context.Context, q query.Q) (*RepoList, error) {
 	l := &RepoList{}
 	if c.Value {
 		repo := d.unaryData.Repository
+		repo.IndexTime = d.unaryData.IndexTime
 		l.Repos = append(l.Repos, &repo)
 	}
 	return l, nil
