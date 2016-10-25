@@ -190,6 +190,7 @@ func TestBasic(t *testing.T) {
 
 	result := string(resultBytes)
 	for req, needles := range map[string][]string{
+		"/": []string{"from 1 repositories"},
 		"/search?q=water": []string{
 			"href=\"file-url#line",
 			"carry <b>water</b>",

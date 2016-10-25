@@ -21,6 +21,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -268,8 +269,11 @@ func (s *Server) serveSearchBoxErr(w http.ResponseWriter, r *http.Request) error
 	for _, r := range stats.Repos {
 		uniq[r] = struct{}{}
 	}
-
 	stats.Repos = stats.Repos[:0]
+	for r := range uniq {
+		stats.Repos = append(stats.Repos, r)
+	}
+	sort.Strings(stats.Repos)
 
 	d := SearchBoxInput{
 		Stats:   stats,
