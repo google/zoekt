@@ -22,12 +22,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/ctags"
 )
 
 func runCTags(bin string, sandboxBin string, inputs map[string][]byte) ([]*ctags.Entry, error) {
+	const debug = false
 	if len(inputs) == 0 {
 		return nil, nil
 	}
@@ -35,9 +37,12 @@ func runCTags(bin string, sandboxBin string, inputs map[string][]byte) ([]*ctags
 	if err != nil {
 		return nil, err
 	}
-	defer os.RemoveAll(dir)
+	if !debug {
+		defer os.RemoveAll(dir)
+	}
 
-	args := []string{bin, "-n", "-f", "-"}
+	// --sort shells out to sort(1).
+	args := []string{bin, "-n", "-f", "-", "--sort=no"}
 
 	fileCount := 0
 	for n, c := range inputs {
@@ -64,28 +69,31 @@ func runCTags(bin string, sandboxBin string, inputs map[string][]byte) ([]*ctags
 		// ctags parses untrusted input and is written in C.
 		// Run it in a sandbox as defense in depth.  The
 		// namespace sandbox only works on Linux,
-		// unfortunately.
+		// unfortunately. If someone packages a complex
+		// exploit (eg. dirty COW) inside the repository, we
+		// may still be SOL, but this is better than nothing.
 		sandboxDir, err := ioutil.TempDir("", "")
 		if err != nil {
 			return nil, err
 		}
-		defer os.RemoveAll(sandboxDir)
+		if !debug {
+			defer os.RemoveAll(sandboxDir)
+		}
 
 		sandboxArgs := []string{
 			sandboxBin,
-			"-t30", "-T30",
-			"-D", "-S", sandboxDir, "-M", dir, "-m", "/input", "-W", "/input",
+			"-s", sandboxDir, "-b", dir + "=input", "-d", "/input",
 			// Make sure the binary is available in the sandbox.
-			"-M", bin, "-m", "/ctags",
+			"-b", bin + "=" + "ctags",
 		}
 		args[0] = "/ctags"
-		for _, d := range []string{"/bin", "/lib", "/usr/bin", "/lib64"} {
+		for _, d := range []string{"/lib", "/lib64"} {
 			if _, err := os.Lstat(d); err == nil {
-				sandboxArgs = append(sandboxArgs, "-M", d, "-m", d)
+				sandboxArgs = append(sandboxArgs, "-b", d+"="+d[1:])
 			}
 		}
 
-		sandboxArgs = append(sandboxArgs, "--")
+		sandboxArgs = append(sandboxArgs, "-t", "tmp", "--")
 		args = append(sandboxArgs, args...)
 	} else {
 		log.Println("WARNING: running ctags without sandboxing.")
@@ -94,15 +102,32 @@ func runCTags(bin string, sandboxBin string, inputs map[string][]byte) ([]*ctags
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Dir = dir
 
-	var errBuf bytes.Buffer
+	var errBuf, outBuf bytes.Buffer
 	cmd.Stderr = &errBuf
-	out, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("exec(%s): %v, stderr: %s", cmd.Args, err, errBuf.String())
+	cmd.Stdout = &outBuf
+
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+
+	errChan := make(chan error, 1)
+	go func() {
+		err := cmd.Wait()
+		errChan <- err
+	}()
+	timeout := time.After(5 * time.Second)
+	select {
+	case <-timeout:
+		cmd.Process.Kill()
+		return nil, fmt.Errorf("timeout executing ctags.")
+	case err := <-errChan:
+		if err != nil {
+			return nil, fmt.Errorf("exec(%s): %v, stderr: %s", cmd.Args, err, errBuf.String())
+		}
 	}
 
 	var entries []*ctags.Entry
-	for _, l := range bytes.Split(out, []byte{'\n'}) {
+	for _, l := range bytes.Split(outBuf.Bytes(), []byte{'\n'}) {
 		if len(l) == 0 {
 			continue
 		}

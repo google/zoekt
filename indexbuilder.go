@@ -187,6 +187,39 @@ func (b *IndexBuilder) AddBranch(br, version string) error {
 }
 
 const maxTrigramCount = 20000
+const maxLineSize = 1000
+
+// IsText returns false if the given contents are probably not source texts.
+func IsText(content []byte) bool {
+	if len(content) < ngramSize {
+		return true
+	}
+
+	trigrams := map[ngram]struct{}{}
+
+	lineSize := 0
+	for i := 0; i < len(content)-ngramSize; i++ {
+		if content[i] == 0 {
+			return false
+		}
+		if content[i] == '\n' {
+			lineSize = 0
+		} else {
+			lineSize++
+		}
+		if lineSize > maxLineSize {
+			return false
+		}
+
+		trigrams[bytesToNGram(content[i:i+ngramSize])] = struct{}{}
+
+		if len(trigrams) > maxTrigramCount {
+			// probably not text.
+			return false
+		}
+	}
+	return true
+}
 
 func (b *IndexBuilder) populateSubRepoIndices() {
 	if b.subRepoIndices != nil {
@@ -204,22 +237,10 @@ func (b *IndexBuilder) populateSubRepoIndices() {
 	}
 }
 
-// Add a file which only occurs in certain branches.
+// Add a file which only occurs in certain branches. The document
+// should be checked for sanity with IsText first.
 func (b *IndexBuilder) Add(doc Document) error {
-	if len(doc.Content) >= ngramSize {
-		trigrams := map[ngram]struct{}{}
-		for i := ngramSize; i < len(doc.Content); i++ {
-			trigrams[bytesToNGram(doc.Content[i-3:i])] = struct{}{}
-
-			if len(trigrams) > maxTrigramCount {
-				// probably not text.
-				return nil
-			}
-		}
-	}
-
 	sort.Sort(docSectionSlice(doc.Symbols))
-
 	var last DocumentSection
 	for i, s := range doc.Symbols {
 		if i > 0 {

@@ -198,8 +198,8 @@ func TestDeleteOldShards(t *testing.T) {
 		t.Fatalf("NewBuilder: %v", err)
 	}
 	for i := 0; i < 4; i++ {
-		s := fmt.Sprintf("%d", i)
-		b.AddFile("F"+s, []byte(strings.Repeat(s, 1024)))
+		s := fmt.Sprintf("%d\n", i)
+		b.AddFile("F"+s, []byte(strings.Repeat(s, 1024/2)))
 	}
 	b.Finish()
 
@@ -218,8 +218,8 @@ func TestDeleteOldShards(t *testing.T) {
 		t.Fatalf("NewBuilder: %v", err)
 	}
 	for i := 0; i < 4; i++ {
-		s := fmt.Sprintf("%d", i)
-		b.AddFile("F"+s, []byte(strings.Repeat(s, 1024)))
+		s := fmt.Sprintf("%d\n", i)
+		b.AddFile("F"+s, []byte(strings.Repeat(s, 1024/2)))
 	}
 	b.Finish()
 

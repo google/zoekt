@@ -17,7 +17,6 @@
 package build
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -105,7 +104,7 @@ func (o *Options) SetDefaults() {
 		}
 	}
 	if o.NamespaceSandbox == "" {
-		ns, err := exec.LookPath("namespace-sandbox")
+		ns, err := exec.LookPath("zoekt-sandbox")
 		if err == nil {
 			o.NamespaceSandbox = ns
 		}
@@ -160,7 +159,8 @@ func (b *Builder) Add(doc zoekt.Document) {
 	if len(doc.Content) > b.opts.SizeMax {
 		return
 	}
-	if bytes.IndexByte(doc.Content, 0) != -1 {
+
+	if !zoekt.IsText(doc.Content) {
 		return
 	}
 
