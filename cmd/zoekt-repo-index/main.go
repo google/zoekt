@@ -41,7 +41,7 @@ import (
 	"github.com/google/slothfs/manifest"
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
-	gitindex "github.com/google/zoekt/git"
+	"github.com/google/zoekt/gitindex"
 	git "github.com/libgit2/git2go"
 )
 

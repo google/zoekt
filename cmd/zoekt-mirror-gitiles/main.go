@@ -27,7 +27,7 @@ import (
 	"path/filepath"
 	"regexp"
 
-	gitindex "github.com/google/zoekt/git"
+	"github.com/google/zoekt/gitindex"
 )
 
 func main() {

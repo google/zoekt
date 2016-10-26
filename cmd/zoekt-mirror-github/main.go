@@ -30,7 +30,7 @@ import (
 	"github.com/google/go-github/github"
 	"golang.org/x/oauth2"
 
-	gitindex "github.com/google/zoekt/git"
+	"github.com/google/zoekt/gitindex"
 )
 
 func main() {
