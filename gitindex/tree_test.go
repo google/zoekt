@@ -15,6 +15,7 @@
 package gitindex
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
@@ -110,9 +111,13 @@ func TestTreeToFiles(t *testing.T) {
 		t.Fatalf("AsTree: %v", err)
 	}
 
-	files, err := TreeToFiles(repo, tree, aURL.String(), cache)
+	files, versions, err := TreeToFiles(repo, tree, aURL.String(), cache)
 	if err != nil {
 		t.Fatalf("TreeToFiles: %v", err)
+	}
+
+	if e, v := tree.EntryByName("bname"), versions["bname"]; e == nil || bytes.Compare(e.Id[:], v[:]) != 0 {
+		t.Fatalf("got 'bname' versions %v, want %v", v, e)
 	}
 
 	var paths []string
@@ -163,7 +168,7 @@ func TestSubmoduleIndex(t *testing.T) {
 		&query.Substring{Pattern: "bcont"},
 		&zoekt.SearchOptions{})
 	if err != nil {
-		t.Fatal("NewShardedSearcher", err)
+		t.Fatal("Search", err)
 	}
 
 	if len(results.Files) != 1 {
@@ -176,5 +181,18 @@ func TestSubmoduleIndex(t *testing.T) {
 	}
 	if got, want := file.SubRepositoryPath, "bname"; got != want {
 		t.Errorf("got subrepo path %q, want %q", got, want)
+	}
+
+	subVersion := file.Version
+	if len(subVersion) != 40 {
+		t.Fatalf("got %q, want hex sha1", subVersion)
+	}
+
+	if results, err := searcher.Search(context.Background(), &query.Substring{Pattern: "acont"}, &zoekt.SearchOptions{}); err != nil {
+		t.Fatalf("Search('acont'): %v", err)
+	} else if len(results.Files) != 1 {
+		t.Errorf("got %v, want 1 result", results.Files)
+	} else if f := results.Files[0]; f.Version == subVersion {
+		t.Errorf("version in super repo matched version is subrepo.")
 	}
 }

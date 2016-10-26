@@ -112,6 +112,16 @@ func (b *IndexBuilder) AddSubRepository(path string, desc *Repository) error {
 	if len(b.files) > 0 {
 		return fmt.Errorf("AddSubRepository called after adding files.")
 	}
+	branchEqual := len(b.repo.Branches) == len(desc.Branches)
+	if branchEqual {
+		for i, b := range b.repo.Branches {
+			branchEqual = branchEqual && (b.Name == desc.Branches[i].Name)
+		}
+	}
+
+	if !branchEqual {
+		return fmt.Errorf("got subrepository branches %v, want main repository branches %v", b.repo.Branches, desc.Branches)
+	}
 	if err := desc.verify(); err != nil {
 		return err
 	}
@@ -179,6 +189,9 @@ func (b *IndexBuilder) addBranch(br, v string) int {
 // AddBranch registers a branch name.  The first is assumed to be the
 // default.
 func (b *IndexBuilder) AddBranch(br, version string) error {
+	if len(b.subRepoMap) > 0 {
+		return fmt.Errorf("must add branches before sub repositories")
+	}
 	idx := b.addBranch(br, version)
 	if idx >= 32 {
 		return fmt.Errorf("branch %q: branch counts are limited to 32")

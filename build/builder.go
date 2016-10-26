@@ -273,13 +273,13 @@ func (b *Builder) buildShard(todo []*zoekt.Document, nextShardNum int) error {
 	if err := shardBuilder.AddRepository(&b.opts.RepositoryDescription); err != nil {
 		return err
 	}
-	for k, v := range b.opts.SubRepositories {
-		if err := shardBuilder.AddSubRepository(k, v); err != nil {
+	for _, b := range b.opts.RepositoryDescription.Branches {
+		if err := shardBuilder.AddBranch(b.Name, b.Version); err != nil {
 			return err
 		}
 	}
-	for _, b := range b.opts.RepositoryDescription.Branches {
-		if err := shardBuilder.AddBranch(b.Name, b.Version); err != nil {
+	for k, v := range b.opts.SubRepositories {
+		if err := shardBuilder.AddSubRepository(k, v); err != nil {
 			return err
 		}
 	}

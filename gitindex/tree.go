@@ -33,8 +33,11 @@ type repoWalker struct {
 
 	// Path => SubmoduleEntry
 	submodules map[string]*SubmoduleEntry
-	err        error
-	repoCache  *RepoCache
+
+	// Path => commit SHA1
+	subRepoVersions map[string]git.Oid
+	err             error
+	repoCache       *RepoCache
 }
 
 // subURL returns the URL for a submodule.
@@ -55,10 +58,11 @@ func (w *repoWalker) subURL(relURL string) (*url.URL, error) {
 func newRepoWalker(r *git.Repository, repoURL string, repoCache *RepoCache) *repoWalker {
 	u, _ := url.Parse(repoURL)
 	return &repoWalker{
-		repo:      r,
-		repoURL:   u,
-		tree:      map[FileKey]BlobLocation{},
-		repoCache: repoCache,
+		repo:            r,
+		repoURL:         u,
+		tree:            map[FileKey]BlobLocation{},
+		repoCache:       repoCache,
+		subRepoVersions: map[string]git.Oid{},
 	}
 }
 
@@ -83,22 +87,22 @@ func (rw *repoWalker) parseModuleMap(t *git.Tree) error {
 	return nil
 }
 
-// TreeToFiles fetches the SHA1s for a tree. If repoCache is non-nil,
-// recurse into submodules. In addition, it returns a mapping that
-// indicates in which repo each SHA1 can be found.
+// TreeToFiles fetches the blob SHA1s for a tree. If repoCache is
+// non-nil, recurse into submodules. In addition, it returns a mapping
+// that indicates in which repo each SHA1 can be found.
 func TreeToFiles(r *git.Repository, t *git.Tree,
-	repoURL string, repoCache *RepoCache) (map[FileKey]BlobLocation, error) {
+	repoURL string, repoCache *RepoCache) (map[FileKey]BlobLocation, map[string]git.Oid, error) {
 	ref := newRepoWalker(r, repoURL, repoCache)
 
 	if err := ref.parseModuleMap(t); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	t.Walk(ref.cbInt)
 	if ref.err != nil {
-		return nil, ref.err
+		return nil, nil, ref.err
 	}
-	return ref.tree, nil
+	return ref.tree, ref.subRepoVersions, nil
 }
 
 // cb is the git2go callback
@@ -125,6 +129,8 @@ func (r *repoWalker) cb(n string, e *git.TreeEntry) error {
 			return err
 		}
 		defer obj.Free()
+
+		r.subRepoVersions[p] = *e.Id
 		treeObj, err := obj.Peel(git.ObjectTree)
 		if err != nil {
 			return err
@@ -136,7 +142,7 @@ func (r *repoWalker) cb(n string, e *git.TreeEntry) error {
 		if err != nil {
 			return err
 		}
-		subTree, err := TreeToFiles(subRepo, tree, subURL.String(), r.repoCache)
+		subTree, subVersions, err := TreeToFiles(subRepo, tree, subURL.String(), r.repoCache)
 		if err != nil {
 			return err
 		}
@@ -146,6 +152,9 @@ func (r *repoWalker) cb(n string, e *git.TreeEntry) error {
 				Path:        k.Path,
 				ID:          k.ID,
 			}] = repo
+		}
+		for k, v := range subVersions {
+			r.subRepoVersions[filepath.Join(p, k)] = v
 		}
 		return nil
 	}

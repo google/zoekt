@@ -126,7 +126,7 @@ func Templates(u *url.URL) (*zoekt.Repository, error) {
 			Name:                 filepath.Join(u.Host, u.Path),
 			URL:                  u.String(),
 			CommitURLTemplate:    u.String() + "/+/{{.Version}}",
-			FileURLTemplate:      u.String() + "/+/{{.Branch}}/{{.Path}}",
+			FileURLTemplate:      u.String() + "/+/{{.Version}}/{{.Path}}",
 			LineFragmentTemplate: "{{.LineNumber}}",
 		}, nil
 	} else if u.Host == "github.com" {
@@ -139,7 +139,7 @@ func Templates(u *url.URL) (*zoekt.Repository, error) {
 			Name:                 filepath.Join(t.Host, t.Path),
 			URL:                  t.String(),
 			CommitURLTemplate:    t.String() + "/commit/{{.Version}}",
-			FileURLTemplate:      t.String() + "/blob/{{.Branch}}/{{.Path}}",
+			FileURLTemplate:      t.String() + "/blob/{{.Version}}/{{.Path}}",
 			LineFragmentTemplate: "L{{.LineNumber}}",
 		}, nil
 	}
@@ -189,6 +189,8 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 	// FileKey => branches
 	branchMap := map[FileKey][]string{}
 
+	// Branch => Repo => SHA1
+	branchVersions := map[string]map[string]git.Oid{}
 	for _, b := range branches {
 		fullName := b
 		if b != "HEAD" {
@@ -218,7 +220,7 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 		}
 		defer tree.Free()
 
-		files, err := TreeToFiles(repo, tree, opts.RepositoryDescription.URL, repoCache)
+		files, subVersions, err := TreeToFiles(repo, tree, opts.RepositoryDescription.URL, repoCache)
 		if err != nil {
 			return err
 		}
@@ -226,6 +228,8 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 			repos[k] = v
 			branchMap[k] = append(branchMap[k], b)
 		}
+
+		branchVersions[b] = subVersions
 	}
 
 	reposByPath := map[string]BlobLocation{}
@@ -241,6 +245,15 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 			tpl = &zoekt.Repository{URL: location.URL.String()}
 		}
 		opts.SubRepositories[path] = tpl
+	}
+	for _, br := range opts.RepositoryDescription.Branches {
+		for path, repo := range opts.SubRepositories {
+			id := branchVersions[br.Name][path]
+			repo.Branches = append(repo.Branches, zoekt.RepositoryBranch{
+				Name:    br.Name,
+				Version: id.String(),
+			})
+		}
 	}
 
 	builder, err := build.NewBuilder(opts)
@@ -279,7 +292,5 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 			})
 		}
 	}
-	builder.Finish()
-
-	return nil
+	return builder.Finish()
 }

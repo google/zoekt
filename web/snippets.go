@@ -51,7 +51,7 @@ func (s *Server) formatResults(result *zoekt.SearchResult, localPrint bool) ([]*
 		}
 		return ""
 	}
-	getURL := func(repo, filename string, branches []string) string {
+	getURL := func(repo, filename string, branches []string, version string) string {
 		if localPrint {
 			v := make(url.Values)
 			v.Add("r", repo)
@@ -69,8 +69,9 @@ func (s *Server) formatResults(result *zoekt.SearchResult, localPrint bool) ([]*
 				b = branches[0]
 			}
 			err := tpl.Execute(&buf, map[string]string{
-				"Branch": b,
-				"Path":   filename,
+				"Branch":  b,
+				"Version": version,
+				"Path":    filename,
 			})
 			if err != nil {
 				log.Println("url template: %v", err)
@@ -90,9 +91,9 @@ func (s *Server) formatResults(result *zoekt.SearchResult, localPrint bool) ([]*
 
 		if f.SubRepositoryName != "" {
 			fn := strings.TrimPrefix(fMatch.FileName[len(f.SubRepositoryPath):], "/")
-			fMatch.URL = getURL(f.SubRepositoryName, fn, f.Branches)
+			fMatch.URL = getURL(f.SubRepositoryName, fn, f.Branches, f.Version)
 		} else {
-			fMatch.URL = getURL(f.Repository, f.FileName, f.Branches)
+			fMatch.URL = getURL(f.Repository, f.FileName, f.Branches, f.Version)
 		}
 
 		for _, m := range f.LineMatches {

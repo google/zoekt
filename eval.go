@@ -613,6 +613,14 @@ nextFileMatch:
 			fileMatch.SubRepositoryPath = path
 			sr := d.unaryData.SubRepoMap[path]
 			fileMatch.SubRepositoryName = sr.Name
+			if idx := d.branchIndex(nextDoc); idx >= 0 {
+				fileMatch.Version = sr.Branches[idx].Version
+			}
+		} else {
+			idx := d.branchIndex(nextDoc)
+			if idx >= 0 {
+				fileMatch.Version = d.unaryData.Repository.Branches[idx].Version
+			}
 		}
 
 		atomMatchCount := 0
@@ -754,9 +762,24 @@ func gatherMatches(mt matchTree, known map[matchTree]bool) []*candidateMatch {
 	return res
 }
 
+func (d *indexData) branchIndex(docID uint32) int {
+	mask := d.fileBranchMasks[docID]
+	idx := 0
+	for mask != 0 {
+		if mask&0x1 != 0 {
+			return idx
+		}
+		idx++
+		mask >>= 1
+	}
+	return -1
+}
+
+// gatherBranches returns a list of branch names.
 func (d *indexData) gatherBranches(docID uint32, mt matchTree, known map[matchTree]bool) []string {
 	foundBranchQuery := false
 	var branches []string
+
 	visitMatches(mt, known, func(mt matchTree) {
 		bq, ok := mt.(*branchQueryMatchTree)
 		if ok {

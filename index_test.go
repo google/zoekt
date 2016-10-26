@@ -560,6 +560,26 @@ func TestBranchReport(t *testing.T) {
 	}
 }
 
+func TestBranchVersions(t *testing.T) {
+	b := NewIndexBuilder()
+
+	b.AddBranch("stable", "v-stable")
+	b.AddBranch("master", "v-master")
+
+	b.Add(Document{Name: "f2", Content: []byte("needle"), Branches: []string{"master"}})
+	sres := searchForTest(t, b, &query.Substring{
+		Pattern: "needle",
+	})
+	if len(sres.Files) != 1 {
+		t.Fatalf("got %v, want 1 result from f2", sres.Files)
+	}
+
+	f := sres.Files[0]
+	if f.Version != "v-master" {
+		t.Fatalf("got file %#v, want version 'v-master'", f)
+	}
+}
+
 func TestCoversContent(t *testing.T) {
 	b := NewIndexBuilder()
 

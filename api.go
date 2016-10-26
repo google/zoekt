@@ -45,6 +45,9 @@ type FileMatch struct {
 	// SubRepositoryPath holds the prefix where the subrepository
 	// was mounted.
 	SubRepositoryPath string
+
+	// Commit SHA1 (hex) of the (sub)repo holding the file.
+	Version string
 }
 
 // LineMatch holds the matches within a single line in a file.

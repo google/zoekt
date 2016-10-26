@@ -147,9 +147,12 @@ func main() {
 	opts.RepoDir = branches[0].manifestPath
 	perBranch := map[string]map[gitindex.FileKey]gitindex.BlobLocation{}
 	opts.SubRepositories = map[string]*zoekt.Repository{}
+
+	// branch => repo => version
+	versionMap := map[string]map[string]git.Oid{}
 	for _, br := range branches {
 		br.mf.Filter()
-		files, err := iterateManifest(br.mf, *baseURL, *revPrefix, repoCache)
+		files, versions, err := iterateManifest(br.mf, *baseURL, *revPrefix, repoCache)
 		if err != nil {
 			log.Fatalf("iterateManifest: %v", err)
 		}
@@ -171,6 +174,17 @@ func main() {
 			}
 
 			opts.SubRepositories[key.SubRepoPath] = desc
+		}
+		versionMap[br.branch] = versions
+	}
+
+	for _, br := range branches {
+		for p, repo := range opts.SubRepositories {
+			id := versionMap[br.branch][p]
+			repo.Branches = append(repo.Branches, zoekt.RepositoryBranch{
+				Name:    br.branch,
+				Version: id.String(),
+			})
 		}
 	}
 
@@ -205,8 +219,9 @@ func main() {
 
 		builder.Add(doc)
 	}
-	builder.Finish()
-
+	if err := builder.Finish(); err != nil {
+		log.Fatalf("Finish: %v", err)
+	}
 }
 
 // getManifest parses the manifest XML at the given branch/path inside a Git repository.
@@ -226,9 +241,9 @@ func getManifest(repo *git.Repository, branch, path string) (*manifest.Manifest,
 // iterateManifest constructs a complete tree from the given Manifest.
 func iterateManifest(mf *manifest.Manifest,
 	baseURL url.URL, revPrefix string,
-	cache *gitindex.RepoCache) (map[gitindex.FileKey]gitindex.BlobLocation, error) {
+	cache *gitindex.RepoCache) (map[gitindex.FileKey]gitindex.BlobLocation, map[string]git.Oid, error) {
 	allFiles := map[gitindex.FileKey]gitindex.BlobLocation{}
-
+	allVersions := map[string]git.Oid{}
 	for _, p := range mf.Project {
 		rev := mf.ProjectRevision(&p)
 
@@ -237,13 +252,13 @@ func iterateManifest(mf *manifest.Manifest,
 
 		topRepo, err := cache.Open(&projURL)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		// provide ':' to get the tree.
 		obj, err := topRepo.RevparseSingle(revPrefix + rev + ":")
 		if err != nil {
-			return nil, fmt.Errorf("RevparseSingle(%s, %s): %v", p.Name, rev, err)
+			return nil, nil, fmt.Errorf("RevparseSingle(%s, %s): %v", p.Name, rev, err)
 		}
 
 		// Since the number of projects is small, it's OK to
@@ -251,12 +266,12 @@ func iterateManifest(mf *manifest.Manifest,
 		defer obj.Free()
 		tree, err := obj.AsTree()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
-		files, err := gitindex.TreeToFiles(topRepo, tree, projURL.String(), cache)
+		files, versions, err := gitindex.TreeToFiles(topRepo, tree, projURL.String(), cache)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		for key, repo := range files {
@@ -266,7 +281,11 @@ func iterateManifest(mf *manifest.Manifest,
 				ID:          key.ID,
 			}] = repo
 		}
+
+		for path, version := range versions {
+			allVersions[filepath.Join(p.GetPath(), path)] = version
+		}
 	}
 
-	return allFiles, nil
+	return allFiles, allVersions, nil
 }
