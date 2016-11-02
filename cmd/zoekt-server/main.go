@@ -13,7 +13,6 @@
 // limitations under the License.
 
 // This program manages a zoekt deployment:
-// * (re)starting a webserver,
 // * recycling logs
 // * periodically fetching new data.
 
@@ -22,12 +21,10 @@ package main
 import (
 	"bytes"
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/google/zoekt/gitindex"
@@ -112,42 +109,6 @@ func deleteLogs(logDir string, maxAge time.Duration) {
 	}
 }
 
-// runServer runs the webserver in a loop. The webserver runs as a subprocess so
-// any fatal bugs will be recorded in a log file.
-func runServer(logDir, indexDir string, refresh time.Duration, args []string) {
-	for {
-		start := time.Now()
-
-		nm := fmt.Sprintf("%s/zoekt-webserver.%s.stderr", logDir, time.Now().Format(time.RFC3339Nano))
-		nm = strings.Replace(nm, ":", "_", -1)
-
-		f, err := os.Create(nm)
-		if err != nil {
-			log.Fatal("cannot create log file", err)
-		}
-
-		log.Printf("restarting server, log in %s", nm)
-		cmd := exec.Command("zoekt-webserver", "-index", indexDir, "-log_dir", logDir, "-log_refresh", refresh.String())
-		cmd.Args = append(cmd.Args, args...)
-		cmd.Stderr = f
-
-		if err := cmd.Start(); err != nil {
-			log.Fatal("could not start %s: %v", cmd, err)
-		}
-
-		f.Close()
-		if err := cmd.Wait(); err != nil {
-			log.Printf("webserver died, see %s", nm)
-
-			if time.Now().Sub(start) < 2*time.Second {
-				log.Println("crash loop?")
-				time.Sleep(5 * time.Second)
-			}
-		}
-
-	}
-}
-
 func main() {
 	maxLogAge := flag.Duration("max_log_age", 3*day, "recycle logs after this much time")
 	fetchInterval := flag.Duration("fetch_interval", time.Hour, "run fetches this often")
@@ -181,7 +142,6 @@ func main() {
 	} else {
 		go periodicMirror(repoDir, *mirrorConfig, *mirrorInterval)
 	}
-	go refresh(repoDir, indexDir, *fetchInterval)
 	go deleteLogs(logDir, *maxLogAge)
-	runServer(logDir, indexDir, *maxLogAge/10, flag.Args())
+	refresh(repoDir, indexDir, *fetchInterval)
 }

@@ -45,6 +45,19 @@ Starting the web interface
     go install github.com/google/zoekt/cmd/zoekt-webserver
     $GOPATH/bin/zoekt-webserver -listen :6070
 
+A more organized installation on a Linux server should use a systemd unit file,
+eg.
+
+    [Unit]
+    Description=zoekt webserver
+
+    [Service]
+    ExecStart=/zoekt/bin/zoekt-webserver -index /zoekt/index -listen :443  --ssl_cert /zoekt/etc/cert.pem   --ssl_key /zoekt/etc/key.pem
+    Restart=true
+
+    [Install]
+    WantedBy=default.target
+
 
 SEARCH SERVICE
 ==============
