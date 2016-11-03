@@ -34,7 +34,7 @@ func (f *mmapedIndexFile) Read(off, sz uint32) ([]byte, error) {
 }
 
 func (f *mmapedIndexFile) Name() string {
-	return f.Name()
+	return f.name
 }
 
 func (f *mmapedIndexFile) Size() (uint32, error) {
