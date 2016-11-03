@@ -155,21 +155,22 @@ func (b *Builder) AddFile(name string, content []byte) {
 	b.Add(zoekt.Document{Name: name, Content: content})
 }
 
-func (b *Builder) Add(doc zoekt.Document) {
+func (b *Builder) Add(doc zoekt.Document) error {
 	if len(doc.Content) > b.opts.SizeMax {
-		return
+		return nil
 	}
 
 	if !zoekt.IsText(doc.Content) {
-		return
+		return nil
 	}
 
 	b.todo = append(b.todo, &doc)
 	b.size += len(doc.Name) + len(doc.Content)
-
 	if b.size > b.opts.ShardMax {
-		b.flush()
+		return b.flush()
 	}
+
+	return nil
 }
 
 func (b *Builder) Finish() error {
@@ -196,18 +197,18 @@ func (b *Builder) deleteRemainingShards() {
 	}
 }
 
-func (b *Builder) flush() {
+func (b *Builder) flush() error {
 	todo := b.todo
 	b.todo = nil
 	b.size = 0
 	b.errMu.Lock()
 	defer b.errMu.Unlock()
 	if b.buildError != nil {
-		return
+		return b.buildError
 	}
 
 	if len(todo) == 0 {
-		return
+		return nil
 	}
 
 	shard := b.nextShardNum
@@ -237,7 +238,11 @@ func (b *Builder) flush() {
 			todo = nil
 			b.writeMemProfile(b.opts.MemProfile)
 		}
+
+		return b.buildError
 	}
+
+	return nil
 }
 
 var profileNumber int
