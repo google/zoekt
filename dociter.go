@@ -33,7 +33,9 @@ type candidateMatch struct {
 	substrBytes   []byte
 	substrLowered []byte
 
-	file    uint32
+	file uint32
+
+	// Offset is relative to the start of the filename or file contents.
 	offset  uint32
 	matchSz uint32
 }

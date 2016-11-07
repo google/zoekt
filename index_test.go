@@ -400,6 +400,23 @@ func TestFileSubstringSearchBruteForce(t *testing.T) {
 	}
 }
 
+func TestFileSubstringSearchBruteForceEnd(t *testing.T) {
+	b := NewIndexBuilder()
+
+	b.AddFile("BANZANA", []byte("x orange y"))
+	b.AddFile("bananaq", []byte("x apple y"))
+
+	q := &query.Substring{
+		Pattern:  "q",
+		FileName: true,
+	}
+
+	res := searchForTest(t, b, q)
+	if want := "bananaq"; len(res.Files) != 1 || res.Files[0].FileName != want {
+		t.Fatalf("got %v, want 1 match in %q", res.Files, want)
+	}
+}
+
 func TestSearchMatchAll(t *testing.T) {
 	b := NewIndexBuilder()
 

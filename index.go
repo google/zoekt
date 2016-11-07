@@ -196,7 +196,7 @@ func (data *indexData) getBruteForceFileNameDocIterator(query *query.Substring) 
 			substrBytes:   []byte(query.Pattern),
 			substrLowered: lowerPat,
 			file:          uint32(fileID),
-			offset:        uint32(start),
+			offset:        uint32(start - startName),
 			matchSz:       uint32(end - start),
 		})
 	}
