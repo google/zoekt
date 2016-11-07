@@ -46,4 +46,4 @@ EOF
 
 chmod +x ${out}/deploy.sh
 
-tar -cJf zoekt-deploy-${VERSION}.tar.xz ${out}/*
+tar -czf zoekt-deploy-${VERSION}.tar.gz ${out}/*
