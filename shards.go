@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"sort"
 	"time"
 
@@ -299,7 +300,7 @@ func (ss *shardedSearcher) Search(ctx context.Context, pat query.Q, opts *Search
 		go func(s Searcher) {
 			defer func() {
 				if r := recover(); r != nil {
-					log.Printf("crashed shard: %s: %s", s.String(), r)
+					log.Printf("crashed shard: %s: %s, %s", s.String(), r, debug.Stack())
 
 					var r SearchResult
 					r.Stats.Crashes = 1
