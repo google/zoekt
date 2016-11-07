@@ -120,7 +120,7 @@ func (b *IndexBuilder) AddSubRepository(path string, desc *Repository) error {
 	}
 
 	if !branchEqual {
-		return fmt.Errorf("got subrepository branches %v, want main repository branches %v", b.repo.Branches, desc.Branches)
+		return fmt.Errorf("got subrepository branches %v, want main repository branches %v", desc.Branches, b.repo.Branches)
 	}
 	if err := desc.verify(); err != nil {
 		return err

@@ -148,6 +148,10 @@ func NewBuilder(opt Options) (*Builder, error) {
 		throttle: make(chan int, opt.Parallelism),
 	}
 
+	if _, err := b.newShardBuilder(); err != nil {
+		return nil, err
+	}
+
 	return b, nil
 }
 
@@ -274,24 +278,33 @@ func (b *Builder) buildShard(todo []*zoekt.Document, nextShardNum int) error {
 		return err
 	}
 
-	shardBuilder := zoekt.NewIndexBuilder()
-	if err := shardBuilder.AddRepository(&b.opts.RepositoryDescription); err != nil {
+	shardBuilder, err := b.newShardBuilder()
+	if err != nil {
 		return err
 	}
-	for _, b := range b.opts.RepositoryDescription.Branches {
-		if err := shardBuilder.AddBranch(b.Name, b.Version); err != nil {
-			return err
-		}
-	}
-	for k, v := range b.opts.SubRepositories {
-		if err := shardBuilder.AddSubRepository(k, v); err != nil {
-			return err
-		}
-	}
+
 	for _, t := range todo {
 		shardBuilder.Add(*t)
 	}
 	return writeShard(name, shardBuilder)
+}
+
+func (b *Builder) newShardBuilder() (*zoekt.IndexBuilder, error) {
+	shardBuilder := zoekt.NewIndexBuilder()
+	if err := shardBuilder.AddRepository(&b.opts.RepositoryDescription); err != nil {
+		return nil, err
+	}
+	for _, b := range b.opts.RepositoryDescription.Branches {
+		if err := shardBuilder.AddBranch(b.Name, b.Version); err != nil {
+			return nil, err
+		}
+	}
+	for k, v := range b.opts.SubRepositories {
+		if err := shardBuilder.AddSubRepository(k, v); err != nil {
+			return nil, fmt.Errorf("AddSubRepository(%s): %s", k, err)
+		}
+	}
+	return shardBuilder, nil
 }
 
 func shardName(dir string, repoDir string, shardNum int) (string, error) {
