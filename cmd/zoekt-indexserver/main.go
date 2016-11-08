@@ -179,6 +179,12 @@ func main() {
 		log.Fatal("must set --data_dir")
 	}
 
+	// Automatically prepend our own path at the front, to minimize
+	// required configuration.
+	if l, err := os.Readlink("/proc/self/exe"); err == nil {
+		os.Setenv("PATH", filepath.Dir(l)+":"+os.Getenv("PATH"))
+	}
+
 	logDir := filepath.Join(*dataDir, "logs")
 	indexDir := filepath.Join(*dataDir, "index")
 	repoDir := filepath.Join(*dataDir, "repos")
