@@ -3,13 +3,17 @@
 # this script packages up all the binaries, and a script (deploy.sh)
 # to twiddle with the server and the binaries
 
-set -eux
+set -ex
 
-
-VERSION=$(date --iso-8601=minutes | tr -d ':' | sed 's|\+.*$||')
-if [[ -d .git ]]; then
-  VERSION=$(git show --pretty=format:%h -q)-${VERSION}
+# Put the date first so we can sort.
+if [[ -z "$VERSION" ]]; then
+  VERSION=$(date --iso-8601=minutes | tr -d ':' | sed 's|\+.*$||')
+  if [[ -d .git ]]; then
+    VERSION=${VERSION}-$(git show --pretty=format:%h -q)
+  fi
 fi
+
+set -u
 
 out=zoekt-${VERSION}
 mkdir -p ${out}
