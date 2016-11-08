@@ -88,12 +88,7 @@ func main() {
 		opts.RepositoryDescription.Name = name
 		opts.RepoDir = filepath.Clean(dir)
 
-		if mod, err := gitindex.RepoModTime(opts.RepoDir); *incremental && err == nil && mod.Before(opts.Timestamp()) {
-			continue
-		}
-
-		log.Printf("indexing %s (%s)", dir, name)
-		if err := gitindex.IndexGitRepo(opts, *branchPrefix, branches, *submodules, *repoCacheDir); err != nil {
+		if err := gitindex.IndexGitRepo(opts, *branchPrefix, branches, *submodules, *incremental, *repoCacheDir); err != nil {
 			log.Printf("indexGitRepo(%s): %v", dir, err)
 			exitStatus = 1
 		}

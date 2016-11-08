@@ -27,9 +27,10 @@ import (
 	"runtime/pprof"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/google/zoekt"
+	"github.com/google/zoekt/query"
+	"golang.org/x/net/context"
 )
 
 var DefaultDir = filepath.Join(os.Getenv("HOME"), ".zoekt")
@@ -120,21 +121,46 @@ func (o *Options) SetDefaults() {
 	}
 }
 
-// Timestamp returns the timestamp of the existing index file, or the
-// zero time value if none is found.
-func (o *Options) Timestamp() time.Time {
-	var zero time.Time
-	nm, err := shardName(o.IndexDir, o.RepoDir, 0)
+// ShardName returns the name the given index shard.
+func (o *Options) shardName(n int) (string, error) {
+	abs, err := filepath.Abs(o.RepoDir)
 	if err != nil {
-		return zero
+		return "", err
 	}
 
-	fi, err := os.Lstat(nm)
+	return filepath.Join(o.IndexDir,
+		fmt.Sprintf("%s_v%d.%05d.zoekt", strings.Replace(abs, "/", "_", -1), zoekt.IndexFormatVersion, n)), nil
+}
+
+// IndexVersions returns the versions as present in the index, for
+// implementing incremental indexing.
+func (o *Options) IndexVersions() []zoekt.RepositoryBranch {
+	fn, err := o.shardName(0)
 	if err != nil {
-		return zero
+		return nil
+	}
+	f, err := os.Open(fn)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+
+	iFile, err := zoekt.NewIndexFile(f)
+	if err != nil {
+		return nil
+	}
+	s, err := zoekt.NewSearcher(iFile)
+	if err != nil {
+		return nil
+	}
+	defer s.Close()
+
+	l, err := s.List(context.Background(), &query.Repo{})
+	if err != nil {
+		return nil
 	}
 
-	return fi.ModTime()
+	return l.Repos[0].Branches
 }
 
 // NewBuilder creates a new Builder instance.
@@ -190,7 +216,7 @@ func (b *Builder) deleteRemainingShards() {
 	for {
 		shard := b.nextShardNum
 		b.nextShardNum++
-		name, err := shardName(b.opts.IndexDir, b.opts.RepoDir, shard)
+		name, err := b.opts.shardName(shard)
 		if err != nil {
 			break
 		}
@@ -273,7 +299,7 @@ func (b *Builder) buildShard(todo []*zoekt.Document, nextShardNum int) error {
 		}
 	}
 
-	name, err := shardName(b.opts.IndexDir, b.opts.RepoDir, nextShardNum)
+	name, err := b.opts.shardName(nextShardNum)
 	if err != nil {
 		return err
 	}
@@ -305,16 +331,6 @@ func (b *Builder) newShardBuilder() (*zoekt.IndexBuilder, error) {
 		}
 	}
 	return shardBuilder, nil
-}
-
-func shardName(dir string, repoDir string, shardNum int) (string, error) {
-	abs, err := filepath.Abs(repoDir)
-	if err != nil {
-		return "", err
-	}
-
-	return filepath.Join(dir,
-		fmt.Sprintf("%s_v%d.%05d.zoekt", strings.Replace(abs, "/", "_", -1), zoekt.IndexFormatVersion, shardNum)), nil
 }
 
 func writeShard(fn string, b *zoekt.IndexBuilder) error {

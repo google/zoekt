@@ -20,6 +20,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -163,7 +164,7 @@ func getCommit(repo *git.Repository, ref string) (*git.Commit, error) {
 }
 
 // IndexGitRepo indexes the git repository as specified by the options and arguments.
-func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, submodules bool, repoCacheDir string) error {
+func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, submodules, incremental bool, repoCacheDir string) error {
 	repo, err := git.OpenRepository(opts.RepoDir)
 	if err != nil {
 		return err
@@ -230,6 +231,13 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 		}
 
 		branchVersions[b] = subVersions
+	}
+
+	if incremental {
+		versions := opts.IndexVersions()
+		if reflect.DeepEqual(versions, opts.RepositoryDescription.Branches) {
+			return nil
+		}
 	}
 
 	reposByPath := map[string]BlobLocation{}

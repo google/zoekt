@@ -154,7 +154,7 @@ func TestSubmoduleIndex(t *testing.T) {
 	}
 	opts.SetDefaults()
 
-	if err := IndexGitRepo(opts, "refs/heads/", []string{"master"}, true, dir); err != nil {
+	if err := IndexGitRepo(opts, "refs/heads/", []string{"master"}, true, true, dir); err != nil {
 		t.Fatalf("IndexGitRepo: %v", err)
 	}
 
