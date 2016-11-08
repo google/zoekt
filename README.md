@@ -53,7 +53,7 @@ eg.
 
     [Service]
     ExecStart=/zoekt/bin/zoekt-webserver -index /zoekt/index -listen :443  --ssl_cert /zoekt/etc/cert.pem   --ssl_key /zoekt/etc/key.pem
-    Restart=true
+    Restart=always
 
     [Install]
     WantedBy=default.target
@@ -64,7 +64,7 @@ SEARCH SERVICE
 
 Zoekt comes with a small service management program:
 
-    go install github.com/google/zoekt/cmd/zoekt-server
+    go install github.com/google/zoekt/cmd/zoekt-indexserver
 
     cat << EOF > config.json
     [{"GithubUser": "username"},
@@ -75,12 +75,12 @@ Zoekt comes with a small service management program:
     $GOPATH/bin/zoekt-server -mirror_config config.json
 
 This will mirror all repos under 'github.com/username' as well as the
-'zoekt' repository. It will index the repositories and start the
-webserver.
+'zoekt' repository. It will index the repositories.
 
-It takes care of fetching and indexing new data, restarting crashed
-webservers and cleaning up logfiles
+It takes care of fetching and indexing new data and cleaning up logfiles.
 
+The webserver can be started from a standard service management framework, such
+as systemd.
 
 SYMBOL SEARCH
 =============
