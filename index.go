@@ -61,10 +61,11 @@ type indexData struct {
 }
 
 type indexUnaryData struct {
-	Repository         Repository
-	SubRepoMap         map[string]*Repository
-	IndexFormatVersion int
-	IndexTime          time.Time
+	Repository          Repository
+	SubRepoMap          map[string]*Repository
+	IndexFormatVersion  int
+	IndexFeatureVersion int
+	IndexTime           time.Time
 }
 
 func (d *indexData) String() string {
@@ -93,10 +94,11 @@ func (d *indexData) Stats() (*RepoStats, error) {
 		lastFN = d.fileNameIndex[len(d.fileNameIndex)-1]
 	}
 	return &RepoStats{
-		Repos:        []string{d.unaryData.Repository.Name},
-		IndexBytes:   int64(d.memoryUse()),
-		ContentBytes: int64(int(last) + int(lastFN)),
-		Documents:    len(d.newlinesIndex) - 1,
+		Repos:          []string{d.unaryData.Repository.Name},
+		IndexBytes:     int64(d.memoryUse()),
+		ContentBytes:   int64(int(last) + int(lastFN)),
+		Documents:      len(d.newlinesIndex) - 1,
+		FeatureVersion: d.unaryData.IndexFeatureVersion,
 	}, nil
 }
 

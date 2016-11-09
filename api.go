@@ -194,6 +194,9 @@ type RepoStats struct {
 	Documents    int
 	IndexBytes   int64
 	ContentBytes int64
+
+	// Oldest feature version
+	FeatureVersion int
 }
 
 func (s *RepoStats) Add(o *RepoStats) {
@@ -201,6 +204,9 @@ func (s *RepoStats) Add(o *RepoStats) {
 	s.IndexBytes += o.IndexBytes
 	s.Documents += o.Documents
 	s.ContentBytes += o.ContentBytes
+	if o.FeatureVersion < s.FeatureVersion {
+		o.FeatureVersion = s.FeatureVersion
+	}
 }
 
 type SearchOptions struct {

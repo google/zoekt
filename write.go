@@ -27,6 +27,9 @@ import (
 // on-disk index format is changed.
 const IndexFormatVersion = 5
 
+// FeatureVersion is increased if a feature is added that requires reindexing data.
+const FeatureVersion = 1
+
 var _ = log.Println
 
 type indexTOC struct {
@@ -150,10 +153,11 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 	toc.subRepos.end(w)
 
 	unaryData := indexUnaryData{
-		Repository:         b.repo,
-		IndexFormatVersion: IndexFormatVersion,
-		IndexTime:          time.Now(),
-		SubRepoMap:         b.subRepoMap,
+		Repository:          b.repo,
+		IndexFormatVersion:  IndexFormatVersion,
+		IndexTime:           time.Now(),
+		SubRepoMap:          b.subRepoMap,
+		IndexFeatureVersion: FeatureVersion,
 	}
 
 	blob, err := json.Marshal(&unaryData)

@@ -155,6 +155,15 @@ func (o *Options) IndexVersions() []zoekt.RepositoryBranch {
 	}
 	defer s.Close()
 
+	st, err := s.Stats()
+	if err != nil {
+		return nil
+	}
+
+	if st.FeatureVersion != zoekt.FeatureVersion {
+		return nil
+	}
+
 	l, err := s.List(context.Background(), &query.Repo{})
 	if err != nil {
 		return nil
