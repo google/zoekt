@@ -166,7 +166,7 @@ func (s *compoundSection) readBlob(r *indexData, i uint32) ([]byte, error) {
 	return r.readSectionBlob(simpleSection{s.offsets[i], s.offsets[i+1] - s.offsets[i]})
 }
 
-func toDeltas(offsets []uint32) []byte {
+func toSizedDeltas(offsets []uint32) []byte {
 	var enc [8]byte
 
 	deltas := make([]byte, 0, len(offsets)*2)
@@ -185,7 +185,7 @@ func toDeltas(offsets []uint32) []byte {
 	return deltas
 }
 
-func fromDeltas(data []byte, ps []uint32) []uint32 {
+func fromSizedDeltas(data []byte, ps []uint32) []uint32 {
 	sz, m := binary.Uvarint(data)
 	data = data[m:]
 
@@ -204,4 +204,21 @@ func fromDeltas(data []byte, ps []uint32) []uint32 {
 		ps = append(ps, offset)
 	}
 	return ps
+}
+
+func fromDeltas(data []byte, buf []uint32) []uint32 {
+	buf = buf[:0]
+	if cap(buf) < len(data)/2 {
+		buf = make([]uint32, 0, len(data)/2)
+	}
+
+	var last uint32
+	for len(data) > 0 {
+		delta, m := binary.Uvarint(data)
+		offset := last + uint32(delta)
+		last = offset
+		data = data[m:]
+		buf = append(buf, offset)
+	}
+	return buf
 }

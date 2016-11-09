@@ -95,11 +95,11 @@ func marshalDocSections(secs []DocumentSection) []byte {
 		ints = append(ints, uint32(s.Start), uint32(s.End))
 	}
 
-	return toDeltas(ints)
+	return toSizedDeltas(ints)
 }
 
 func unmarshalDocSections(in []byte) (secs []DocumentSection) {
-	ints := fromDeltas(in, nil)
+	ints := fromSizedDeltas(in, nil)
 	res := make([]DocumentSection, 0, len(ints)/2)
 	for len(ints) > 0 {
 		res = append(res, DocumentSection{ints[0], ints[1]})

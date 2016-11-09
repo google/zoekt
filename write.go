@@ -25,7 +25,9 @@ import (
 
 // FormatVersion is a version number. It is increased every time the
 // on-disk index format is changed.
-const IndexFormatVersion = 5
+// 5: subrepositories.
+// 6: remove size prefix for posting varint list.
+const IndexFormatVersion = 6
 
 // FeatureVersion is increased if a feature is added that requires reindexing data.
 const FeatureVersion = 1
@@ -93,7 +95,7 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 
 	toc.newlines.start(w)
 	for _, f := range b.files {
-		toc.newlines.addItem(w, toDeltas(newLinesIndices(f.data)))
+		toc.newlines.addItem(w, toSizedDeltas(newLinesIndices(f.data)))
 	}
 	toc.newlines.end(w)
 
@@ -123,7 +125,7 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 
 	toc.postings.start(w)
 	for _, k := range keys {
-		toc.postings.addItem(w, toDeltas(b.contentPostings[stringToNGram(k)]))
+		toc.postings.addItem(w, b.contentPostings[stringToNGram(k)])
 	}
 	toc.postings.end(w)
 
@@ -144,12 +146,12 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 
 	toc.namePostings.start(w)
 	for _, k := range keys {
-		toc.namePostings.addItem(w, toDeltas(b.namePostings[stringToNGram(k)]))
+		toc.namePostings.addItem(w, b.namePostings[stringToNGram(k)])
 	}
 	toc.namePostings.end(w)
 
 	toc.subRepos.start(w)
-	w.Write(toDeltas(b.subRepos))
+	w.Write(toSizedDeltas(b.subRepos))
 	toc.subRepos.end(w)
 
 	unaryData := indexUnaryData{

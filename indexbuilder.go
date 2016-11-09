@@ -15,6 +15,7 @@
 package zoekt
 
 import (
+	"encoding/binary"
 	"fmt"
 	"html/template"
 	"log"
@@ -38,17 +39,23 @@ func (e *searchableString) end() uint32 {
 	return e.offset + uint32(len(e.data))
 }
 
-func newSearchableString(data []byte, startOff uint32, postings map[ngram][]uint32) *searchableString {
+func newSearchableString(data []byte, startOff uint32, postings map[ngram][]byte,
+	lastOffsets map[ngram]uint32) *searchableString {
 	dest := searchableString{
 		offset: startOff,
 		data:   data,
 	}
+	var buf [8]byte
 	for i := range dest.data {
 		if i+ngramSize > len(dest.data) {
 			break
 		}
 		ngram := bytesToNGram(dest.data[i : i+ngramSize])
-		postings[ngram] = append(postings[ngram], startOff+uint32(i))
+		lastOff := lastOffsets[ngram]
+		newOff := startOff + uint32(i)
+		m := binary.PutUvarint(buf[:], uint64(newOff-lastOff))
+		postings[ngram] = append(postings[ngram], buf[:m]...)
+		lastOffsets[ngram] = newOff
 	}
 	return &dest
 }
@@ -66,10 +73,12 @@ type IndexBuilder struct {
 	subRepos    []uint32
 
 	// ngram => posting.
-	contentPostings map[ngram][]uint32
+	contentPostings    map[ngram][]byte
+	contentLastOffsets map[ngram]uint32
 
 	// like postings, but for filenames
-	namePostings map[ngram][]uint32
+	namePostings    map[ngram][]byte
+	nameLastOffsets map[ngram]uint32
 
 	// root repository
 	repo Repository
@@ -100,9 +109,11 @@ func (b *IndexBuilder) ContentSize() uint32 {
 // NewIndexBuilder creates a fresh IndexBuilder.
 func NewIndexBuilder() *IndexBuilder {
 	return &IndexBuilder{
-		contentPostings: make(map[ngram][]uint32),
-		namePostings:    make(map[ngram][]uint32),
-		subRepoMap:      map[string]*Repository{},
+		contentPostings:    make(map[ngram][]byte),
+		namePostings:       make(map[ngram][]byte),
+		contentLastOffsets: make(map[ngram]uint32),
+		nameLastOffsets:    make(map[ngram]uint32),
+		subRepoMap:         map[string]*Repository{},
 	}
 }
 
@@ -279,8 +290,9 @@ func (b *IndexBuilder) Add(doc Document) error {
 
 	b.subRepos = append(b.subRepos, i)
 
-	b.files = append(b.files, newSearchableString(doc.Content, b.contentEnd, b.contentPostings))
-	b.fileNames = append(b.fileNames, newSearchableString([]byte(doc.Name), b.nameEnd, b.namePostings))
+	b.files = append(b.files, newSearchableString(doc.Content, b.contentEnd, b.contentPostings, b.contentLastOffsets))
+	b.fileNames = append(b.fileNames, newSearchableString([]byte(doc.Name), b.nameEnd, b.namePostings, b.nameLastOffsets))
+
 	b.docSections = append(b.docSections, doc.Symbols)
 	b.contentEnd += uint32(len(doc.Content))
 	b.nameEnd += uint32(len(doc.Name))

@@ -169,7 +169,8 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 		j := i / ngramSize
 		off := fileNamePostingsIndex[j]
 		end := fileNamePostingsIndex[j+1]
-		d.fileNameNgrams[bytesToNGram(nameNgramText[i:i+ngramSize])] = fromDeltas(fileNamePostingsData[off:end], nil)
+		ngram := bytesToNGram(nameNgramText[i : i+ngramSize])
+		d.fileNameNgrams[ngram] = fromDeltas(fileNamePostingsData[off:end], nil)
 	}
 
 	for j, br := range d.unaryData.Repository.Branches {
@@ -181,7 +182,7 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 	if blob, err := d.readSectionBlob(toc.subRepos); err != nil {
 		return nil, err
 	} else {
-		d.subRepos = fromDeltas(blob, nil)
+		d.subRepos = fromSizedDeltas(blob, nil)
 	}
 
 	var keys []string
@@ -210,7 +211,7 @@ func (d *indexData) readNewlines(i uint32, buf []uint32) ([]uint32, error) {
 		return nil, err
 	}
 
-	return fromDeltas(blob, buf), nil
+	return fromSizedDeltas(blob, buf), nil
 }
 
 func (d *indexData) readDocSections(i uint32) ([]DocumentSection, error) {
