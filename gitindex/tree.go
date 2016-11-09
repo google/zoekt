@@ -109,61 +109,67 @@ func TreeToFiles(r *git.Repository, t *git.Tree,
 	return ref.tree, ref.subRepoVersions, nil
 }
 
+func (r *repoWalker) handleSubmodule(p string, id *git.Oid) error {
+	submod := r.submodules[p]
+	if submod == nil {
+		if r.ignoreMissingSubmodules {
+			return nil
+		}
+		return fmt.Errorf("no entry for submodule path %q", r.repoURL)
+	}
+
+	subURL, err := r.subURL(submod.URL)
+	if err != nil {
+		return err
+	}
+
+	subRepo, err := r.repoCache.Open(subURL)
+	if err != nil {
+		return err
+	}
+
+	obj, err := subRepo.Lookup(id)
+	if err != nil {
+		return err
+	}
+	defer obj.Free()
+
+	r.subRepoVersions[p] = *id
+	treeObj, err := obj.Peel(git.ObjectTree)
+	if err != nil {
+		return err
+	}
+	if treeObj != obj {
+		defer treeObj.Free()
+	}
+	tree, err := treeObj.AsTree()
+	if err != nil {
+		return err
+	}
+	subTree, subVersions, err := TreeToFiles(subRepo, tree, subURL.String(), r.repoCache)
+	if err != nil {
+		return err
+	}
+	for k, repo := range subTree {
+		r.tree[FileKey{
+			SubRepoPath: filepath.Join(p, k.SubRepoPath),
+			Path:        k.Path,
+			ID:          k.ID,
+		}] = repo
+	}
+	for k, v := range subVersions {
+		r.subRepoVersions[filepath.Join(p, k)] = v
+	}
+	return nil
+}
+
 // cb is the git2go callback
 func (r *repoWalker) cb(n string, e *git.TreeEntry) error {
 	p := filepath.Join(n, e.Name)
 	if e.Type == git.ObjectCommit && r.repoCache != nil {
-		submod := r.submodules[p]
-		if submod == nil {
-			if r.ignoreMissingSubmodules {
-				return nil
-			}
-			return fmt.Errorf("in repo %s: no entry for submodule path %q", r.repoURL, p)
+		if err := r.handleSubmodule(p, e.Id); err != nil {
+			return fmt.Errorf("submodule %s: %v", p, err)
 		}
-
-		subURL, err := r.subURL(submod.URL)
-		if err != nil {
-			return err
-		}
-
-		subRepo, err := r.repoCache.Open(subURL)
-		if err != nil {
-			return err
-		}
-
-		obj, err := subRepo.Lookup(e.Id)
-		if err != nil {
-			return err
-		}
-		defer obj.Free()
-
-		r.subRepoVersions[p] = *e.Id
-		treeObj, err := obj.Peel(git.ObjectTree)
-		if err != nil {
-			return err
-		}
-		if treeObj != obj {
-			defer treeObj.Free()
-		}
-		tree, err := treeObj.AsTree()
-		if err != nil {
-			return err
-		}
-		subTree, subVersions, err := TreeToFiles(subRepo, tree, subURL.String(), r.repoCache)
-		if err != nil {
-			return err
-		}
-		for k, repo := range subTree {
-			r.tree[FileKey{
-				SubRepoPath: filepath.Join(p, k.SubRepoPath),
-				Path:        k.Path,
-				ID:          k.ID,
-			}] = repo
-		}
-		for k, v := range subVersions {
-			r.subRepoVersions[filepath.Join(p, k)] = v
-		}
-		return nil
 	}
 
 	switch e.Filemode {
