@@ -200,26 +200,25 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 }
 
 func (d *indexData) verify() error {
+	// This is not an exhaustive check: the postings can easily
+	// generate OOB acccesses, and are expensive to check, but this lets us rule out
+	// other sources of OOB access.
 	n := len(d.fileNameIndex)
 	if n == 0 {
 		return nil
 	}
 
 	n--
-	if len(d.fileEnds) != n {
-		return fmt.Errorf("file ends %d != %d", len(d.fileEnds), n)
-	}
-	if len(d.boundaries) != n+1 {
-		return fmt.Errorf("file name idx %d != %d", len(d.fileNameIndex), n+1)
-	}
-	if len(d.fileBranchMasks) != n {
-		return fmt.Errorf("branch masks.")
-	}
-	if len(d.docSectionsIndex) != n+1 {
-		return fmt.Errorf("doc sections.")
-	}
-	if len(d.newlinesIndex) != n+1 {
-		return fmt.Errorf("nls sections.")
+	for what, got := range map[string]int{
+		"file ends":         len(d.fileEnds),
+		"boundaries":        len(d.boundaries) - 1,
+		"branch masks":      len(d.fileBranchMasks),
+		"doc section index": len(d.docSectionsIndex) - 1,
+		"newlines index":    len(d.newlinesIndex) - 1,
+	} {
+		if got != n {
+			return fmt.Errorf("got %s %d, want %d", what, got, n)
+		}
 	}
 	return nil
 }
