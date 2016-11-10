@@ -192,7 +192,36 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 	sort.Strings(keys)
 	d.subRepoPaths = keys
 
+	if err := d.verify(); err != nil {
+		return nil, err
+	}
+
 	return &d, nil
+}
+
+func (d *indexData) verify() error {
+	n := len(d.fileNameIndex)
+	if n == 0 {
+		return nil
+	}
+
+	n--
+	if len(d.fileEnds) != n {
+		return fmt.Errorf("file ends %d != %d", len(d.fileEnds), n)
+	}
+	if len(d.boundaries) != n+1 {
+		return fmt.Errorf("file name idx %d != %d", len(d.fileNameIndex), n+1)
+	}
+	if len(d.fileBranchMasks) != n {
+		return fmt.Errorf("branch masks.")
+	}
+	if len(d.docSectionsIndex) != n+1 {
+		return fmt.Errorf("doc sections.")
+	}
+	if len(d.newlinesIndex) != n+1 {
+		return fmt.Errorf("nls sections.")
+	}
+	return nil
 }
 
 func (d *indexData) readContents(i uint32) ([]byte, error) {
