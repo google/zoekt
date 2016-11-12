@@ -67,6 +67,9 @@ type Options struct {
 	// Path to exuberant ctags binary to run
 	CTags string
 
+	// If set, ctags must succeed.
+	CTagsMustSucceed bool
+
 	// Path to namespace-sandbox from Bazel
 	NamespaceSandbox string
 
@@ -302,8 +305,15 @@ func (b *Builder) writeMemProfile(name string) {
 }
 
 func (b *Builder) buildShard(todo []*zoekt.Document, nextShardNum int) error {
+	if b.opts.CTags == "" && b.opts.CTagsMustSucceed {
+		return fmt.Errorf("ctags binary not found, but CTagsMustSucceed set.")
+	}
 	if b.opts.CTags != "" {
-		if err := ctagsAddSymbols(todo, b.opts.CTags, b.opts.NamespaceSandbox); err != nil {
+		err := ctagsAddSymbols(todo, b.opts.CTags, b.opts.NamespaceSandbox)
+		if b.opts.CTagsMustSucceed && err != nil {
+			return err
+		}
+		if err != nil {
 			log.Printf("ignoring %s error: %v", b.opts.CTags, err)
 		}
 	}

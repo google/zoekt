@@ -40,6 +40,7 @@ func main() {
 	repoCacheDir := flag.String("repo_cache", "", "directory holding bare git repos, named by URL. "+
 		"this is used to find repositories for submodules. "+
 		"It also affects name if the indexed repository is under this directory.")
+	ctags := flag.Bool("require_ctags", false, "If set, ctags calls must succeed.")
 	flag.Parse()
 
 	if *repoCacheDir != "" {
@@ -50,10 +51,11 @@ func main() {
 		*repoCacheDir = dir
 	}
 	opts := build.Options{
-		Parallelism: *parallelism,
-		SizeMax:     *sizeMax,
-		ShardMax:    *shardLimit,
-		IndexDir:    *indexDir,
+		Parallelism:      *parallelism,
+		SizeMax:          *sizeMax,
+		ShardMax:         *shardLimit,
+		IndexDir:         *indexDir,
+		CTagsMustSucceed: *ctags,
 	}
 	opts.SetDefaults()
 

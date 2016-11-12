@@ -30,7 +30,7 @@ import (
 const IndexFormatVersion = 6
 
 // FeatureVersion is increased if a feature is added that requires reindexing data.
-const FeatureVersion = 1
+const FeatureVersion = 2
 
 var _ = log.Println
 
