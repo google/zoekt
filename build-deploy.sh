@@ -48,6 +48,8 @@ sudo setcap 'cap_net_bind_service=+ep' bin/zoekt-webserver
 
 EOF
 
-chmod +x ${out}/deploy.sh
+chmod 755 ${out}/*
 
-tar -czf zoekt-deploy-${VERSION}.tar.gz ${out}/*
+tar --owner=root --group=root -czf zoekt-deploy-${VERSION}.tar.gz ${out}/*
+
+rm -rf ${out}
