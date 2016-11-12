@@ -279,6 +279,7 @@ func (ss *shardedSearcher) Search(ctx context.Context, pat query.Q, opts *Search
 	// This critical section is large, but we don't want to deal with
 	// searches on shards that have just been closed.
 	ss.shardLoader.rlock()
+	defer ss.shardLoader.runlock()
 	aggregate.Wait = time.Now().Sub(start)
 	start = time.Now()
 
@@ -334,7 +335,6 @@ func (ss *shardedSearcher) Search(ctx context.Context, pat query.Q, opts *Search
 			cancel = nil
 		}
 	}
-	ss.runlock()
 
 	sortFilesByScore(aggregate.Files)
 	aggregate.Duration = time.Now().Sub(start)
@@ -348,6 +348,8 @@ func (ss *shardedSearcher) List(ctx context.Context, r query.Q) (*RepoList, erro
 	}
 
 	ss.rlock()
+	defer ss.runlock()
+
 	shards := ss.getShards()
 	shardCount := len(shards)
 	all := make(chan res, shardCount)
@@ -377,7 +379,6 @@ func (ss *shardedSearcher) List(ctx context.Context, r query.Q) (*RepoList, erro
 			uniq[r.Name] = r
 		}
 	}
-	ss.runlock()
 
 	var names []string
 	for n := range uniq {
