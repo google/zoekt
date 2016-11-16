@@ -15,6 +15,9 @@
 package zoekt
 
 import (
+	"bytes"
+	"log"
+	"os"
 	"testing"
 
 	"golang.org/x/net/context"
@@ -54,6 +57,9 @@ func (s *crashSearcher) Close() {}
 func (s *crashSearcher) String() string { return "crashSearcher" }
 
 func TestCrashResilience(t *testing.T) {
+	out := &bytes.Buffer{}
+	log.SetOutput(out)
+	defer log.SetOutput(os.Stderr)
 	ss := &shardedSearcher{&testLoader{[]Searcher{&crashSearcher{}}}}
 
 	q := &query.Substring{Pattern: "hoi"}
