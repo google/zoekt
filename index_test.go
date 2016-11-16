@@ -964,6 +964,31 @@ func TestListRepos(t *testing.T) {
 	}
 }
 
+func TestMetadata(t *testing.T) {
+	b := NewIndexBuilder()
+
+	content := []byte("bla the needle")
+	// ----------------01234567890123
+	b.AddRepository(&Repository{
+		Name: "reponame",
+	})
+	b.AddFile("f1", content)
+	b.AddFile("f2", content)
+
+	var buf bytes.Buffer
+	b.Write(&buf)
+	f := &memSeeker{buf.Bytes()}
+
+	md, err := ReadMetadata(f)
+	if err != nil {
+		t.Fatalf("ReadMetadata: %v", err)
+	}
+
+	if got, want := md.Repository.Name, "reponame"; got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+}
+
 func TestOr(t *testing.T) {
 	b := NewIndexBuilder()
 

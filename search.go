@@ -138,7 +138,7 @@ func (p *contentProvider) fillContentMatches(ms []*candidateMatch) []LineMatch {
 		if len(lineCands) == 0 {
 			log.Panicf(
 				"%s %v infinite loop: num %d start,end %d,%d, offset %d",
-				p.id.fileName(p.idx), p.id.unaryData,
+				p.id.fileName(p.idx), p.id.metaData,
 				num, lineStart, lineEnd,
 				m.offset)
 		}

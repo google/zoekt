@@ -47,14 +47,14 @@ type indexTOC struct {
 
 	nameNgramText simpleSection
 	namePostings  compoundSection
-	unaryData     simpleSection
+	metaData      simpleSection
 }
 
 func (t *indexTOC) sections() []section {
 	return []section{
 		// This must be first, so it can be reliably read across
 		// file format versions.
-		&t.unaryData,
+		&t.metaData,
 		&t.fileContents,
 		&t.fileNames,
 		&t.fileSections,
@@ -154,7 +154,7 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 	w.Write(toSizedDeltas(b.subRepos))
 	toc.subRepos.end(w)
 
-	unaryData := indexUnaryData{
+	metaData := IndexMetadata{
 		Repository:          b.repo,
 		IndexFormatVersion:  IndexFormatVersion,
 		IndexTime:           time.Now(),
@@ -162,13 +162,13 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 		IndexFeatureVersion: FeatureVersion,
 	}
 
-	blob, err := json.Marshal(&unaryData)
+	blob, err := json.Marshal(&metaData)
 	if err != nil {
 		return err
 	}
-	toc.unaryData.start(w)
+	toc.metaData.start(w)
 	w.Write(blob)
-	toc.unaryData.end(w)
+	toc.metaData.end(w)
 
 	var tocSection simpleSection
 

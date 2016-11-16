@@ -54,13 +54,14 @@ type indexData struct {
 	// name => mask (power of 2)
 	branchIDs map[string]uint
 
-	unaryData indexUnaryData
+	metaData IndexMetadata
 
 	subRepos     []uint32
 	subRepoPaths []string
 }
 
-type indexUnaryData struct {
+// IndexMetadata holds metadata stored in the index file.
+type IndexMetadata struct {
 	Repository          Repository
 	SubRepoMap          map[string]*Repository
 	IndexFormatVersion  int
@@ -94,11 +95,11 @@ func (d *indexData) Stats() (*RepoStats, error) {
 		lastFN = d.fileNameIndex[len(d.fileNameIndex)-1]
 	}
 	return &RepoStats{
-		Repos:          []string{d.unaryData.Repository.Name},
+		Repos:          []string{d.metaData.Repository.Name},
 		IndexBytes:     int64(d.memoryUse()),
 		ContentBytes:   int64(int(last) + int(lastFN)),
 		Documents:      len(d.newlinesIndex) - 1,
-		FeatureVersion: d.unaryData.IndexFeatureVersion,
+		FeatureVersion: d.metaData.IndexFeatureVersion,
 	}, nil
 }
 

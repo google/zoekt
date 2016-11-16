@@ -452,7 +452,7 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*substrMatchTree]struct{}) (m
 func (d *indexData) simplify(in query.Q) query.Q {
 	eval := query.Map(in, func(q query.Q) query.Q {
 		if r, ok := q.(*query.Repo); ok {
-			return &query.Const{strings.Contains(d.unaryData.Repository.Name, r.Pattern)}
+			return &query.Const{strings.Contains(d.metaData.Repository.Name, r.Pattern)}
 		}
 		return q
 	})
@@ -591,13 +591,13 @@ nextFileMatch:
 
 		if v, ok := evalMatchTree(known, mt); !ok {
 			log.Panicf("did not decide. Repo %s, doc %d, known %v",
-				d.unaryData.Repository.Name, nextDoc, known)
+				d.metaData.Repository.Name, nextDoc, known)
 		} else if !v {
 			continue nextFileMatch
 		}
 
 		fileMatch := FileMatch{
-			Repository: d.unaryData.Repository.Name,
+			Repository: d.metaData.Repository.Name,
 			FileName:   string(d.fileName(nextDoc)),
 			// Maintain ordering of input files. This
 			// strictly dominates the in-file ordering of
@@ -611,7 +611,7 @@ nextFileMatch:
 			}
 			path := d.subRepoPaths[s]
 			fileMatch.SubRepositoryPath = path
-			sr := d.unaryData.SubRepoMap[path]
+			sr := d.metaData.SubRepoMap[path]
 			fileMatch.SubRepositoryName = sr.Name
 			if idx := d.branchIndex(nextDoc); idx >= 0 {
 				fileMatch.Version = sr.Branches[idx].Version
@@ -619,7 +619,7 @@ nextFileMatch:
 		} else {
 			idx := d.branchIndex(nextDoc)
 			if idx >= 0 {
-				fileMatch.Version = d.unaryData.Repository.Branches[idx].Version
+				fileMatch.Version = d.metaData.Repository.Branches[idx].Version
 			}
 		}
 
@@ -660,8 +660,8 @@ nextFileMatch:
 	}
 	sortFilesByScore(res.Files)
 
-	addRepo(&res, &d.unaryData.Repository)
-	for _, v := range d.unaryData.SubRepoMap {
+	addRepo(&res, &d.metaData.Repository)
+	for _, v := range d.metaData.SubRepoMap {
 		addRepo(&res, v)
 	}
 	return &res, nil
@@ -813,8 +813,8 @@ func (d *indexData) List(ctx context.Context, q query.Q) (*RepoList, error) {
 
 	l := &RepoList{}
 	if c.Value {
-		repo := d.unaryData.Repository
-		repo.IndexTime = d.unaryData.IndexTime
+		repo := d.metaData.Repository
+		repo.IndexTime = d.metaData.IndexTime
 		l.Repos = append(l.Repos, &repo)
 	}
 	return l, nil
