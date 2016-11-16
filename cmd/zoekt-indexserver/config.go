@@ -120,12 +120,25 @@ func periodicMirror(repoDir string, cfgFile string, interval time.Duration) {
 		lastCfg = randomize(lastCfg)
 		for _, c := range lastCfg {
 			if c.GithubUser != "" {
-				cmd := exec.Command("zoekt-mirror-github", "-user", c.GithubUser, "-name", c.Name,
-					"-exclude", c.Exclude, "-dest", repoDir)
+				cmd := exec.Command("zoekt-mirror-github",
+					"-dest", repoDir)
+				if c.GithubUser != "" {
+					cmd.Args = append(cmd.Args, "-user", c.GithubUser)
+				}
+				if c.Name != "" {
+					cmd.Args = append(cmd.Args, "-name", c.Name)
+				}
+				if c.Exclude != "" {
+					cmd.Args = append(cmd.Args, "-exclude", c.Exclude)
+				}
 				loggedRun(cmd)
 			} else if c.GitilesURL != "" {
 				cmd := exec.Command("zoekt-mirror-gitiles",
-					"-exclude", c.Exclude, "-dest", repoDir, "-name", c.Name, c.GitilesURL)
+					"-dest", repoDir, "-name", c.Name)
+				if c.Exclude != "" {
+					cmd.Args = append(cmd.Args, "-exclude", c.Exclude)
+				}
+				cmd.Args = append(cmd.Args, c.GitilesURL)
 				loggedRun(cmd)
 			}
 		}
