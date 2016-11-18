@@ -1080,7 +1080,7 @@ func TestListRepos(t *testing.T) {
 	if err != nil {
 		t.Fatalf("List(%v): %v", q, err)
 	}
-	if len(res.Repos) != 1 || res.Repos[0].Name != "reponame" {
+	if len(res.Repos) != 1 || res.Repos[0].Repository.Name != "reponame" {
 		t.Fatalf("got %v, want 1 matches", res)
 	}
 	q = &query.Repo{Pattern: "bla"}

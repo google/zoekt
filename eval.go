@@ -813,9 +813,10 @@ func (d *indexData) List(ctx context.Context, q query.Q) (*RepoList, error) {
 
 	l := &RepoList{}
 	if c.Value {
-		repo := d.repoMetaData
-		repo.IndexTime = d.metaData.IndexTime
-		l.Repos = append(l.Repos, &repo)
+		l.Repos = append(l.Repos, &RepoListEntry{
+			Repository:    d.repoMetaData,
+			IndexMetadata: d.metaData,
+		})
 	}
 	return l, nil
 }

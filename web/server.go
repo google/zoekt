@@ -365,14 +365,14 @@ func (s *Server) serveListReposErr(q query.Q, qStr string, w http.ResponseWriter
 		RepoCount: len(repos.Repos),
 	}
 	for _, r := range repos.Repos {
-		t := s.getTemplate(r.CommitURLTemplate)
+		t := s.getTemplate(r.Repository.CommitURLTemplate)
 
 		repo := Repository{
-			Name:      r.Name,
-			URL:       r.URL,
-			IndexTime: r.IndexTime,
+			Name:      r.Repository.Name,
+			URL:       r.Repository.URL,
+			IndexTime: r.IndexMetadata.IndexTime,
 		}
-		for _, b := range r.Branches {
+		for _, b := range r.Repository.Branches {
 			var buf bytes.Buffer
 			if err := t.Execute(&buf, b); err != nil {
 				return err

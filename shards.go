@@ -368,7 +368,7 @@ func (ss *shardedSearcher) List(ctx context.Context, r query.Q) (*RepoList, erro
 	}
 
 	crashes := 0
-	uniq := map[string]*Repository{}
+	uniq := map[string]*RepoListEntry{}
 	for i := 0; i < shardCount; i++ {
 		r := <-all
 		if r.err != nil {
@@ -376,7 +376,7 @@ func (ss *shardedSearcher) List(ctx context.Context, r query.Q) (*RepoList, erro
 		}
 		crashes += r.rl.Crashes
 		for _, r := range r.rl.Repos {
-			uniq[r.Name] = r
+			uniq[r.Repository.Name] = r
 		}
 	}
 
@@ -386,7 +386,7 @@ func (ss *shardedSearcher) List(ctx context.Context, r query.Q) (*RepoList, erro
 	}
 	sort.Strings(names)
 
-	var aggregate []*Repository
+	var aggregate []*RepoListEntry
 	for _, k := range names {
 		aggregate = append(aggregate, uniq[k])
 	}

@@ -158,9 +158,6 @@ type Repository struct {
 	// Nil if this is not the super project.
 	SubRepoMap map[string]*Repository
 
-	// Timestamp of indexing
-	IndexTime time.Time
-
 	// URL template to link to the commit of a branch
 	CommitURLTemplate string
 
@@ -180,9 +177,14 @@ type IndexMetadata struct {
 	IndexTime           time.Time
 }
 
+type RepoListEntry struct {
+	Repository    Repository
+	IndexMetadata IndexMetadata
+}
+
 // RepoList holds a set of Repository metadata.
 type RepoList struct {
-	Repos   []*Repository
+	Repos   []*RepoListEntry
 	Crashes int
 }
 
