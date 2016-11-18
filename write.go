@@ -28,7 +28,8 @@ import (
 // 5: subrepositories.
 // 6: remove size prefix for posting varint list.
 // 7: move subrepos into Repository struct.
-const IndexFormatVersion = 7
+// 8: move repoMetaData out of indexMetadata
+const IndexFormatVersion = 8
 
 // FeatureVersion is increased if a feature is added that requires reindexing data.
 const FeatureVersion = 2
@@ -49,6 +50,7 @@ type indexTOC struct {
 	nameNgramText simpleSection
 	namePostings  compoundSection
 	metaData      simpleSection
+	repoMetaData  simpleSection
 }
 
 func (t *indexTOC) sections() []section {
@@ -56,6 +58,7 @@ func (t *indexTOC) sections() []section {
 		// This must be first, so it can be reliably read across
 		// file format versions.
 		&t.metaData,
+		&t.repoMetaData,
 		&t.fileContents,
 		&t.fileNames,
 		&t.fileSections,
@@ -155,20 +158,16 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 	w.Write(toSizedDeltas(b.subRepos))
 	toc.subRepos.end(w)
 
-	metaData := IndexMetadata{
-		Repository:          b.repo,
+	if err := b.writeJSON(&IndexMetadata{
 		IndexFormatVersion:  IndexFormatVersion,
 		IndexTime:           time.Now(),
 		IndexFeatureVersion: FeatureVersion,
-	}
-
-	blob, err := json.Marshal(&metaData)
-	if err != nil {
+	}, &toc.metaData, w); err != nil {
 		return err
 	}
-	toc.metaData.start(w)
-	w.Write(blob)
-	toc.metaData.end(w)
+	if err := b.writeJSON(b.repo, &toc.repoMetaData, w); err != nil {
+		return err
+	}
 
 	var tocSection simpleSection
 
@@ -177,6 +176,17 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 	tocSection.end(w)
 	tocSection.write(w)
 	return w.err
+}
+
+func (b *IndexBuilder) writeJSON(data interface{}, sec *simpleSection, w *writer) error {
+	blob, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	sec.start(w)
+	w.Write(blob)
+	sec.end(w)
+	return nil
 }
 
 func newLinesIndices(in []byte) []uint32 {

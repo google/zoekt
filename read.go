@@ -100,19 +100,13 @@ func readSectionU32(f IndexFile, sec simpleSection) ([]uint32, error) {
 	return arr, nil
 }
 
-func (r *reader) readMetadata(toc *indexTOC) (*IndexMetadata, error) {
-	sec := toc.metaData
+func (r *reader) readJSON(data interface{}, sec *simpleSection) error {
 	blob, err := r.r.Read(sec.off, sec.sz)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	var md IndexMetadata
-	if err := json.Unmarshal(blob, &md); err != nil {
-		return nil, err
-	}
-
-	return &md, nil
+	return json.Unmarshal(blob, data)
 }
 
 func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
@@ -123,6 +117,7 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 		branchIDs:      map[string]uint{},
 		branchNames:    map[uint]string{},
 	}
+
 	blob, err := d.readSectionBlob(toc.metaData)
 	if err != nil {
 		return nil, err
@@ -134,6 +129,14 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 
 	if d.metaData.IndexFormatVersion != IndexFormatVersion {
 		return nil, fmt.Errorf("file is v%d, want v%d", d.metaData.IndexFormatVersion, IndexFormatVersion)
+	}
+
+	blob, err = d.readSectionBlob(toc.repoMetaData)
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(blob, &d.repoMetaData); err != nil {
+		return nil, err
 	}
 
 	d.boundaries = toc.fileContents.absoluteIndex()
@@ -188,7 +191,7 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 		d.fileNameNgrams[ngram] = fromDeltas(fileNamePostingsData[off:end], nil)
 	}
 
-	for j, br := range d.metaData.Repository.Branches {
+	for j, br := range d.repoMetaData.Branches {
 		id := uint(1) << uint(j)
 		d.branchIDs[br.Name] = id
 		d.branchNames[id] = br.Name
@@ -201,7 +204,7 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 	}
 
 	var keys []string
-	for k := range d.metaData.Repository.SubRepoMap {
+	for k := range d.repoMetaData.SubRepoMap {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
@@ -294,17 +297,22 @@ func NewSearcher(r IndexFile) (Searcher, error) {
 	return indexData, nil
 }
 
-func ReadMetadata(inf IndexFile) (*IndexMetadata, error) {
+func ReadMetadata(inf IndexFile) (*Repository, *IndexMetadata, error) {
 	rd := &reader{r: inf}
 	var toc indexTOC
 	if err := rd.readTOC(&toc); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	md, err := rd.readMetadata(&toc)
-	if err != nil {
-		return nil, err
+	var md IndexMetadata
+	if err := rd.readJSON(&md, &toc.metaData); err != nil {
+		return nil, nil, err
 	}
 
-	return md, nil
+	var repo Repository
+	if err := rd.readJSON(&repo, &toc.repoMetaData); err != nil {
+		return nil, nil, err
+	}
+
+	return &repo, &md, nil
 }

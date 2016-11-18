@@ -1110,12 +1110,12 @@ func TestMetadata(t *testing.T) {
 	b.Write(&buf)
 	f := &memSeeker{buf.Bytes()}
 
-	md, err := ReadMetadata(f)
+	rd, _, err := ReadMetadata(f)
 	if err != nil {
 		t.Fatalf("ReadMetadata: %v", err)
 	}
 
-	if got, want := md.Repository.Name, "reponame"; got != want {
+	if got, want := rd.Name, "reponame"; got != want {
 		t.Fatalf("got %q want %q", got, want)
 	}
 }

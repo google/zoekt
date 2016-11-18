@@ -53,7 +53,8 @@ type indexData struct {
 	// name => mask (power of 2)
 	branchIDs map[string]uint
 
-	metaData IndexMetadata
+	metaData     IndexMetadata
+	repoMetaData Repository
 
 	subRepos     []uint32
 	subRepoPaths []string
@@ -85,7 +86,7 @@ func (d *indexData) Stats() (*RepoStats, error) {
 		lastFN = d.fileNameIndex[len(d.fileNameIndex)-1]
 	}
 	return &RepoStats{
-		Repos:          []string{d.metaData.Repository.Name},
+		Repos:          []string{d.repoMetaData.Name},
 		IndexBytes:     int64(d.memoryUse()),
 		ContentBytes:   int64(int(last) + int(lastFN)),
 		Documents:      len(d.newlinesIndex) - 1,

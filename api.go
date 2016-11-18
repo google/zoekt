@@ -175,7 +175,6 @@ type Repository struct {
 
 // IndexMetadata holds metadata stored in the index file.
 type IndexMetadata struct {
-	Repository          Repository
 	IndexFormatVersion  int
 	IndexFeatureVersion int
 	IndexTime           time.Time
