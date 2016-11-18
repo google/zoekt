@@ -42,7 +42,7 @@ var TemplateText = map[string]string{
       autofocus
       onfocus="this.value = this.value;"
       {{if .Query}}value={{.Query}}
-      {{end}}type="text" name="q"> Max results:  <input style="width: 5em;" type="text" name="num" value="50"> <input type="submit" value="Search">
+      {{end}}type="text" name="q"> Max results:  <input style="width: 5em;" type="text" name="num" value="{{.Num}}"> <input type="submit" value="Search">
   </form>
 `,
 

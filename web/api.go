@@ -22,6 +22,7 @@ import (
 
 type LastInput struct {
 	Query string
+	Num   int
 }
 
 // Result holds the data provided to the search results template.

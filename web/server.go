@@ -51,6 +51,8 @@ var Funcmap = template.FuncMap{
 		return fmt.Sprintf("%d%s", b, suffix)
 	}}
 
+const defaultNumResults = 50
+
 type Server struct {
 	Searcher zoekt.Searcher
 
@@ -196,8 +198,8 @@ func (s *Server) serveSearchErr(w http.ResponseWriter, r *http.Request) error {
 	numStr := qvals.Get("num")
 
 	num, err := strconv.Atoi(numStr)
-	if err != nil {
-		num = 50
+	if err != nil || num <= 0 {
+		num = defaultNumResults
 	}
 
 	sOpts := zoekt.SearchOptions{
@@ -237,7 +239,10 @@ func (s *Server) serveSearchErr(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	res := ResultInput{
-		Last:          LastInput{Query: queryStr},
+		Last: LastInput{
+			Query: queryStr,
+			Num:   num,
+		},
 		Stats:         result.Stats,
 		Query:         q.String(),
 		QueryStr:      queryStr,
@@ -279,6 +284,9 @@ func (s *Server) serveSearchBoxErr(w http.ResponseWriter, r *http.Request) error
 	sort.Strings(stats.Repos)
 
 	d := SearchBoxInput{
+		Last: LastInput{
+			Num: defaultNumResults,
+		},
 		Stats:   stats,
 		Version: s.Version,
 		Uptime:  time.Now().Sub(s.startTime),
@@ -351,7 +359,9 @@ func (s *Server) serveListReposErr(q query.Q, qStr string, w http.ResponseWriter
 	}
 
 	res := RepoListInput{
-		Last:      LastInput{Query: qStr},
+		Last: LastInput{
+			Query: qStr,
+		},
 		RepoCount: len(repos.Repos),
 	}
 	for _, r := range repos.Repos {
@@ -395,6 +405,11 @@ func (s *Server) servePrintErr(w http.ResponseWriter, r *http.Request) error {
 	fileStr := qvals.Get("f")
 	repoStr := qvals.Get("r")
 	queryStr := qvals.Get("q")
+	numStr := qvals.Get("num")
+	num, err := strconv.Atoi(numStr)
+	if err != nil || num <= 0 {
+		num = defaultNumResults
+	}
 
 	qs := []query.Q{
 		&query.Substring{Pattern: fileStr, FileName: true},
@@ -426,7 +441,10 @@ func (s *Server) servePrintErr(w http.ResponseWriter, r *http.Request) error {
 		Name:    f.FileName,
 		Repo:    f.Repository,
 		Content: string(f.Content),
-		Last:    LastInput{Query: queryStr},
+		Last: LastInput{
+			Query: queryStr,
+			Num:   num,
+		},
 	}
 
 	var buf bytes.Buffer
