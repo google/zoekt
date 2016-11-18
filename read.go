@@ -214,6 +214,7 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 		return nil, err
 	}
 
+	d.calculateStats()
 	return &d, nil
 }
 
@@ -315,4 +316,23 @@ func ReadMetadata(inf IndexFile) (*Repository, *IndexMetadata, error) {
 	}
 
 	return &repo, &md, nil
+}
+
+func (d *indexData) calculateStats() {
+	last := d.boundaries[len(d.boundaries)-1]
+	lastFN := last
+	if len(d.fileNameIndex) > 0 {
+		lastFN = d.fileNameIndex[len(d.fileNameIndex)-1]
+	}
+
+	stats := RepoStats{
+		IndexBytes:   int64(d.memoryUse()),
+		ContentBytes: int64(int(last) + int(lastFN)),
+		Documents:    len(d.newlinesIndex) - 1,
+	}
+	d.repoListEntry = RepoListEntry{
+		Repository:    d.repoMetaData,
+		IndexMetadata: d.metaData,
+		Stats:         stats,
+	}
 }

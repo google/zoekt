@@ -101,7 +101,7 @@ dt {
 <p>
 Used {{HumanUnit .Stats.IndexBytes}} memory for
 {{.Stats.Documents}} documents ({{HumanUnit .Stats.ContentBytes}})
-from {{len .Stats.Repos}} repositories.
+from {{.Stats.Repos}} repositories.
 
 
 <p>
@@ -170,6 +170,7 @@ To list repositories, try:
       {{range .Branches}}
          {{if .URL}}<a href="{{.URL}}">{{end}}{{.Name}}{{if .URL}}</a>{{end}},
       {{end}}
+      <small>{{HumanUnit .Files}} files ({{HumanUnit .Size}})</small>
    </li>
   {{end}}
   </ul>
@@ -201,7 +202,7 @@ To list repositories, try:
 <p>
 Used {{HumanUnit .Stats.IndexBytes}} memory for
 {{.Stats.Documents}} documents ({{HumanUnit .Stats.ContentBytes}})
-from {{len .Stats.Repos}} repositories.
+from {{.Stats.Repos}} repositories.
 </p>
 
 <p>

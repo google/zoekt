@@ -88,10 +88,6 @@ func TestEmptyIndex(t *testing.T) {
 		t.Fatalf("Search: %v", err)
 	}
 
-	if _, err := searcher.Stats(); err != nil {
-		t.Fatalf("Stats: %v", err)
-	}
-
 	if _, err := searcher.List(context.Background(), &query.Repo{}); err != nil {
 		t.Fatalf("List: %v", err)
 	}

@@ -58,6 +58,8 @@ type indexData struct {
 
 	subRepos     []uint32
 	subRepoPaths []string
+
+	repoListEntry RepoListEntry
 }
 
 func (d *indexData) String() string {
@@ -77,21 +79,6 @@ func (d *indexData) memoryUse() int {
 		sz += 4*len(v) + 4
 	}
 	return sz
-}
-
-func (d *indexData) Stats() (*RepoStats, error) {
-	last := d.boundaries[len(d.boundaries)-1]
-	lastFN := last
-	if len(d.fileNameIndex) > 0 {
-		lastFN = d.fileNameIndex[len(d.fileNameIndex)-1]
-	}
-	return &RepoStats{
-		Repos:          []string{d.repoMetaData.Name},
-		IndexBytes:     int64(d.memoryUse()),
-		ContentBytes:   int64(int(last) + int(lastFN)),
-		Documents:      len(d.newlinesIndex) - 1,
-		FeatureVersion: d.metaData.IndexFeatureVersion,
-	}, nil
 }
 
 func (data *indexData) getDocIterator(q query.Q) (docIterator, error) {

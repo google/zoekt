@@ -21,7 +21,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -91,7 +90,7 @@ type Server struct {
 
 	startTime time.Time
 
-	mu            sync.Mutex
+	templateMu    sync.Mutex
 	templateCache map[string]*template.Template
 }
 
@@ -100,8 +99,8 @@ func (s *Server) serveSearchAPI(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getTemplate(str string) *template.Template {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.templateMu.Lock()
+	defer s.templateMu.Unlock()
 	t := s.templateCache[str]
 	if t != nil {
 		return t
@@ -266,23 +265,28 @@ func (s *Server) servePrint(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (s *Server) fetchStats() (*zoekt.RepoStats, error) {
+	repos, err := s.Searcher.List(context.Background(), &query.Const{true})
+	if err != nil {
+		return nil, err
+	}
+
+	var stats zoekt.RepoStats
+	names := map[string]struct{}{}
+	for _, r := range repos.Repos {
+		stats.Add(&r.Stats)
+		names[r.Repository.Name] = struct{}{}
+	}
+	stats.Repos = len(names)
+	return &stats, nil
+
+}
+
 func (s *Server) serveSearchBoxErr(w http.ResponseWriter, r *http.Request) error {
-	stats, err := s.Searcher.Stats()
+	stats, err := s.fetchStats()
 	if err != nil {
 		return err
 	}
-	var buf bytes.Buffer
-
-	uniq := map[string]struct{}{}
-	for _, r := range stats.Repos {
-		uniq[r] = struct{}{}
-	}
-	stats.Repos = stats.Repos[:0]
-	for r := range uniq {
-		stats.Repos = append(stats.Repos, r)
-	}
-	sort.Strings(stats.Repos)
-
 	d := SearchBoxInput{
 		Last: LastInput{
 			Num: defaultNumResults,
@@ -302,6 +306,7 @@ func (s *Server) serveSearchBoxErr(w http.ResponseWriter, r *http.Request) error
 		d.Last.Query = custom + " "
 	}
 
+	var buf bytes.Buffer
 	if err := s.search.Execute(&buf, &d); err != nil {
 		return err
 	}
@@ -316,21 +321,10 @@ func (s *Server) serveSearchBox(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) serveAboutErr(w http.ResponseWriter, r *http.Request) error {
-	stats, err := s.Searcher.Stats()
+	stats, err := s.fetchStats()
 	if err != nil {
 		return err
 	}
-	var buf bytes.Buffer
-
-	uniq := map[string]struct{}{}
-	for _, r := range stats.Repos {
-		uniq[r] = struct{}{}
-	}
-	stats.Repos = stats.Repos[:0]
-	for r := range uniq {
-		stats.Repos = append(stats.Repos, r)
-	}
-	sort.Strings(stats.Repos)
 
 	d := SearchBoxInput{
 		Stats:   stats,
@@ -338,6 +332,7 @@ func (s *Server) serveAboutErr(w http.ResponseWriter, r *http.Request) error {
 		Uptime:  time.Now().Sub(s.startTime),
 	}
 
+	var buf bytes.Buffer
 	if err := s.about.Execute(&buf, &d); err != nil {
 		return err
 	}
@@ -364,6 +359,7 @@ func (s *Server) serveListReposErr(q query.Q, qStr string, w http.ResponseWriter
 		},
 		RepoCount: len(repos.Repos),
 	}
+
 	for _, r := range repos.Repos {
 		t := s.getTemplate(r.Repository.CommitURLTemplate)
 
@@ -371,6 +367,8 @@ func (s *Server) serveListReposErr(q query.Q, qStr string, w http.ResponseWriter
 			Name:      r.Repository.Name,
 			URL:       r.Repository.URL,
 			IndexTime: r.IndexMetadata.IndexTime,
+			Size:      r.Stats.ContentBytes,
+			Files:     int64(r.Stats.Documents),
 		}
 		for _, b := range r.Repository.Branches {
 			var buf bytes.Buffer

@@ -250,20 +250,6 @@ type shardedSearcher struct {
 	shardLoader
 }
 
-func (ss *shardedSearcher) Stats() (*RepoStats, error) {
-	var r RepoStats
-	ss.rlock()
-	defer ss.runlock()
-	for _, s := range ss.shardLoader.getShards() {
-		s, err := s.Stats()
-		if err != nil {
-			return nil, err
-		}
-		r.Add(s)
-	}
-	return &r, nil
-}
-
 func (ss *shardedSearcher) Search(ctx context.Context, pat query.Q, opts *SearchOptions) (*SearchResult, error) {
 	start := time.Now()
 	type res struct {
@@ -369,6 +355,8 @@ func (ss *shardedSearcher) List(ctx context.Context, r query.Q) (*RepoList, erro
 
 	crashes := 0
 	uniq := map[string]*RepoListEntry{}
+
+	var names []string
 	for i := 0; i < shardCount; i++ {
 		r := <-all
 		if r.err != nil {
@@ -376,17 +364,19 @@ func (ss *shardedSearcher) List(ctx context.Context, r query.Q) (*RepoList, erro
 		}
 		crashes += r.rl.Crashes
 		for _, r := range r.rl.Repos {
-			uniq[r.Repository.Name] = r
+			prev, ok := uniq[r.Repository.Name]
+			if !ok {
+				cp := *r
+				uniq[r.Repository.Name] = &cp
+				names = append(names, r.Repository.Name)
+			} else {
+				prev.Stats.Add(&r.Stats)
+			}
 		}
-	}
-
-	var names []string
-	for n := range uniq {
-		names = append(names, n)
 	}
 	sort.Strings(names)
 
-	var aggregate []*RepoListEntry
+	aggregate := make([]*RepoListEntry, 0, len(names))
 	for _, k := range names {
 		aggregate = append(aggregate, uniq[k])
 	}

@@ -166,7 +166,8 @@ func TestBasic(t *testing.T) {
 	if err := b.Add(zoekt.Document{
 		Name:    "f2",
 		Content: []byte("to carry water in the no later bla"),
-		// ------------- 0123456789012345678901234567890123456789
+		// ------------- 0123456789012345678901234567890123
+		// ------------- 0         1         2         3
 		Branches: []string{"master"},
 	}); err != nil {
 		t.Fatalf("Add: %v", err)
@@ -210,6 +211,7 @@ func TestBasic(t *testing.T) {
 			"Found 1 repositories",
 			nowStr,
 			"repo-url\">name",
+			"1 files (36)",
 		},
 	} {
 		res, err := http.Get(ts.URL + req)

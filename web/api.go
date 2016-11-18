@@ -91,8 +91,10 @@ type Repository struct {
 	URL       string
 	IndexTime time.Time
 	Branches  []Branch
-	Files     int
-	Memory    int
+	Files     int64
+
+	// Total amount of content bytes.
+	Size int64
 }
 
 // PrintInput is provided to the server.Print template.

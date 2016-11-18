@@ -177,9 +177,37 @@ type IndexMetadata struct {
 	IndexTime           time.Time
 }
 
+// Statistics of a (collection of) repositories.
+type RepoStats struct {
+	// Repos is used for aggregrating the number of repositories.
+	Repos int
+
+	// Shards is the total number of search shards.
+	Shards int
+
+	// Documents holds the number of documents or files.
+	Documents int
+
+	// IndexBytes is the amount of RAM used for index overhead.
+	IndexBytes int64
+
+	// ContentBytes is the amount of RAM used for raw content.
+	ContentBytes int64
+}
+
+func (s *RepoStats) Add(o *RepoStats) {
+	// can't update Repos, since one repo may have multiple
+	// shards.
+	s.Shards += o.Shards
+	s.IndexBytes += o.IndexBytes
+	s.Documents += o.Documents
+	s.ContentBytes += o.ContentBytes
+}
+
 type RepoListEntry struct {
 	Repository    Repository
 	IndexMetadata IndexMetadata
+	Stats         RepoStats
 }
 
 // RepoList holds a set of Repository metadata.
@@ -194,31 +222,10 @@ type Searcher interface {
 	// List lists repositories. The query `q` can only contain
 	// query.Repo atoms.
 	List(ctx context.Context, q query.Q) (*RepoList, error)
-	Stats() (*RepoStats, error)
 	Close()
 
 	// Describe the searcher for debug messages.
 	String() string
-}
-
-type RepoStats struct {
-	Repos        []string
-	Documents    int
-	IndexBytes   int64
-	ContentBytes int64
-
-	// Oldest feature version
-	FeatureVersion int
-}
-
-func (s *RepoStats) Add(o *RepoStats) {
-	s.Repos = append(s.Repos, o.Repos...)
-	s.IndexBytes += o.IndexBytes
-	s.Documents += o.Documents
-	s.ContentBytes += o.ContentBytes
-	if o.FeatureVersion < s.FeatureVersion {
-		o.FeatureVersion = s.FeatureVersion
-	}
 }
 
 type SearchOptions struct {
