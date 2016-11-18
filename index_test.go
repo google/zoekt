@@ -1281,3 +1281,33 @@ func TestSubRepo(t *testing.T) {
 		t.Errorf("got LineFragmentTemplate %v, want {'sub':'sub-line'}", sres.LineFragments)
 	}
 }
+
+func TestSearchEither(t *testing.T) {
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
+
+	for i, d := range []Document{
+		{Name: "f1", Content: []byte("bla needle bla")},
+		{Name: "needle-file-branch", Content: []byte("bla content")},
+	} {
+		if err := b.Add(d); err != nil {
+			t.Fatalf("Add %d: %v", i, err)
+		}
+	}
+
+	sres := searchForTest(t, b, &query.Substring{Pattern: "needle"})
+	if len(sres.Files) != 2 {
+		t.Fatalf("got %v, wanted 2 matches", sres.Files)
+	}
+
+	sres = searchForTest(t, b, &query.Substring{Pattern: "needle", Content: true})
+	if len(sres.Files) != 1 {
+		t.Fatalf("got %v, wanted 1 match", sres.Files)
+	}
+
+	if got, want := sres.Files[0].FileName, "f1"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}

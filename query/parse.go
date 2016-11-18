@@ -167,13 +167,20 @@ func parseExpr(in []byte) (Q, int, error) {
 	case tokBranch:
 		expr = &Branch{Pattern: text}
 	case tokText, tokRegex:
-		q, err := regexpQuery(text, false)
+		q, err := regexpQuery(text, false, false)
 		if err != nil {
 			return nil, 0, err
 		}
 		expr = q
 	case tokFile:
-		q, err := regexpQuery(text, true)
+		q, err := regexpQuery(text, false, true)
+		if err != nil {
+			return nil, 0, err
+		}
+		expr = q
+
+	case tokContent:
+		q, err := regexpQuery(text, true, false)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -210,6 +217,7 @@ func parseExpr(in []byte) (Q, int, error) {
 		}
 		b = b[n:]
 		expr = &Not{subQ}
+
 	}
 
 	return expr, len(in) - len(b), nil
@@ -217,7 +225,7 @@ func parseExpr(in []byte) (Q, int, error) {
 
 // regexpQuery parses an atom into either a regular expression, or a
 // simple substring atom.
-func regexpQuery(text string, file bool) (Q, error) {
+func regexpQuery(text string, content, file bool) (Q, error) {
 	var expr Q
 
 	r, err := syntax.Parse(text, syntax.Perl)
@@ -229,11 +237,13 @@ func regexpQuery(text string, file bool) (Q, error) {
 		expr = &Substring{
 			Pattern:  string(r.Rune),
 			FileName: file,
+			Content:  content,
 		}
 	} else {
 		expr = &Regexp{
 			Regexp:   r,
 			FileName: file,
+			Content:  content,
 		}
 	}
 
@@ -366,31 +376,34 @@ const (
 	tokNegate     = 8
 	tokRegex      = 9
 	tokOr         = 10
+	tokContent    = 11
 )
 
 var tokNames = map[int]string{
-	tokText:       "Text",
-	tokFile:       "File",
-	tokRepo:       "Repo",
-	tokCase:       "Case",
 	tokBranch:     "Branch",
-	tokParenOpen:  "ParenOpen",
-	tokParenClose: "ParenClose",
+	tokCase:       "Case",
 	tokError:      "Error",
+	tokFile:       "File",
 	tokNegate:     "Negate",
-	tokRegex:      "Regex",
 	tokOr:         "Or",
+	tokParenClose: "ParenClose",
+	tokParenOpen:  "ParenOpen",
+	tokRegex:      "Regex",
+	tokRepo:       "Repo",
+	tokText:       "Text",
 }
 
 var prefixes = map[string]int{
-	"b:":      tokBranch,
-	"branch:": tokBranch,
-	"case:":   tokCase,
-	"f:":      tokFile,
-	"file:":   tokFile,
-	"r:":      tokRepo,
-	"regex:":  tokRegex,
-	"repo:":   tokRepo,
+	"b:":       tokBranch,
+	"branch:":  tokBranch,
+	"c:":       tokContent,
+	"case:":    tokCase,
+	"content:": tokContent,
+	"f:":       tokFile,
+	"file:":    tokFile,
+	"r:":       tokRepo,
+	"regex:":   tokRegex,
+	"repo:":    tokRepo,
 }
 
 var reservedWords = map[string]int{

@@ -80,6 +80,9 @@ func TestParseQuery(t *testing.T) {
 		{"abc\\.\\*def", &Substring{Pattern: "abc.*def"}},
 		{"(abc)", &Regexp{Regexp: mustParseRE("(abc)")}},
 
+		{"c:abc", &Substring{Pattern: "abc", Content: true}},
+		{"content:abc", &Substring{Pattern: "abc", Content: true}},
+
 		// case
 		{"abc case:yes", &Substring{Pattern: "abc", CaseSensitive: true}},
 		{"abc case:auto", &Substring{Pattern: "abc", CaseSensitive: false}},

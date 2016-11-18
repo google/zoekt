@@ -33,6 +33,7 @@ type Q interface {
 type Regexp struct {
 	Regexp        *syntax.Regexp
 	FileName      bool
+	Content       bool
 	CaseSensitive bool
 }
 
@@ -78,7 +79,12 @@ func (q *Repo) String() string {
 type Substring struct {
 	Pattern       string
 	CaseSensitive bool
-	FileName      bool
+
+	// Match only filename
+	FileName bool
+
+	// Match only content
+	Content bool
 }
 
 func (q *Substring) String() string {
@@ -87,6 +93,8 @@ func (q *Substring) String() string {
 	t := ""
 	if q.FileName {
 		t = "file_"
+	} else if q.Content {
+		t = "content_"
 	}
 
 	s += fmt.Sprintf("%ssubstr:%q", t, q.Pattern)
@@ -293,6 +301,30 @@ func Map(q Q, f func(q Q) Q) Q {
 		q = &Not{Child: Map(s.Child, f)}
 	}
 	return f(q)
+}
+
+// Expand expands Substr queries into (OR file_substr content_substr)
+// queries, and the same for Regexp queries..
+func ExpandFileContent(q Q) Q {
+	switch s := q.(type) {
+	case *Substring:
+		if !s.FileName && !s.Content {
+			f := *s
+			f.FileName = true
+			c := *s
+			c.Content = true
+			return NewOr(&f, &c)
+		}
+	case *Regexp:
+		if !s.FileName && !s.Content {
+			f := *s
+			f.FileName = true
+			c := *s
+			c.Content = true
+			return NewOr(&f, &c)
+		}
+	}
+	return q
 }
 
 // VisitAtoms runs `v` on all atom queries within `q`.

@@ -492,6 +492,8 @@ func (d *indexData) Search(ctx context.Context, q query.Q, opts *SearchOptions) 
 		return &res, nil
 	}
 
+	q = query.Map(q, query.ExpandFileContent)
+
 	atoms := map[*substrMatchTree]struct{}{}
 	mt, err := d.newMatchTree(q, atoms)
 	if err != nil {
