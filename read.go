@@ -201,7 +201,7 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 	}
 
 	var keys []string
-	for k := range d.metaData.SubRepoMap {
+	for k := range d.metaData.Repository.SubRepoMap {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)

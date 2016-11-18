@@ -63,22 +63,26 @@ func searcherForTest(t *testing.T, b *zoekt.IndexBuilder) zoekt.Searcher {
 }
 
 func TestJSON(t *testing.T) {
-	b := zoekt.NewIndexBuilder()
-	b.AddRepository(&zoekt.Repository{
+	b, err := zoekt.NewIndexBuilder(&zoekt.Repository{
 		Name:                 "name",
 		URL:                  "repo-url",
 		CommitURLTemplate:    "{{.Version}}",
 		FileURLTemplate:      "url",
 		LineFragmentTemplate: "line",
+		Branches:             []zoekt.RepositoryBranch{{"master", "1234"}},
 	})
-	b.AddBranch("master", "1234")
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	line := "abc apple orange"
-	b.Add(zoekt.Document{
+	if err := b.Add(zoekt.Document{
 		Name:     "f2",
 		Content:  []byte(line),
 		Branches: []string{"master"},
-	})
+	}); err != nil {
+		t.Fatalf("Add: %v", err)
+	}
 
 	s := searcherForTest(t, b)
 	srv := Server{
@@ -148,21 +152,25 @@ func TestJSONParseError(t *testing.T) {
 }
 
 func TestBasic(t *testing.T) {
-	b := zoekt.NewIndexBuilder()
-	b.AddRepository(&zoekt.Repository{
+	b, err := zoekt.NewIndexBuilder(&zoekt.Repository{
 		Name:                 "name",
 		URL:                  "repo-url",
 		CommitURLTemplate:    "{{.Version}}",
 		FileURLTemplate:      "file-url",
 		LineFragmentTemplate: "line",
+		Branches:             []zoekt.RepositoryBranch{{"master", "1234"}},
 	})
-	b.AddBranch("master", "1234")
-	b.Add(zoekt.Document{
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
+	if err := b.Add(zoekt.Document{
 		Name:    "f2",
 		Content: []byte("to carry water in the no later bla"),
 		// ------------- 0123456789012345678901234567890123456789
 		Branches: []string{"master"},
-	})
+	}); err != nil {
+		t.Fatalf("Add: %v", err)
+	}
 
 	s := searcherForTest(t, b)
 	srv := Server{
@@ -268,14 +276,18 @@ func TestCrash(t *testing.T) {
 }
 
 func TestHostCustomization(t *testing.T) {
-	b := zoekt.NewIndexBuilder()
-	b.AddRepository(&zoekt.Repository{
+	b, err := zoekt.NewIndexBuilder(&zoekt.Repository{
 		Name: "name",
 	})
-	b.Add(zoekt.Document{
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
+	if err := b.Add(zoekt.Document{
 		Name:    "file",
 		Content: []byte("bla"),
-	})
+	}); err != nil {
+		t.Fatalf("Add: %v", err)
+	}
 
 	s := searcherForTest(t, b)
 	srv := Server{

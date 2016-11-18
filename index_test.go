@@ -37,8 +37,10 @@ func clearScores(r *SearchResult) {
 }
 
 func TestBoundary(t *testing.T) {
-	b := NewIndexBuilder()
-
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v")
+	}
 	b.AddFile("f1", []byte("x the"))
 	b.AddFile("f1", []byte("reader"))
 	res := searchForTest(t, b, &query.Substring{Pattern: "there"})
@@ -51,8 +53,10 @@ func TestBoundary(t *testing.T) {
 var _ = log.Println
 
 func TestBasic(t *testing.T) {
-	b := NewIndexBuilder()
-
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 	if err := b.AddFile(
 		// ---------- 0123456789012345678901234567890123456789
 		"f2", []byte("to carry water in the no later bla")); err != nil {
@@ -73,12 +77,14 @@ func TestBasic(t *testing.T) {
 }
 
 func TestEmptyIndex(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 	searcher := searcherForTest(t, b)
 
 	var opts SearchOptions
-	_, err := searcher.Search(context.Background(), &query.Substring{}, &opts)
-	if err != nil {
+	if _, err := searcher.Search(context.Background(), &query.Substring{}, &opts); err != nil {
 		t.Fatalf("Search: %v", err)
 	}
 
@@ -113,7 +119,10 @@ func (s *memSeeker) Size() (uint32, error) {
 }
 
 func TestNewlines(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 	b.AddFile("filename", []byte("line1\nline2\nbla"))
 	//----------------------------012345 678901 23456
 
@@ -169,7 +178,10 @@ func searcherForTest(t *testing.T, b *IndexBuilder) Searcher {
 }
 
 func TestFileBasedSearch(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	c1 := []byte("I love bananas without skin")
 	// -----------0123456789012345678901234567890123456789
@@ -190,7 +202,10 @@ func TestFileBasedSearch(t *testing.T) {
 }
 
 func TestCaseFold(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	c1 := []byte("I love BaNaNAS.")
 	// ---------- 012345678901234567890123456
@@ -219,7 +234,10 @@ func TestCaseFold(t *testing.T) {
 }
 
 func TestAndSearch(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	b.AddFile("f1", []byte("x banana y"))
 	b.AddFile("f2", []byte("x apple y"))
@@ -256,7 +274,10 @@ func TestAndSearch(t *testing.T) {
 }
 
 func TestAndNegateSearch(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	b.AddFile("f1", []byte("x banana y"))
 	b.AddFile("f4", []byte("x banana apple y"))
@@ -283,7 +304,10 @@ func TestAndNegateSearch(t *testing.T) {
 }
 
 func TestNegativeMatchesOnlyShortcut(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	b.AddFile("f1", []byte("x banana y"))
 
@@ -305,7 +329,10 @@ func TestNegativeMatchesOnlyShortcut(t *testing.T) {
 }
 
 func TestFileSearch(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	b.AddFile("banzana", []byte("x orange y"))
 	// --------------------------0123456879
@@ -337,7 +364,10 @@ func TestFileSearch(t *testing.T) {
 }
 
 func TestFileCase(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	b.AddFile("BANANA", []byte("x orange y"))
 	sres := searchForTest(t, b, &query.Substring{
@@ -352,7 +382,10 @@ func TestFileCase(t *testing.T) {
 }
 
 func TestFileRegexpSearchBruteForce(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	b.AddFile("banzana", []byte("x orange y"))
 	// --------------------------0123456879
@@ -369,7 +402,10 @@ func TestFileRegexpSearchBruteForce(t *testing.T) {
 }
 
 func TestFileRegexpSearchShortString(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	b.AddFile("banana.py", []byte("x orange y"))
 	sres := searchForTest(t, b, &query.Regexp{
@@ -384,7 +420,10 @@ func TestFileRegexpSearchShortString(t *testing.T) {
 }
 
 func TestFileSubstringSearchBruteForce(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	b.AddFile("BANZANA", []byte("x orange y"))
 	b.AddFile("banana", []byte("x apple y"))
@@ -401,7 +440,10 @@ func TestFileSubstringSearchBruteForce(t *testing.T) {
 }
 
 func TestFileSubstringSearchBruteForceEnd(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	b.AddFile("BANZANA", []byte("x orange y"))
 	b.AddFile("bananaq", []byte("x apple y"))
@@ -418,7 +460,10 @@ func TestFileSubstringSearchBruteForceEnd(t *testing.T) {
 }
 
 func TestSearchMatchAll(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	b.AddFile("banzana", []byte("x orange y"))
 	// --------------------------0123456879
@@ -432,7 +477,10 @@ func TestSearchMatchAll(t *testing.T) {
 }
 
 func TestSearchNewline(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	b.AddFile("banzana", []byte("abcd\ndefg"))
 	sres := searchForTest(t, b, &query.Substring{Pattern: "d\nd"})
@@ -446,7 +494,10 @@ func TestSearchNewline(t *testing.T) {
 }
 
 func TestSearchMatchAllRegexp(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	b.AddFile("banzana", []byte("abcd"))
 	// --------------------------0123456879
@@ -463,7 +514,10 @@ func TestSearchMatchAllRegexp(t *testing.T) {
 }
 
 func TestFileRestriction(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	b.AddFile("banana1", []byte("x orange y"))
 	// --------------------------0123456879
@@ -492,7 +546,10 @@ func TestFileRestriction(t *testing.T) {
 }
 
 func TestFileNameBoundary(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 	b.AddFile("banana2", []byte("x apple y"))
 	b.AddFile("helpers.go", []byte("x apple y"))
 	b.AddFile("foo", []byte("x apple y"))
@@ -508,7 +565,10 @@ func TestFileNameBoundary(t *testing.T) {
 }
 
 func TestWordBoundaryRanking(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 	b.AddFile("f1", []byte("xbytex xbytex"))
 	b.AddFile("f2", []byte("xbytex\nbytex\nbyte bla"))
 	// ---------------------0123456 789012 34567890
@@ -536,11 +596,26 @@ func TestWordBoundaryRanking(t *testing.T) {
 }
 
 func TestBranchMask(t *testing.T) {
-	b := NewIndexBuilder()
-	b.Add(Document{Name: "f1", Content: []byte("needle"), Branches: []string{"master"}})
-	b.Add(Document{Name: "f2", Content: []byte("needle"), Branches: []string{"stable", "master"}})
-	b.Add(Document{Name: "f3", Content: []byte("needle"), Branches: []string{"stable", "master"}})
-	b.Add(Document{Name: "f4", Content: []byte("needle"), Branches: []string{"bonzai"}})
+	b, err := NewIndexBuilder(&Repository{
+		Branches: []RepositoryBranch{
+			{"master", "v-master"},
+			{"stable", "v-stable"},
+			{"bonzai", "v-bonzai"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
+	for i, d := range []*Document{
+		{Name: "f1", Content: []byte("needle"), Branches: []string{"master"}},
+		{Name: "f2", Content: []byte("needle"), Branches: []string{"stable", "master"}},
+		{Name: "f3", Content: []byte("needle"), Branches: []string{"stable", "master"}},
+		{Name: "f4", Content: []byte("needle"), Branches: []string{"bonzai"}},
+	} {
+		if err := b.Add(*d); err != nil {
+			t.Errorf("Add(%d): %v", i, err)
+		}
+	}
 
 	sres := searchForTest(t, b, query.NewAnd(
 		&query.Substring{
@@ -560,7 +635,15 @@ func TestBranchMask(t *testing.T) {
 }
 
 func TestBranchReport(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(&Repository{
+		Branches: []RepositoryBranch{
+			{"stable", "vs"},
+			{"master", "vm"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	branches := []string{"stable", "master"}
 	b.Add(Document{Name: "f2", Content: []byte("needle"), Branches: branches})
@@ -578,10 +661,15 @@ func TestBranchReport(t *testing.T) {
 }
 
 func TestBranchVersions(t *testing.T) {
-	b := NewIndexBuilder()
-
-	b.AddBranch("stable", "v-stable")
-	b.AddBranch("master", "v-master")
+	b, err := NewIndexBuilder(&Repository{
+		Branches: []RepositoryBranch{
+			{"stable", "v-stable"},
+			{"master", "v-master"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	b.Add(Document{Name: "f2", Content: []byte("needle"), Branches: []string{"master"}})
 	sres := searchForTest(t, b, &query.Substring{
@@ -598,10 +686,14 @@ func TestBranchVersions(t *testing.T) {
 }
 
 func TestCoversContent(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
-	branches := []string{"stable", "master"}
-	b.Add(Document{Name: "f1", Content: []byte("needle the bla"), Branches: branches})
+	if err := b.Add(Document{Name: "f1", Content: []byte("needle the bla")}); err != nil {
+		t.Fatalf("Add: %v", err)
+	}
 
 	sres := searchForTest(t, b,
 		query.NewAnd(
@@ -631,7 +723,10 @@ func mustParseRE(s string) *syntax.Regexp {
 }
 
 func TestRegexp(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	content := []byte("needle the bla")
 	// ----------------01234567890123
@@ -666,7 +761,10 @@ func TestRegexp(t *testing.T) {
 }
 
 func TestRegexpFile(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	content := []byte("needle the bla")
 	// ----------------01234567890123
@@ -689,7 +787,10 @@ func TestRegexpFile(t *testing.T) {
 }
 
 func TestRegexpOrder(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	content := []byte("bla the needle")
 	// ----------------01234567890123
@@ -706,13 +807,14 @@ func TestRegexpOrder(t *testing.T) {
 }
 
 func TestRepoName(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(&Repository{Name: "bla"})
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	content := []byte("bla the needle")
+
 	// ----------------01234567890123
-	if err := b.AddRepository(&Repository{Name: "bla"}); err != nil {
-		t.Fatalf("AddRepository: %v", err)
-	}
 	b.AddFile("f1", content)
 
 	sres := searchForTest(t, b,
@@ -740,7 +842,10 @@ func TestRepoName(t *testing.T) {
 }
 
 func TestMergeMatches(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	content := []byte("blablabla")
 	b.AddFile("f1", content)
@@ -752,19 +857,21 @@ func TestMergeMatches(t *testing.T) {
 }
 
 func TestRepoURL(t *testing.T) {
-	b := NewIndexBuilder()
-
-	content := []byte("blablabla")
-	if err := b.AddRepository(&Repository{
+	b, err := NewIndexBuilder(&Repository{
 		Name:                 "name",
 		URL:                  "URL",
 		CommitURLTemplate:    "commit",
 		FileURLTemplate:      "file-url",
 		LineFragmentTemplate: "fragment",
-	}); err != nil {
-		t.Fatalf("AddRepository: %v", err)
+	})
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
 	}
-	b.AddFile("f1", content)
+
+	content := []byte("blablabla")
+	if err := b.AddFile("f1", content); err != nil {
+		t.Fatalf("AddFile: %v", err)
+	}
 
 	sres := searchForTest(t, b, &query.Substring{Pattern: "bla"})
 
@@ -777,7 +884,10 @@ func TestRepoURL(t *testing.T) {
 }
 
 func TestRegexpCaseSensitive(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	content := []byte("bla\nfunc unmarshalGitiles\n")
 	b.AddFile("f1", content)
@@ -794,7 +904,10 @@ func TestRegexpCaseSensitive(t *testing.T) {
 }
 
 func TestRegexpCaseFolding(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	content := []byte("bla\nfunc unmarshalGitiles\n")
 	b.AddFile("f1", content)
@@ -811,7 +924,10 @@ func TestRegexpCaseFolding(t *testing.T) {
 }
 
 func TestCaseRegexp(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	content := []byte("BLABLABLA")
 	b.AddFile("f1", content)
@@ -827,7 +943,10 @@ func TestCaseRegexp(t *testing.T) {
 }
 
 func TestNegativeRegexp(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	content := []byte("BLABLABLA needle bla")
 	b.AddFile("f1", content)
@@ -848,7 +967,10 @@ func TestNegativeRegexp(t *testing.T) {
 }
 
 func TestSymbolRank(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	content := []byte("func bla() blub")
 	// ----------------012345678901234
@@ -872,7 +994,7 @@ func TestSymbolRank(t *testing.T) {
 		})
 
 	if len(res.Files) != 3 {
-		t.Errorf("got %#v, want 3 files", res.Files)
+		t.Fatalf("got %#v, want 3 files", res.Files)
 	}
 	if res.Files[0].FileName != "f2" {
 		t.Errorf("got %#v, want 'f2' as top match", res.Files[0])
@@ -880,7 +1002,10 @@ func TestSymbolRank(t *testing.T) {
 }
 
 func TestPartialSymbolRank(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	content := []byte("func bla() blub")
 	// ----------------012345678901234
@@ -906,7 +1031,7 @@ func TestPartialSymbolRank(t *testing.T) {
 		})
 
 	if len(res.Files) != 3 {
-		t.Errorf("got %#v, want 3 files", res.Files)
+		t.Fatalf("got %#v, want 3 files", res.Files)
 	}
 	if res.Files[0].FileName != "f2" {
 		t.Errorf("got %#v, want 'f2' as top match", res.Files[0])
@@ -914,13 +1039,15 @@ func TestPartialSymbolRank(t *testing.T) {
 }
 
 func TestNegativeRepo(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(&Repository{
+		Name: "bla",
+	})
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	content := []byte("bla the needle")
 	// ----------------01234567890123
-	b.AddRepository(&Repository{
-		Name: "bla",
-	})
 	b.AddFile("f1", content)
 
 	sres := searchForTest(t, b,
@@ -935,13 +1062,15 @@ func TestNegativeRepo(t *testing.T) {
 }
 
 func TestListRepos(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(&Repository{
+		Name: "reponame",
+	})
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	content := []byte("bla the needle")
 	// ----------------01234567890123
-	b.AddRepository(&Repository{
-		Name: "reponame",
-	})
 	b.AddFile("f1", content)
 	b.AddFile("f2", content)
 
@@ -965,13 +1094,15 @@ func TestListRepos(t *testing.T) {
 }
 
 func TestMetadata(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(&Repository{
+		Name: "reponame",
+	})
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	content := []byte("bla the needle")
 	// ----------------01234567890123
-	b.AddRepository(&Repository{
-		Name: "reponame",
-	})
 	b.AddFile("f1", content)
 	b.AddFile("f2", content)
 
@@ -990,7 +1121,10 @@ func TestMetadata(t *testing.T) {
 }
 
 func TestOr(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
 	b.Add(Document{Name: "f1", Content: []byte("needle")})
 	b.Add(Document{Name: "f2", Content: []byte("banana")})
@@ -1004,11 +1138,27 @@ func TestOr(t *testing.T) {
 }
 
 func TestAtomCountScore(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(
+		&Repository{
+			Branches: []RepositoryBranch{
+				{"branches", "v1"},
+				{"needle", "v2"},
+			},
+		})
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 
-	b.Add(Document{Name: "f1", Content: []byte("needle the bla"), Branches: []string{"branches"}})
-	b.Add(Document{Name: "needle-file-branch", Content: []byte("needle content"), Branches: []string{"needle"}})
-	b.Add(Document{Name: "needle-file", Content: []byte("needle content"), Branches: []string{"branches"}})
+	for i, d := range []Document{
+		{Name: "f1", Content: []byte("needle the bla"), Branches: []string{"branches"}},
+		{Name: "needle-file-branch", Content: []byte("needle content"), Branches: []string{"needle"}},
+		{Name: "needle-file", Content: []byte("needle content"), Branches: []string{"branches"}},
+	} {
+		if err := b.Add(d); err != nil {
+			t.Fatalf("Add %d: %v", i, err)
+		}
+
+	}
 	sres := searchForTest(t, b,
 		query.NewOr(
 			&query.Substring{Pattern: "needle"},
@@ -1026,7 +1176,10 @@ func TestAtomCountScore(t *testing.T) {
 }
 
 func TestImportantCutoff(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 	content := []byte("func bla() blub")
 	// ----------------012345678901234
 	b.Add(Document{
@@ -1049,7 +1202,10 @@ func TestImportantCutoff(t *testing.T) {
 }
 
 func TestFrequency(t *testing.T) {
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 	content := []byte("sla _Py_HashDouble(double v sla las las shd dot dot")
 	// ----------------012345678901234
 	b.Add(Document{
@@ -1068,7 +1224,10 @@ func TestMatchNewline(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	b := NewIndexBuilder()
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
 	content := []byte("pqr\nalex")
 	// ----------------0123 4567
 	b.Add(Document{
@@ -1085,21 +1244,29 @@ func TestMatchNewline(t *testing.T) {
 }
 
 func TestSubRepo(t *testing.T) {
-	b := NewIndexBuilder()
-	if err := b.AddSubRepository("sub", &Repository{
-		Name:                 "sub-name",
-		LineFragmentTemplate: "sub-line",
-	}); err != nil {
-		t.Fatalf("AddSubRepository: %v", err)
+	subRepos := map[string]*Repository{
+		"sub": &Repository{
+			Name:                 "sub-name",
+			LineFragmentTemplate: "sub-line",
+		}}
+
+	b, err := NewIndexBuilder(&Repository{
+		SubRepoMap: subRepos,
+	})
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
 	}
 
 	content := []byte("pqr\nalex")
 	// ----------------0123 4567
-	b.Add(Document{
+	if err := b.Add(Document{
 		Name:              "sub/f1",
 		Content:           content,
 		SubRepositoryPath: "sub",
-	})
+	}); err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+
 	sres := searchForTest(t, b, &query.Substring{Pattern: "alex"})
 	if len(sres.Files) != 1 {
 		t.Fatalf("got %v, wanted 1 matches", sres.Files)

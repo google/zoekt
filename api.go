@@ -155,6 +155,9 @@ type Repository struct {
 	// The branches indexed in this repo.
 	Branches []RepositoryBranch
 
+	// Nil if this is not the super project.
+	SubRepoMap map[string]*Repository
+
 	// Timestamp of indexing
 	IndexTime time.Time
 
@@ -168,6 +171,14 @@ type Repository struct {
 	// The URL fragment to add to a file URL for line numbers.
 	// has access to {{LineNumber}}.
 	LineFragmentTemplate string
+}
+
+// IndexMetadata holds metadata stored in the index file.
+type IndexMetadata struct {
+	Repository          Repository
+	IndexFormatVersion  int
+	IndexFeatureVersion int
+	IndexTime           time.Time
 }
 
 // RepoList holds a set of Repository metadata.

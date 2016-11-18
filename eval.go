@@ -607,11 +607,11 @@ nextFileMatch:
 
 		if s := d.subRepos[nextDoc]; s > 0 {
 			if s >= uint32(len(d.subRepoPaths)) {
-				panic(fmt.Sprintf("corrupt index: subrepo %d beyond %v", s, d.subRepoPaths))
+				log.Panicf("corrupt index: subrepo %d beyond %v", s, d.subRepoPaths)
 			}
 			path := d.subRepoPaths[s]
 			fileMatch.SubRepositoryPath = path
-			sr := d.metaData.SubRepoMap[path]
+			sr := d.metaData.Repository.SubRepoMap[path]
 			fileMatch.SubRepositoryName = sr.Name
 			if idx := d.branchIndex(nextDoc); idx >= 0 {
 				fileMatch.Version = sr.Branches[idx].Version
@@ -661,7 +661,7 @@ nextFileMatch:
 	sortFilesByScore(res.Files)
 
 	addRepo(&res, &d.metaData.Repository)
-	for _, v := range d.metaData.SubRepoMap {
+	for _, v := range d.metaData.Repository.SubRepoMap {
 		addRepo(&res, v)
 	}
 	return &res, nil

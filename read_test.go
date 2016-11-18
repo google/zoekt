@@ -24,8 +24,14 @@ import (
 var _ = log.Println
 
 func TestReadWrite(t *testing.T) {
-	b := NewIndexBuilder()
-	b.AddFile("filename", []byte("abcde"))
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
+
+	if err := b.AddFile("filename", []byte("abcde")); err != nil {
+		t.Fatalf("AddFile: %v", err)
+	}
 
 	var buf bytes.Buffer
 	b.Write(&buf)
@@ -34,7 +40,7 @@ func TestReadWrite(t *testing.T) {
 	r := reader{r: f}
 
 	var toc indexTOC
-	err := r.readTOC(&toc)
+	err = r.readTOC(&toc)
 
 	if err != nil {
 		t.Errorf("got read error %v", err)
@@ -65,8 +71,14 @@ func TestReadWrite(t *testing.T) {
 }
 
 func TestReadWriteNames(t *testing.T) {
-	b := NewIndexBuilder()
-	b.AddFile("abCd", []byte(""))
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
+
+	if err := b.AddFile("abCd", []byte("")); err != nil {
+		t.Fatalf("AddFile: %v", err)
+	}
 
 	var buf bytes.Buffer
 	b.Write(&buf)

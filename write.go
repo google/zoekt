@@ -27,7 +27,8 @@ import (
 // on-disk index format is changed.
 // 5: subrepositories.
 // 6: remove size prefix for posting varint list.
-const IndexFormatVersion = 6
+// 7: move subrepos into Repository struct.
+const IndexFormatVersion = 7
 
 // FeatureVersion is increased if a feature is added that requires reindexing data.
 const FeatureVersion = 2
@@ -158,7 +159,6 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 		Repository:          b.repo,
 		IndexFormatVersion:  IndexFormatVersion,
 		IndexTime:           time.Now(),
-		SubRepoMap:          b.subRepoMap,
 		IndexFeatureVersion: FeatureVersion,
 	}
 

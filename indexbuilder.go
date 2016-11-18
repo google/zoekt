@@ -83,9 +83,6 @@ type IndexBuilder struct {
 	// root repository
 	repo Repository
 
-	// subRepositories
-	subRepoMap map[string]*Repository
-
 	// name to index.
 	subRepoIndices map[string]uint32
 }
@@ -106,55 +103,58 @@ func (b *IndexBuilder) ContentSize() uint32 {
 	return b.contentEnd + b.nameEnd
 }
 
-// NewIndexBuilder creates a fresh IndexBuilder.
-func NewIndexBuilder() *IndexBuilder {
-	return &IndexBuilder{
+// NewIndexBuilder creates a fresh IndexBuilder. The passed in
+// Repository contains repo metadata, and may be set to nil.
+func NewIndexBuilder(r *Repository) (*IndexBuilder, error) {
+	b := &IndexBuilder{
 		contentPostings:    make(map[ngram][]byte),
 		namePostings:       make(map[ngram][]byte),
 		contentLastOffsets: make(map[ngram]uint32),
 		nameLastOffsets:    make(map[ngram]uint32),
-		subRepoMap:         map[string]*Repository{},
 	}
+
+	if r == nil {
+		r = &Repository{}
+	}
+	if err := b.setRepository(r); err != nil {
+		return nil, err
+	}
+	return b, nil
 }
 
-// AddSubRepository adds repository metadata for a subrepository. The
-// Branches field is ignored.
-func (b *IndexBuilder) AddSubRepository(path string, desc *Repository) error {
+// setRepository adds repository metadata. The Branches field is
+// ignored.
+func (b *IndexBuilder) setRepository(desc *Repository) error {
 	if len(b.files) > 0 {
 		return fmt.Errorf("AddSubRepository called after adding files.")
 	}
-	branchEqual := len(b.repo.Branches) == len(desc.Branches)
-	if branchEqual {
-		for i, b := range b.repo.Branches {
-			branchEqual = branchEqual && (b.Name == desc.Branches[i].Name)
+	if err := desc.verify(); err != nil {
+		return err
+	}
+
+	for _, subrepo := range desc.SubRepoMap {
+		branchEqual := len(subrepo.Branches) == len(desc.Branches)
+		if branchEqual {
+			for i, b := range subrepo.Branches {
+				branchEqual = branchEqual && (b.Name == desc.Branches[i].Name)
+			}
 		}
 	}
 
-	if !branchEqual {
-		return fmt.Errorf("got subrepository branches %v, want main repository branches %v", desc.Branches, b.repo.Branches)
-	}
-	if err := desc.verify(); err != nil {
-		return err
+	if len(desc.Branches) > 32 {
+		return fmt.Errorf("too many branches.")
 	}
 
-	r := *desc
-	b.subRepoMap[path] = &r
-	return nil
-}
-
-// AddRepository adds repository metadata. The Branches field is
-// ignored.
-func (b *IndexBuilder) AddRepository(desc *Repository) error {
-	if len(b.files) > 0 {
-		return fmt.Errorf("AddSubRepository called after adding files.")
-	}
-	if err := desc.verify(); err != nil {
-		return err
-	}
-
-	before := b.repo.Branches
 	b.repo = *desc
-	b.repo.Branches = before
+	repoCopy := *desc
+	repoCopy.SubRepoMap = nil
+
+	if b.repo.SubRepoMap == nil {
+		b.repo.SubRepoMap = map[string]*Repository{}
+	}
+	b.repo.SubRepoMap[""] = &repoCopy
+
+	b.populateSubRepoIndices()
 	return nil
 }
 
@@ -181,33 +181,6 @@ func (m docSectionSlice) Less(i, j int) bool { return m[i].Start < m[j].Start }
 // AddFile is a convenience wrapper for Add
 func (b *IndexBuilder) AddFile(name string, content []byte) error {
 	return b.Add(Document{Name: name, Content: content})
-}
-
-// addBranch adds a branch (if new) and returns its index.
-func (b *IndexBuilder) addBranch(br, v string) int {
-	for i, b := range b.repo.Branches {
-		if br == b.Name {
-			return i
-		}
-	}
-	b.repo.Branches = append(b.repo.Branches, RepositoryBranch{
-		Name:    br,
-		Version: v,
-	})
-	return len(b.repo.Branches) - 1
-}
-
-// AddBranch registers a branch name.  The first is assumed to be the
-// default.
-func (b *IndexBuilder) AddBranch(br, version string) error {
-	if len(b.subRepoMap) > 0 {
-		return fmt.Errorf("must add branches before sub repositories")
-	}
-	idx := b.addBranch(br, version)
-	if idx >= 32 {
-		return fmt.Errorf("branch %q: branch counts are limited to 32")
-	}
-	return nil
 }
 
 const maxTrigramCount = 20000
@@ -249,9 +222,8 @@ func (b *IndexBuilder) populateSubRepoIndices() {
 	if b.subRepoIndices != nil {
 		return
 	}
-	b.subRepoMap[""] = &b.repo
 	var paths []string
-	for k := range b.subRepoMap {
+	for k := range b.repo.SubRepoMap {
 		paths = append(paths, k)
 	}
 	sort.Strings(paths)
@@ -275,7 +247,6 @@ func (b *IndexBuilder) Add(doc Document) error {
 		last = s
 	}
 
-	b.populateSubRepoIndices()
 	if doc.SubRepositoryPath != "" {
 		rel, err := filepath.Rel(doc.SubRepositoryPath, doc.Name)
 		if err != nil || rel == doc.Name {
@@ -283,12 +254,21 @@ func (b *IndexBuilder) Add(doc Document) error {
 		}
 	}
 
-	i, ok := b.subRepoIndices[doc.SubRepositoryPath]
+	subRepoIdx, ok := b.subRepoIndices[doc.SubRepositoryPath]
 	if !ok {
 		return fmt.Errorf("unknown subrepo path %q", doc.SubRepositoryPath)
 	}
 
-	b.subRepos = append(b.subRepos, i)
+	var mask uint32
+	for _, br := range doc.Branches {
+		m := b.branchMask(br)
+		if m == 0 {
+			return fmt.Errorf("no branch found for %s", br)
+		}
+		mask |= m
+	}
+
+	b.subRepos = append(b.subRepos, subRepoIdx)
 
 	b.files = append(b.files, newSearchableString(doc.Content, b.contentEnd, b.contentPostings, b.contentLastOffsets))
 	b.fileNames = append(b.fileNames, newSearchableString([]byte(doc.Name), b.nameEnd, b.namePostings, b.nameLastOffsets))
@@ -297,11 +277,15 @@ func (b *IndexBuilder) Add(doc Document) error {
 	b.contentEnd += uint32(len(doc.Content))
 	b.nameEnd += uint32(len(doc.Name))
 
-	var mask uint32
-	for _, br := range doc.Branches {
-		mask |= uint32(1 << uint(b.addBranch(br, "")))
-	}
-
 	b.branchMasks = append(b.branchMasks, mask)
 	return nil
+}
+
+func (b *IndexBuilder) branchMask(br string) uint32 {
+	for i, b := range b.repo.Branches {
+		if b.Name == br {
+			return uint32(1) << uint(i)
+		}
+	}
+	return 0
 }

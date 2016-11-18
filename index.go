@@ -19,7 +19,6 @@ import (
 	"log"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/google/zoekt/query"
 )
@@ -58,15 +57,6 @@ type indexData struct {
 
 	subRepos     []uint32
 	subRepoPaths []string
-}
-
-// IndexMetadata holds metadata stored in the index file.
-type IndexMetadata struct {
-	Repository          Repository
-	SubRepoMap          map[string]*Repository
-	IndexFormatVersion  int
-	IndexFeatureVersion int
-	IndexTime           time.Time
 }
 
 func (d *indexData) String() string {
