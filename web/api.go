@@ -90,6 +90,8 @@ type Repository struct {
 	URL       string
 	IndexTime time.Time
 	Branches  []Branch
+	Files     int
+	Memory    int
 }
 
 // PrintInput is provided to the server.Print template.

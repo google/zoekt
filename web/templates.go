@@ -14,11 +14,18 @@
 
 package web
 
-import "html/template"
+import (
+	"html/template"
+	"log"
+)
 
+// Top provides the standard templates in parsed form
 var Top = template.New("top").Funcs(Funcmap)
 
-var DidYouMeanTemplate = template.Must(Top.New("didyoumean").Parse(`<html>
+// TemplateText contains the text of the standard templates.
+var TemplateText = map[string]string{
+
+	"didyoumean": `<html>
   <head>
     <title>Error</title>
   </head>
@@ -26,10 +33,10 @@ var DidYouMeanTemplate = template.Must(Top.New("didyoumean").Parse(`<html>
     <p>{{.Message}}. Did you mean <a href="/search?q={{.Suggestion}}">{{.Suggestion}}</a> ?
   </body>
 </html>
-`))
+`,
 
-// QueryTemplate is the template for the search box.
-var QueryTemplate = template.Must(Top.New("box").Parse(`
+	// the template for the search box.
+	"searchbox": `
   <form action="search">
     Search some code: <input
       autofocus
@@ -37,10 +44,10 @@ var QueryTemplate = template.Must(Top.New("box").Parse(`
       {{if .Query}}value={{.Query}}
       {{end}}type="text" name="q"> Max results:  <input style="width: 5em;" type="text" name="num" value="50"> <input type="submit" value="Search">
   </form>
-`))
+`,
 
-var SearchBoxTemplate = template.Must(Top.New("search").Parse(
-	`<html>
+	// search box for the entry page.
+	"search": `<html>
 <head>
 <style>
 dt {
@@ -51,7 +58,7 @@ dt {
 <title>Zoekt, en gij zult spinazie eten</title>
 <body>
 <div style="margin: 3em; padding 3em; position: center;">
-{{template "box" .Last}}
+{{template "searchbox" .Last}}
 </div>
 
 <div style="display: flex; justify-content: space-around; flex-direction: row;">
@@ -117,14 +124,14 @@ To list repositories, try:
 
 </body>
 </html>
-`))
+`,
 
-var ResultsTemplate = template.Must(Top.New("results").Parse(`<html>
+	"results": `<html>
   <head>
     <title>Results for {{.QueryStr}}</title>
   </head>
 <body>
-  {{template "box" .Last}}
+  {{template "searchbox" .Last}}
 <hr>
   {{if .Stats.Crashes}}<br><b>{{.Stats.Crashes}} shards crashed</b><br>{{end}}
   Found {{.Stats.MatchCount}} results in {{.Stats.FileCount}} files ({{.Stats.NgramMatches}} ngram matches,
@@ -145,14 +152,14 @@ var ResultsTemplate = template.Must(Top.New("results").Parse(`<html>
   {{end}}
 </body>
 </html>
-`))
+`,
 
-var RepoListTemplate = template.Must(Top.New("repolist").Parse(`<html>
+	"repolist": `<html>
   <head>
     <title>Repo search result for {{.Last.Query}}</title>
   </head>
 <body>
-{{template "box" .Last}}
+{{template "searchbox" .Last}}
  <hr>
   Found {{.RepoCount}} repositories:
   <p>
@@ -168,19 +175,19 @@ var RepoListTemplate = template.Must(Top.New("repolist").Parse(`<html>
   </ul>
 </body>
 </html>
-`))
+`,
 
-var PrintTemplate = template.Must(Top.New("print").Parse(`
+	"print": `
   <head>
     <title>{{.Repo}}:{{.Name}}</title>
   </head>
-<body>{{template "box" .Last}}
+<body>{{template "searchbox" .Last}}
  <hr>
 
 <pre>{{.Content}}
-</pre>`))
+</pre>`,
 
-var AboutTemplate = template.Must(Top.New("about").Parse(`
+	"about": `
   <head>
     <title>About <em>zoekt</em></title>
   </head>
@@ -202,4 +209,14 @@ from {{len .Stats.Repos}} repositories.
 {{if .Version}}<em>Zoekt</em> version {{.Version}}, uptime{{else}}Uptime{{end}} {{.Uptime}}
 
 </p>
-`))
+`,
+}
+
+func init() {
+	for k, v := range TemplateText {
+		_, err := Top.New(k).Parse(v)
+		if err != nil {
+			log.Panicf("parse(%s): %v:", k, err)
+		}
+	}
+}

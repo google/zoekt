@@ -17,6 +17,8 @@ package main
 import (
 	"flag"
 	"fmt"
+	"html/template"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/pprof"
@@ -58,6 +60,43 @@ func divertLogs(dir string, interval time.Duration) {
 	}
 }
 
+const templateExtension = ".html.tpl"
+
+func loadTemplates(tpl *template.Template, dir string) error {
+	fs, err := filepath.Glob(dir + "/*" + templateExtension)
+	if err != nil {
+		log.Fatalf("Glob: %v", err)
+	}
+
+	for _, fn := range fs {
+		content, err := ioutil.ReadFile(fn)
+		if err != nil {
+			return err
+		}
+
+		base := filepath.Base(fn)
+		base = strings.TrimSuffix(base, ".html")
+		if _, err := tpl.New(base).Parse(string(content)); err != nil {
+			return fmt.Errorf("Parse(%s): %v", fn, err)
+		}
+	}
+	return nil
+}
+
+func writeTemplates(dir string) error {
+	if dir == "" {
+		return fmt.Errorf("must set --template_dir")
+	}
+
+	for k, v := range web.TemplateText {
+		nm := filepath.Join(dir, k+templateExtension)
+		if err := ioutil.WriteFile(nm, []byte(v), 0644); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func main() {
 	logDir := flag.String("log_dir", "", "log to this directory rather than stderr.")
 	logRefresh := flag.Duration("log_refresh", 24*time.Hour, "if using --log_dir, start writing a new file this often.")
@@ -73,7 +112,18 @@ func main() {
 	hostCustomization := flag.String(
 		"host_customization", "",
 		"specify host customization, as HOST1=QUERY,HOST2=QUERY")
+
+	templateDir := flag.String("template_dir", "", "set directory from which to load custom .html.tpl template files")
+	dumpTemplates := flag.Bool("dump_templates", false, "dump templates into --template_dir and exit.")
+
 	flag.Parse()
+
+	if *dumpTemplates {
+		if err := writeTemplates(*templateDir); err != nil {
+			log.Fatal(err)
+		}
+		os.Exit(0)
+	}
 
 	if *logDir != "" {
 		if fi, err := os.Lstat(*logDir); err != nil || !fi.IsDir() {
@@ -94,6 +144,12 @@ func main() {
 		Searcher: searcher,
 		Top:      web.Top,
 		Version:  Version,
+	}
+
+	if *templateDir != "" {
+		if err := loadTemplates(s.Top, *templateDir); err != nil {
+			log.Fatal("loadTemplates: %v", err)
+		}
 	}
 
 	s.Print = *print
