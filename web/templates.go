@@ -60,33 +60,31 @@ dt {
   Search examples:
   <div style="margin-left: 4em;">
   <dl>
-    <dt>needle</dt><dd>search for "needle"
+    <dt><a href="search?q=needle">needle</a></dt><dd>search for "needle"
   </dd>
-    <dt>thread or needle</dt><dd>search for either "thread" or "needle"
+    <dt><a href="search?q=thread+or+needle">thread or needle</a></dt><dd>search for either "thread" or "needle"
   </dd>
-    <dt>class needle</dt><dd>search for files containing both "class" and "needle"
+    <dt><a href="search?q=class+needle">class needle</a></dt><dd>search for files containing both "class" and "needle"
   </dd>
-    <dt>class Needle</dt><dd>search for files containing both "class" (case insensitive) and "Needle" (case sensitive)
+    <dt><a href="search?q=class+Needle">class Needle</a></dt><dd>search for files containing both "class" (case insensitive) and "Needle" (case sensitive)
   </dd>
-    <dt>class Needle case:yes</dt><dd>search for files containing "class" and "Needle", both case sensitively
+    <dt><a href="search?q=class+Needle+case:yes">class Needle case:yes</a></dt><dd>search for files containing "class" and "Needle", both case sensitively
   </dd>
-    <dt>"class Needle"</dt><dd>search for files with the phrase "class Needle"
+    <dt><a href="search?q=%22class Needle%22">"class Needle"</a></dt><dd>search for files with the phrase "class Needle"
   </dd>
-    <dt>needle -hay</dt><dd>search for files with the word "needle" but not the word "hay"
+     <dt><a href="search?q=needle+-hay">needle -hay</a></dt><dd>search for files with the word "needle" but not the word "hay"
   </dd>
-    <dt>path file:java</dt><dd>search for the word "path" in files whose name contains "java"
+    <dt><a href="search?q=path+file:java">path file:java</a></dt><dd>search for the word "path" in files whose name contains "java"
   </dd>
-    <dt>f:\.c$</dt><dd>search for files whose name ends with ".c"
+    <dt><a href="search?q=f:%5C.c%24">f:\.c$</a></dt><dd>search for files whose name ends with ".c"
   </dd>
-    <dt>path -file:java</dt><dd>search for the word "path" excluding files whose name contains "java"</dd>
-    <dt>foo.*bar</dt><dd>search for the regular expression "foo.*bar"</dd>
-    <dt>-(Path File) Stream</dt><dd>search "Stream", but exclude files containing both "Path" and "File"</dd>
-    <dt>-Path\ File Stream</dt><dd>search "Stream", but exclude files containing "Path File"</dd>
-    <dt>phone repo:droid</dt><dd>search for "phone" in repositories whose name contains "droid"</dd>
-    <dt>phone r:droid</dt><dd>search for "phone" to repositories whose name contains "droid"</dd>
-    <dt>r:droid</dt><dd>list repositories whose name contains "droid"</dd>
-    <dt>phone branch:aster</dt><dd>for Git repos, find "phone" in files in branches whose name contains "aster".</dd>
-    <dt>phone b:HEAD</dt><dd>for Git repos, find "phone" in the default ('HEAD') branch.</dd>
+    <dt><a href="search?q=path+-file:java">path -file:java</a></dt><dd>search for the word "path" excluding files whose name contains "java"</dd>
+    <dt><a href="search?q=foo.*bar">foo.*bar</a></dt><dd>search for the regular expression "foo.*bar"</dd>
+    <dt><a href="search?q=-%28Path File%29 Stream">-(Path File) Stream</a></dt><dd>search "Stream", but exclude files containing both "Path" and "File"</dd>
+    <dt><a href="search?q=-Path%5c+file+Stream">-Path\ file Stream</a></dt><dd>search "Stream", but exclude files containing "Path File"</dd>
+    <dt><a href="search?q=phone+r:doid">phone r:droid</a></dt><dd>search for "phone" in repositories whose name contains "droid"</dd>
+    <dt><a href="search?q=phone+b:aster">phone b:aster</a></dt><dd>for Git repos, find "phone" in files in branches whose name contains "aster".</dd>
+    <dt><a href="search?q=phone+b:HEAD">phone b:HEAD</a></dt><dd>for Git repos, find "phone" in the default ('HEAD') branch.</dd>
   </dl>
   </div>
 </div>
@@ -104,8 +102,8 @@ from {{len .Stats.Repos}} repositories.
 To list repositories, try:
   <div style="margin-left: 4em;">
   <dl>
-    <dt>r:droid</dt><dd>list repositories whose name contains "droid".</dd>
-    <dt>r:go -r:google</dt><dd>list repositories whose name contains "go" but not "google".</dd>
+    <dt><a href="search?q=r:droid">r:droid</a></dt><dd>list repositories whose name contains "droid".</dd>
+    <dt><a href="search?q=r:go+-r:google">r:go -r:google</a></dt><dd>list repositories whose name contains "go" but not "google".</dd>
   </dl>
   </div>
 </p>
