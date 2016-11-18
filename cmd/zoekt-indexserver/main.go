@@ -29,6 +29,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/zoekt"
 	"github.com/google/zoekt/gitindex"
 )
 
@@ -164,6 +165,58 @@ func deleteLogs(logDir string, maxAge time.Duration) {
 	}
 }
 
+// Delete the shard if its corresponding git repo can't be found.
+func deleteIfStale(repoDir string, fn string) error {
+	f, err := os.Open(fn)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+
+	ifile, err := zoekt.NewIndexFile(f)
+	if err != nil {
+		return nil
+	}
+	defer ifile.Close()
+
+	repo, _, err := zoekt.ReadMetadata(ifile)
+	if err != nil {
+		return nil
+	}
+
+	u, err := url.Parse(repo.URL)
+	if err != nil {
+		return err
+	}
+
+	_, err = os.Stat(gitindex.Path(repoDir, u))
+	if os.IsNotExist(err) {
+		return os.Remove(fn)
+	}
+
+	return err
+}
+
+func deleteStaleIndexes(indexDir, repoDir string, watchInterval time.Duration) {
+	t := time.NewTicker(watchInterval)
+
+	expr := indexDir + "/*"
+	for {
+		<-t.C
+
+		fs, err := filepath.Glob(expr)
+		if err != nil {
+			log.Println("Glob(%q): %v", expr, err)
+		}
+
+		for _, f := range fs {
+			if err := deleteIfStale(repoDir, f); err != nil {
+				log.Println("deleteIfStale(%q): %v", f, err)
+			}
+		}
+	}
+}
+
 func main() {
 	maxLogAge := flag.Duration("max_log_age", 3*day, "recycle logs after this much time")
 	fetchInterval := flag.Duration("fetch_interval", time.Hour, "run fetches this often")
@@ -206,5 +259,7 @@ func main() {
 		go periodicMirror(repoDir, *mirrorConfig, *mirrorInterval)
 	}
 	go deleteLogs(logDir, *maxLogAge)
+	go deleteStaleIndexes(indexDir, repoDir, *fetchInterval)
+
 	refresh(repoDir, indexDir, *indexConfig, *fetchInterval)
 }

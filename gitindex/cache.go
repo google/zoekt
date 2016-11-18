@@ -45,11 +45,25 @@ func (rc *RepoCache) Close() {
 	}
 }
 
-func (rc *RepoCache) Open(u *url.URL) (*git.Repository, error) {
+func repoKey(u *url.URL) string {
 	key := filepath.Join(u.Host, u.Path)
 	if !strings.HasSuffix(key, ".git") {
 		key += ".git"
 	}
+	return key
+}
+
+// Path returns the absolute path of the bare repository.
+func Path(baseDir string, u *url.URL) string {
+	key := repoKey(u)
+	return filepath.Join(baseDir, key)
+}
+
+// Open opens a git repository. The cache retains a pointer to the
+// repository, so it cannot be freed.
+func (rc *RepoCache) Open(u *url.URL) (*git.Repository, error) {
+	key := repoKey(u)
+	dir := filepath.Join(rc.baseDir, key)
 
 	rc.reposMu.Lock()
 	defer rc.reposMu.Unlock()
@@ -59,8 +73,7 @@ func (rc *RepoCache) Open(u *url.URL) (*git.Repository, error) {
 		return r, nil
 	}
 
-	d := filepath.Join(rc.baseDir, key)
-	repo, err := git.OpenRepository(d)
+	repo, err := git.OpenRepository(dir)
 	if err == nil {
 		rc.repos[key] = repo
 	}
