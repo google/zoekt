@@ -85,6 +85,7 @@ type Server struct {
 	search     *template.Template
 	result     *template.Template
 	print      *template.Template
+	about      *template.Template
 
 	startTime time.Time
 
@@ -125,6 +126,7 @@ func NewMux(s *Server) (*http.ServeMux, error) {
 		"print":      &s.print,
 		"search":     &s.search,
 		"repolist":   &s.repolist,
+		"about":      &s.about,
 	} {
 		*v = s.Top.Lookup(k)
 		if *v == nil {
@@ -140,6 +142,7 @@ func NewMux(s *Server) (*http.ServeMux, error) {
 	if s.HTML {
 		mux.HandleFunc("/search", s.serveSearch)
 		mux.HandleFunc("/", s.serveSearchBox)
+		mux.HandleFunc("/about", s.serveAbout)
 	}
 	if s.RESTAPI {
 		mux.HandleFunc("/api/search", s.serveSearchAPI)
@@ -300,6 +303,42 @@ func (s *Server) serveSearchBoxErr(w http.ResponseWriter, r *http.Request) error
 
 func (s *Server) serveSearchBox(w http.ResponseWriter, r *http.Request) {
 	if err := s.serveSearchBoxErr(w, r); err != nil {
+		http.Error(w, err.Error(), http.StatusTeapot)
+	}
+}
+
+func (s *Server) serveAboutErr(w http.ResponseWriter, r *http.Request) error {
+	stats, err := s.Searcher.Stats()
+	if err != nil {
+		return err
+	}
+	var buf bytes.Buffer
+
+	uniq := map[string]struct{}{}
+	for _, r := range stats.Repos {
+		uniq[r] = struct{}{}
+	}
+	stats.Repos = stats.Repos[:0]
+	for r := range uniq {
+		stats.Repos = append(stats.Repos, r)
+	}
+	sort.Strings(stats.Repos)
+
+	d := SearchBoxInput{
+		Stats:   stats,
+		Version: s.Version,
+		Uptime:  time.Now().Sub(s.startTime),
+	}
+
+	if err := s.about.Execute(&buf, &d); err != nil {
+		return err
+	}
+	w.Write(buf.Bytes())
+	return nil
+}
+
+func (s *Server) serveAbout(w http.ResponseWriter, r *http.Request) {
+	if err := s.serveAboutErr(w, r); err != nil {
 		http.Error(w, err.Error(), http.StatusTeapot)
 	}
 }

@@ -96,7 +96,6 @@ Used {{HumanUnit .Stats.IndexBytes}} memory for
 {{.Stats.Documents}} documents ({{HumanUnit .Stats.ContentBytes}})
 from {{len .Stats.Repos}} repositories.
 
-<p><small>{{if .Version}}<em>Zoekt</em> version {{.Version}}, uptime{{else}}Uptime{{end}} {{.Uptime}}</small>
 
 <p>
 To list repositories, try:
@@ -108,6 +107,14 @@ To list repositories, try:
   </div>
 </p>
 </div>
+</div>
+
+<hr>
+
+<div>
+<a href="about">About</a>
+</div>
+
 </body>
 </html>
 `))
@@ -172,3 +179,27 @@ var PrintTemplate = template.Must(Top.New("print").Parse(`
 
 <pre>{{.Content}}
 </pre>`))
+
+var AboutTemplate = template.Must(Top.New("about").Parse(`
+  <head>
+    <title>About <em>zoekt</em></title>
+  </head>
+<body>
+
+<p>
+  This is <a href="http://github.com/google/zoekt"><em>zoekt</em></a>,
+  an open-source full text search engine.
+</p>
+
+<p>
+Used {{HumanUnit .Stats.IndexBytes}} memory for
+{{.Stats.Documents}} documents ({{HumanUnit .Stats.ContentBytes}})
+from {{len .Stats.Repos}} repositories.
+</p>
+
+<p>
+
+{{if .Version}}<em>Zoekt</em> version {{.Version}}, uptime{{else}}Uptime{{end}} {{.Uptime}}
+
+</p>
+`))
