@@ -46,16 +46,27 @@ func newSearchableString(data []byte, startOff uint32, postings map[ngram][]byte
 		data:   data,
 	}
 	var buf [8]byte
-	for i := range dest.data {
-		if i+ngramSize > len(dest.data) {
-			break
+	var runeGram [3]rune
+	var off [3]uint32
+	var runeCount int
+	for i, c := range string(dest.data) {
+		runeGram[0] = runeGram[1]
+		off[0] = off[1]
+		runeGram[1] = runeGram[2]
+		off[1] = off[2]
+		runeGram[2] = c
+		off[2] = uint32(i)
+		runeCount++
+		if runeCount < ngramSize {
+			continue
 		}
-		ngram := bytesToNGram(dest.data[i : i+ngramSize])
-		lastOff := lastOffsets[ngram]
-		newOff := startOff + uint32(i)
+
+		ng := runesToNGram(runeGram)
+		lastOff := lastOffsets[ng]
+		newOff := startOff + off[0]
 		m := binary.PutUvarint(buf[:], uint64(newOff-lastOff))
-		postings[ngram] = append(postings[ngram], buf[:m]...)
-		lastOffsets[ngram] = newOff
+		postings[ng] = append(postings[ng], buf[:m]...)
+		lastOffsets[ng] = newOff
 	}
 	return &dest
 }
@@ -122,8 +133,6 @@ func NewIndexBuilder(r *Repository) (*IndexBuilder, error) {
 	return b, nil
 }
 
-// setRepository adds repository metadata. The Branches field is
-// ignored.
 func (b *IndexBuilder) setRepository(desc *Repository) error {
 	if len(b.files) > 0 {
 		return fmt.Errorf("AddSubRepository called after adding files.")

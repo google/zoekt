@@ -49,7 +49,7 @@ func (m *candidateMatch) matchContent(content []byte) bool {
 		comp := bytes.Compare(content[m.offset:m.offset+uint32(m.matchSz)], m.substrBytes) == 0
 		return comp
 	} else {
-		return caseFoldingEquals(m.substrLowered, content[m.offset:m.offset+uint32(m.matchSz)])
+		return caseFoldingEqualsBytes(m.substrLowered, content[m.offset:m.offset+uint32(m.matchSz)])
 	}
 }
 

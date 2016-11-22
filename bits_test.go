@@ -43,16 +43,16 @@ func TestGenerateCaseNgrams(t *testing.T) {
 	ng := stringToNGram("aB1")
 	gotNG := generateCaseNgrams(ng)
 
-	var got []string
+	got := map[string]bool{}
 	for _, n := range gotNG {
-		got = append(got, string(ngramToBytes(n)))
+		got[string(ngramToBytes(n))] = true
 	}
 
-	want := []string{
-		"aB1",
-		"AB1",
-		"ab1",
-		"Ab1",
+	want := map[string]bool{
+		"aB1": true,
+		"AB1": true,
+		"ab1": true,
+		"Ab1": true,
 	}
 
 	if !reflect.DeepEqual(got, want) {

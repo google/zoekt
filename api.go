@@ -69,10 +69,10 @@ type LineMatch struct {
 
 // LineFragmentMatch a segment of matching text within a line.
 type LineFragmentMatch struct {
-	// Offset within the line.
+	// Offset within the line, in bytes.
 	LineOffset int
 
-	// Offset from file start
+	// Offset from file start, in bytes.
 	Offset uint32
 
 	// Number bytes that match.

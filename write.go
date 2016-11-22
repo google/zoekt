@@ -16,6 +16,7 @@ package zoekt
 
 import (
 	"bufio"
+	"encoding/binary"
 	"encoding/json"
 	"io"
 	"log"
@@ -29,6 +30,7 @@ import (
 // 6: remove size prefix for posting varint list.
 // 7: move subrepos into Repository struct.
 // 8: move repoMetaData out of indexMetadata
+// 9: use bigendian uint64 for trigrams.
 const IndexFormatVersion = 8
 
 // FeatureVersion is increased if a feature is added that requires reindexing data.
@@ -115,21 +117,23 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 	}
 	toc.fileSections.end(w)
 
-	var keys []string
+	var keys ngramSlice
 	for k := range b.contentPostings {
-		keys = append(keys, k.String())
+		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	sort.Sort(keys)
 
 	toc.ngramText.start(w)
 	for _, k := range keys {
-		w.Write([]byte(k))
+		var buf [8]byte
+		binary.BigEndian.PutUint64(buf[:], uint64(k))
+		w.Write(buf[:])
 	}
 	toc.ngramText.end(w)
 
 	toc.postings.start(w)
 	for _, k := range keys {
-		toc.postings.addItem(w, b.contentPostings[stringToNGram(k)])
+		toc.postings.addItem(w, b.contentPostings[k])
 	}
 	toc.postings.end(w)
 
@@ -138,19 +142,21 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 
 	keys = keys[:0]
 	for k := range b.namePostings {
-		keys = append(keys, k.String())
+		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	sort.Sort(keys)
 
 	toc.nameNgramText.start(w)
 	for _, k := range keys {
-		w.Write([]byte(k))
+		var buf [8]byte
+		binary.BigEndian.PutUint64(buf[:], uint64(k))
+		w.Write(buf[:])
 	}
 	toc.nameNgramText.end(w)
 
 	toc.namePostings.start(w)
 	for _, k := range keys {
-		toc.namePostings.addItem(w, b.namePostings[stringToNGram(k)])
+		toc.namePostings.addItem(w, b.namePostings[k])
 	}
 	toc.namePostings.end(w)
 

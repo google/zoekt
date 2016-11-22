@@ -198,47 +198,6 @@ func minarg(xs []uint32) uint32 {
 	return uint32(j)
 }
 
-func hasCase(c byte) bool {
-	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
-}
-
-func flipCase(c byte) byte {
-	if c >= 'A' && c <= 'Z' {
-		return c - 'A' + 'a'
-	}
-	if c >= 'a' && c <= 'z' {
-		return c - 'a' + 'A'
-	}
-	return c
-}
-
-func generateCaseNgrams(g ngram) []ngram {
-	asBytes := ngramToBytes(g)
-
-	variants := make([]ngram, 0, 8)
-	seen := map[ngram]struct{}{}
-	for i := 0; i < (1 << ngramSize); i++ {
-		var variant [ngramSize]byte
-		for j := 0; j < ngramSize; j++ {
-			c := asBytes[j]
-			if i&(1<<uint(j)) != 0 {
-				if hasCase(c) {
-					c = flipCase(c)
-				}
-			}
-			variant[j] = c
-		}
-
-		next := bytesToNGram(variant[:])
-		if _, ok := seen[next]; !ok {
-			variants = append(variants, next)
-			seen[next] = struct{}{}
-		}
-	}
-
-	return variants
-}
-
 func (data *indexData) ngramFrequency(ng ngram, filename bool) uint32 {
 	if filename {
 		return uint32(len(data.fileNameNgrams[ng]))
