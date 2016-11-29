@@ -25,7 +25,7 @@ import (
 	"github.com/google/zoekt"
 )
 
-func (s *Server) formatResults(result *zoekt.SearchResult, localPrint bool) ([]*FileMatch, error) {
+func (s *Server) formatResults(result *zoekt.SearchResult, query string, localPrint bool) ([]*FileMatch, error) {
 	var fmatches []*FileMatch
 
 	templateMap := map[string]*template.Template{}
@@ -56,6 +56,7 @@ func (s *Server) formatResults(result *zoekt.SearchResult, localPrint bool) ([]*
 			v := make(url.Values)
 			v.Add("r", repo)
 			v.Add("f", filename)
+			v.Add("q", query)
 			if len(branches) > 0 {
 				v.Add("b", branches[0])
 			}

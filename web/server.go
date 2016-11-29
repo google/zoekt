@@ -232,7 +232,7 @@ func (s *Server) serveSearchErr(w http.ResponseWriter, r *http.Request) error {
 		result.Files = result.Files[:num]
 	}
 
-	fileMatches, err := s.formatResults(result, s.Print)
+	fileMatches, err := s.formatResults(result, queryStr, s.Print)
 	if err != nil {
 		return err
 	}
