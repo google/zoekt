@@ -179,14 +179,24 @@ To list repositories, try:
 `,
 
 	"print": `
+<html>
   <head>
     <title>{{.Repo}}:{{.Name}}</title>
   </head>
 <body>{{template "searchbox" .Last}}
- <hr>
+<hr>
+<p>
+  <tt>{{.Repo}} : {{.Name}}</tt>
+</p>
 
+
+<div style="background: #eef;">
 <pre>{{.Content}}
-</pre>`,
+</pre>
+</div>
+</body>
+</html>
+`,
 
 	"about": `
   <head>
