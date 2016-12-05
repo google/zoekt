@@ -199,7 +199,6 @@ func main() {
 	}
 
 	for _, br := range branches {
-		var zero git.Oid
 		var paths []string
 		for p := range opts.SubRepositories {
 			paths = append(paths, p)
@@ -214,12 +213,11 @@ func main() {
 			repo := opts.SubRepositories[p]
 			id := versionMap[br.branch][p]
 
+			// it is possible that 'id' is zero, if this
+			// branch of the manifest doesn't have this
+			// particular subrepository.
 			hasher.Write([]byte(p))
 			hasher.Write([]byte(id.String()))
-
-			if id.String() == zero.String() {
-				log.Panicf("sub project path %q has zero ID.")
-			}
 			repo.Branches = append(repo.Branches, zoekt.RepositoryBranch{
 				Name:    br.branch,
 				Version: id.String(),
@@ -230,7 +228,6 @@ func main() {
 			Name:    br.branch,
 			Version: fmt.Sprintf("%x", hasher.Sum(nil)),
 		})
-
 	}
 
 	// key => branch
