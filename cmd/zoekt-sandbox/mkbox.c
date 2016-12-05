@@ -34,6 +34,9 @@
 
 /* can't find headers for these, but they're in glibc... */
 int pivot_root(const char *new_root, const char *put_old);
+
+/* provided by sys/capability.h (libcap-dev), but provided here for
+   easy compilation. */
 int capset(cap_user_header_t h, cap_user_data_t d);
 int capset(cap_user_header_t h, cap_user_data_t d);
 
