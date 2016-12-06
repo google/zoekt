@@ -213,6 +213,9 @@ func TestBasic(t *testing.T) {
 			"repo-url\">name",
 			"1 files (36)",
 		},
+		"/search?q=magic": []string{
+			`value=magic`,
+		},
 	} {
 		res, err := http.Get(ts.URL + req)
 		if err != nil {

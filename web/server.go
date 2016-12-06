@@ -296,14 +296,17 @@ func (s *Server) serveSearchBoxErr(w http.ResponseWriter, r *http.Request) error
 		Uptime:  time.Now().Sub(s.startTime),
 	}
 
-	custom := s.HostCustomQueries[r.Host]
-	if custom == "" {
-		host, _, _ := net.SplitHostPort(r.Host)
-		custom = s.HostCustomQueries[host]
-	}
+	d.Last.Query = r.URL.Query().Get("q")
+	if d.Last.Query == "" {
+		custom := s.HostCustomQueries[r.Host]
+		if custom == "" {
+			host, _, _ := net.SplitHostPort(r.Host)
+			custom = s.HostCustomQueries[host]
+		}
 
-	if custom != "" {
-		d.Last.Query = custom + " "
+		if custom != "" {
+			d.Last.Query = custom + " "
+		}
 	}
 
 	var buf bytes.Buffer
