@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"log"
 	"regexp"
-	"strings"
 
 	"github.com/google/zoekt/query"
 )
@@ -183,22 +182,6 @@ func (data *indexData) getBruteForceFileNameDocIterator(query *query.Substring) 
 	}
 
 	return &bruteForceIter{cands}
-}
-
-func (data *indexData) getFileNameDocIterator(query *query.Substring) docIterator {
-	if len(query.Pattern) < ngramSize {
-		return data.getBruteForceFileNameDocIterator(query)
-	}
-	str := strings.ToLower(query.Pattern) // TODO - UTF-8
-	di := &ngramDocIterator{
-		query:    query,
-		distance: uint32(len(str)) - ngramSize,
-		ends:     data.fileNameIndex[1:],
-		first:    data.fileNameNgrams[stringToNGram(str[:ngramSize])],
-		last:     data.fileNameNgrams[stringToNGram(str[len(str)-ngramSize:])],
-	}
-
-	return di
 }
 
 const maxUInt32 = 0xffffffff
