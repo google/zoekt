@@ -90,6 +90,29 @@ func (s *compoundSection) writeStrings(w *writer, strs []*searchableString) {
 	s.end(w)
 }
 
+func writePostings(w *writer, s *postingsBuilder, ngramText *simpleSection,
+	postings *compoundSection) {
+	var keys ngramSlice
+	for k := range s.postings {
+		keys = append(keys, k)
+	}
+	sort.Sort(keys)
+
+	ngramText.start(w)
+	for _, k := range keys {
+		var buf [8]byte
+		binary.BigEndian.PutUint64(buf[:], uint64(k))
+		w.Write(buf[:])
+	}
+	ngramText.end(w)
+
+	postings.start(w)
+	for _, k := range keys {
+		postings.addItem(w, s.postings[k])
+	}
+	postings.end(w)
+}
+
 func (b *IndexBuilder) Write(out io.Writer) error {
 	buffered := bufio.NewWriterSize(out, 1<<20)
 	defer buffered.Flush()
@@ -117,48 +140,12 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 	}
 	toc.fileSections.end(w)
 
-	var keys ngramSlice
-	for k := range b.contentPostings {
-		keys = append(keys, k)
-	}
-	sort.Sort(keys)
-
-	toc.ngramText.start(w)
-	for _, k := range keys {
-		var buf [8]byte
-		binary.BigEndian.PutUint64(buf[:], uint64(k))
-		w.Write(buf[:])
-	}
-	toc.ngramText.end(w)
-
-	toc.postings.start(w)
-	for _, k := range keys {
-		toc.postings.addItem(w, b.contentPostings[k])
-	}
-	toc.postings.end(w)
+	writePostings(w, b.contents, &toc.ngramText, &toc.postings)
 
 	// names.
 	toc.fileNames.writeStrings(w, b.fileNames)
 
-	keys = keys[:0]
-	for k := range b.namePostings {
-		keys = append(keys, k)
-	}
-	sort.Sort(keys)
-
-	toc.nameNgramText.start(w)
-	for _, k := range keys {
-		var buf [8]byte
-		binary.BigEndian.PutUint64(buf[:], uint64(k))
-		w.Write(buf[:])
-	}
-	toc.nameNgramText.end(w)
-
-	toc.namePostings.start(w)
-	for _, k := range keys {
-		toc.namePostings.addItem(w, b.namePostings[k])
-	}
-	toc.namePostings.end(w)
+	writePostings(w, b.names, &toc.nameNgramText, &toc.namePostings)
 
 	toc.subRepos.start(w)
 	w.Write(toSizedDeltas(b.subRepos))

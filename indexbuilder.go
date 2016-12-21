@@ -30,20 +30,24 @@ const ngramSize = 3
 type searchableString struct {
 	// lower cased data.
 	data []byte
-
-	// offset of the content
-	offset uint32
 }
 
-func (e *searchableString) end() uint32 {
-	return e.offset + uint32(len(e.data))
+type postingsBuilder struct {
+	postings    map[ngram][]byte
+	lastOffsets map[ngram]uint32
+	end         uint32 // in bytes
 }
 
-func newSearchableString(data []byte, startOff uint32, postings map[ngram][]byte,
-	lastOffsets map[ngram]uint32) *searchableString {
+func newPostingsBuilder() *postingsBuilder {
+	return &postingsBuilder{
+		postings:    map[ngram][]byte{},
+		lastOffsets: map[ngram]uint32{},
+	}
+}
+
+func (s *postingsBuilder) newSearchableString(data []byte) *searchableString {
 	dest := searchableString{
-		offset: startOff,
-		data:   data,
+		data: data,
 	}
 	var buf [8]byte
 	var runeGram [3]rune
@@ -62,12 +66,15 @@ func newSearchableString(data []byte, startOff uint32, postings map[ngram][]byte
 		}
 
 		ng := runesToNGram(runeGram)
-		lastOff := lastOffsets[ng]
-		newOff := startOff + off[0]
+		lastOff := s.lastOffsets[ng]
+		newOff := s.end + off[0]
 		m := binary.PutUvarint(buf[:], uint64(newOff-lastOff))
-		postings[ng] = append(postings[ng], buf[:m]...)
-		lastOffsets[ng] = newOff
+		s.postings[ng] = append(s.postings[ng], buf[:m]...)
+		s.lastOffsets[ng] = newOff
 	}
+
+	s.end += uint32(len(data))
+
 	return &dest
 }
 
@@ -83,13 +90,8 @@ type IndexBuilder struct {
 	branchMasks []uint32
 	subRepos    []uint32
 
-	// ngram => posting.
-	contentPostings    map[ngram][]byte
-	contentLastOffsets map[ngram]uint32
-
-	// like postings, but for filenames
-	namePostings    map[ngram][]byte
-	nameLastOffsets map[ngram]uint32
+	contents *postingsBuilder
+	names    *postingsBuilder
 
 	// root repository
 	repo Repository
@@ -118,10 +120,8 @@ func (b *IndexBuilder) ContentSize() uint32 {
 // Repository contains repo metadata, and may be set to nil.
 func NewIndexBuilder(r *Repository) (*IndexBuilder, error) {
 	b := &IndexBuilder{
-		contentPostings:    make(map[ngram][]byte),
-		namePostings:       make(map[ngram][]byte),
-		contentLastOffsets: make(map[ngram]uint32),
-		nameLastOffsets:    make(map[ngram]uint32),
+		contents: newPostingsBuilder(),
+		names:    newPostingsBuilder(),
 	}
 
 	if r == nil {
@@ -279,12 +279,10 @@ func (b *IndexBuilder) Add(doc Document) error {
 
 	b.subRepos = append(b.subRepos, subRepoIdx)
 
-	b.files = append(b.files, newSearchableString(doc.Content, b.contentEnd, b.contentPostings, b.contentLastOffsets))
-	b.fileNames = append(b.fileNames, newSearchableString([]byte(doc.Name), b.nameEnd, b.namePostings, b.nameLastOffsets))
+	b.files = append(b.files, b.contents.newSearchableString(doc.Content))
+	b.fileNames = append(b.fileNames, b.names.newSearchableString([]byte(doc.Name)))
 
 	b.docSections = append(b.docSections, doc.Symbols)
-	b.contentEnd += uint32(len(doc.Content))
-	b.nameEnd += uint32(len(doc.Name))
 
 	b.branchMasks = append(b.branchMasks, mask)
 	return nil
