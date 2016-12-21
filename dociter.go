@@ -29,27 +29,33 @@ var _ = log.Println
 type candidateMatch struct {
 	caseSensitive bool
 	fileName      bool
+	isASCIISubstr bool
 
 	substrBytes   []byte
 	substrLowered []byte
 
 	file uint32
 
-	// Offset is relative to the start of the filename or file contents.
-	offset  uint32
-	matchSz uint32
+	// Offsets are relative to the start of the filename or file contents.
+	runeOffset  uint32
+	byteOffset  uint32
+	byteMatchSz uint32
 }
 
 func (m *candidateMatch) String() string {
-	return fmt.Sprintf("%d:%d", m.file, m.offset)
+	return fmt.Sprintf("%d:%d", m.file, m.runeOffset)
 }
 
 func (m *candidateMatch) matchContent(content []byte) bool {
 	if m.caseSensitive {
-		comp := bytes.Compare(content[m.offset:m.offset+uint32(m.matchSz)], m.substrBytes) == 0
+		comp := bytes.Compare(content[m.byteOffset:m.byteOffset+uint32(m.byteMatchSz)], m.substrBytes) == 0
 		return comp
 	} else {
-		return caseFoldingEqualsBytes(m.substrLowered, content[m.offset:m.offset+uint32(m.matchSz)])
+		if m.isASCIISubstr {
+			return caseFoldingEqualsASCII(m.substrLowered, content[m.byteOffset:m.byteOffset+uint32(m.byteMatchSz)])
+		}
+
+		return caseFoldingEqualsRunes(m.substrLowered, content[m.byteOffset:m.byteOffset+uint32(m.byteMatchSz)])
 	}
 }
 
@@ -60,7 +66,7 @@ func (m *candidateMatch) matchContent(content []byte) bool {
 // (if matching the last line of the file.)
 func (m *candidateMatch) line(newlines []uint32, fileSize uint32) (lineNum, lineStart, lineEnd int) {
 	idx := sort.Search(len(newlines), func(n int) bool {
-		return newlines[n] >= m.offset
+		return newlines[n] >= m.byteOffset
 	})
 
 	end := int(fileSize)
@@ -84,7 +90,8 @@ type docIterator interface {
 }
 
 type ngramDocIterator struct {
-	query *query.Substring
+	ng1, ng2 ngram
+	query    *query.Substring
 
 	leftPad  uint32
 	rightPad uint32
@@ -107,6 +114,8 @@ func (s *ngramDocIterator) coversContent() bool {
 func (s *ngramDocIterator) next() []*candidateMatch {
 	patBytes := []byte(s.query.Pattern)
 	lowerPatBytes := toLower(patBytes)
+
+	isASCIIPattern := isASCII(lowerPatBytes)
 
 	var candidates []*candidateMatch
 	for {
@@ -136,18 +145,19 @@ func (s *ngramDocIterator) next() []*candidateMatch {
 				continue
 			}
 
-			candidates = append(candidates,
-				&candidateMatch{
-					caseSensitive: s.query.CaseSensitive,
-					fileName:      s.query.FileName,
-					substrBytes:   patBytes,
-					substrLowered: lowerPatBytes,
-					matchSz:       uint32(len(lowerPatBytes)),
-					file:          uint32(s.fileIdx),
-					offset:        p1 - fileStart - s.leftPad,
-				})
+			cand := &candidateMatch{
+				caseSensitive: s.query.CaseSensitive,
+				fileName:      s.query.FileName,
+				substrBytes:   patBytes,
+				substrLowered: lowerPatBytes,
+				// TODO - this is wrong for casefolding searches.
+				byteMatchSz:   uint32(len(lowerPatBytes)),
+				file:          uint32(s.fileIdx),
+				runeOffset:    p1 - fileStart - s.leftPad,
+				isASCIISubstr: isASCIIPattern,
+			}
+			candidates = append(candidates, cand)
 		}
 	}
-
 	return candidates
 }

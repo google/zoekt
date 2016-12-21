@@ -21,6 +21,7 @@ import (
 	"log"
 	"path/filepath"
 	"sort"
+	"unicode/utf8"
 )
 
 var _ = log.Println
@@ -62,37 +63,37 @@ func (s *postingsBuilder) newSearchableString(data []byte) *searchableString {
 	}
 	var buf [8]byte
 	var runeGram [3]rune
-	var off [3]uint32 // byte offsets relative to start of data.
 
-	rune := 0
-	for i, c := range string(dest.data) {
-		runeGram[0] = runeGram[1]
-		off[0] = off[1]
-		runeGram[1] = runeGram[2]
-		off[1] = off[2]
-		runeGram[2] = c
-		off[2] = uint32(i)
-		rune++
+	runeIndex := -1
+
+	dataSz := uint32(len(data))
+	i := 0
+	for len(data) > 0 {
+		c, sz := utf8.DecodeRune(data)
+		data = data[sz:]
+
+		runeGram[0], runeGram[1], runeGram[2] = runeGram[1], runeGram[2], c
+		runeIndex++
 
 		s.runeCount++
 		if idx := s.runeCount - 1; idx%runeOffsetFrequency == 0 {
 			s.runeOffsets = append(s.runeOffsets, s.end+uint32(i))
 		}
+		i += sz
 
-		if rune < ngramSize {
+		if runeIndex < 2 {
 			continue
 		}
 
 		ng := runesToNGram(runeGram)
 		lastOff := s.lastOffsets[ng]
-		newOff := s.end + off[0]
+		newOff := s.end + uint32(runeIndex) - 2
 		m := binary.PutUvarint(buf[:], uint64(newOff-lastOff))
 		s.postings[ng] = append(s.postings[ng], buf[:m]...)
 		s.lastOffsets[ng] = newOff
 	}
 
-	s.end += uint32(len(data))
-
+	s.end += dataSz
 	return &dest
 }
 
@@ -222,11 +223,13 @@ func IsText(content []byte) bool {
 	trigrams := map[ngram]struct{}{}
 
 	lineSize := 0
-	for i := 0; i < len(content)-ngramSize; i++ {
-		if content[i] == 0 {
+
+	var cur [3]rune
+	for len(content) > 0 {
+		if content[0] == 0 {
 			return false
 		}
-		if content[i] == '\n' {
+		if content[0] == '\n' {
 			lineSize = 0
 		} else {
 			lineSize++
@@ -235,8 +238,19 @@ func IsText(content []byte) bool {
 			return false
 		}
 
-		trigrams[bytesToNGram(content[i:i+ngramSize])] = struct{}{}
+		r, sz := utf8.DecodeRune(content)
+		if r == utf8.RuneError {
+			return false
+		}
+		content = content[sz:]
 
+		cur[0], cur[1], cur[2] = cur[1], cur[2], r
+		if cur[0] == 0 {
+			// start of file.
+			continue
+		}
+
+		trigrams[runesToNGram(cur)] = struct{}{}
 		if len(trigrams) > maxTrigramCount {
 			// probably not text.
 			return false

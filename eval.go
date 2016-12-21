@@ -253,6 +253,11 @@ func (p *contentProvider) evalContentMatches(s *substrMatchTree) {
 			}
 		}
 		s.current = pruned
+	} else {
+		// TODO - this side effect is kind of hidden and surprising.
+		for _, cm := range s.current {
+			cm.byteOffset = p.findOffset(cm.fileName, cm.runeOffset)
+		}
 	}
 	s.contEvaluated = true
 }
@@ -261,9 +266,9 @@ func (p *contentProvider) evalRegexpMatches(s *regexpMatchTree) {
 	idxs := s.regexp.FindAllIndex(p.data(s.fileName), -1)
 	for _, idx := range idxs {
 		s.found = append(s.found, &candidateMatch{
-			offset:   uint32(idx[0]),
-			matchSz:  uint32(idx[1] - idx[0]),
-			fileName: s.fileName,
+			byteOffset:  uint32(idx[0]),
+			byteMatchSz: uint32(idx[1] - idx[0]),
+			fileName:    s.fileName,
 		})
 	}
 	s.reEvaluated = true
@@ -580,7 +585,6 @@ nextFileMatch:
 			// TODO - this may evaluate too much.
 			cp.evalContentMatches(st)
 		}
-
 		if len(regexpAtoms) > 0 {
 			if v, ok := evalMatchTree(known, mt); ok && !v {
 				continue nextFileMatch
@@ -705,7 +709,7 @@ type sortByOffsetSlice []*candidateMatch
 func (m sortByOffsetSlice) Len() int      { return len(m) }
 func (m sortByOffsetSlice) Swap(i, j int) { m[i], m[j] = m[j], m[i] }
 func (m sortByOffsetSlice) Less(i, j int) bool {
-	return m[i].offset < m[j].offset
+	return m[i].byteOffset < m[j].byteOffset
 }
 
 // Gather matches from this document. This never returns a mixture of
@@ -749,11 +753,11 @@ func gatherMatches(mt matchTree, known map[matchTree]bool) []*candidateMatch {
 			continue
 		}
 		last := res[len(res)-1]
-		lastEnd := last.offset + last.matchSz
-		end := c.offset + c.matchSz
-		if lastEnd >= c.offset {
+		lastEnd := last.byteOffset + last.byteMatchSz
+		end := c.byteOffset + c.byteMatchSz
+		if lastEnd >= c.byteOffset {
 			if end > lastEnd {
-				last.matchSz = end - last.offset
+				last.byteMatchSz = end - last.byteOffset
 			}
 			continue
 		}
