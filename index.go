@@ -34,15 +34,17 @@ type indexData struct {
 
 	newlinesIndex    []uint32
 	docSectionsIndex []uint32
+	runeOffsets      []uint32
 
 	// offsets of file contents. Includes end of last file.
 	boundaries []uint32
 
 	fileEnds []uint32
 
-	fileNameContent []byte
-	fileNameIndex   []uint32
-	fileNameNgrams  map[ngram][]uint32
+	fileNameContent     []byte
+	fileNameIndex       []uint32
+	fileNameNgrams      map[ngram][]uint32
+	fileNameRuneOffsets []uint32
 
 	fileBranchMasks []uint32
 
@@ -70,6 +72,7 @@ func (d *indexData) memoryUse() int {
 	for _, a := range [][]uint32{
 		d.newlinesIndex, d.docSectionsIndex,
 		d.fileEnds, d.fileNameIndex, d.fileBranchMasks,
+		d.runeOffsets, d.fileNameRuneOffsets,
 	} {
 		sz += 4 * len(a)
 	}

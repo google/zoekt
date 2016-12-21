@@ -185,7 +185,6 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 	}
 
 	fileNamePostingsIndex := toc.namePostings.relativeIndex()
-
 	for i := 0; i < len(nameNgramText); i += ngramEncoding {
 		j := i / ngramEncoding
 		off := fileNamePostingsIndex[j]
@@ -200,10 +199,16 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 		d.branchNames[id] = br.Name
 	}
 
-	if blob, err := d.readSectionBlob(toc.subRepos); err != nil {
-		return nil, err
-	} else {
-		d.subRepos = fromSizedDeltas(blob, nil)
+	for sect, dest := range map[simpleSection]*[]uint32{
+		toc.subRepos:        &d.subRepos,
+		toc.runeOffsets:     &d.runeOffsets,
+		toc.nameRuneOffsets: &d.fileNameRuneOffsets,
+	} {
+		if blob, err := d.readSectionBlob(sect); err != nil {
+			return nil, err
+		} else {
+			*dest = fromSizedDeltas(blob, nil)
+		}
 	}
 
 	var keys []string

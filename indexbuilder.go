@@ -32,9 +32,20 @@ type searchableString struct {
 	data []byte
 }
 
+// Store character (unicode codepoint) offset (in bytes) this often.
+const runeOffsetFrequency = 100
+
 type postingsBuilder struct {
 	postings    map[ngram][]byte
 	lastOffsets map[ngram]uint32
+
+	// To support UTF-8 searching, we must map back runes to byte
+	// offsets. As a first attempt, we sample regularly. The
+	// precise offset can be found by walking from the recorded
+	// offset to the desired rune.  TODO(hanwen): disable the
+	// mapping if the index shard is 100% lo-bit ascii.
+	runeOffsets []uint32
+	runeCount   uint32
 	end         uint32 // in bytes
 }
 
@@ -51,8 +62,9 @@ func (s *postingsBuilder) newSearchableString(data []byte) *searchableString {
 	}
 	var buf [8]byte
 	var runeGram [3]rune
-	var off [3]uint32
-	var runeCount int
+	var off [3]uint32 // byte offsets relative to start of data.
+
+	rune := 0
 	for i, c := range string(dest.data) {
 		runeGram[0] = runeGram[1]
 		off[0] = off[1]
@@ -60,8 +72,14 @@ func (s *postingsBuilder) newSearchableString(data []byte) *searchableString {
 		off[1] = off[2]
 		runeGram[2] = c
 		off[2] = uint32(i)
-		runeCount++
-		if runeCount < ngramSize {
+		rune++
+
+		s.runeCount++
+		if idx := s.runeCount - 1; idx%runeOffsetFrequency == 0 {
+			s.runeOffsets = append(s.runeOffsets, s.end+uint32(i))
+		}
+
+		if rune < ngramSize {
 			continue
 		}
 
