@@ -32,7 +32,7 @@ import (
 // 8: move repoMetaData out of indexMetadata
 // 9: use bigendian uint64 for trigrams.
 // 10: sections for rune offsets.
-const IndexFormatVersion = 8
+const IndexFormatVersion = 10
 
 // FeatureVersion is increased if a feature is added that requires reindexing data.
 const FeatureVersion = 0
