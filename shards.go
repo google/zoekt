@@ -283,9 +283,17 @@ func (ss *shardedSearcher) Search(ctx context.Context, pat query.Q, opts *Search
 
 	defer cancel()
 
+	// For each query, throttle the number of parallel
+	// actions. Since searching is mostly CPU bound, we limit the
+	// number of parallel searches. This reduces the peak working
+	// set, which hopefully stops https://cs.bazel.build from crashing
+	// when looking for the string "com".
+	throttle := make(chan int, 10*runtime.NumCPU())
 	for _, s := range shards {
 		go func(s Searcher) {
+			throttle <- 1
 			defer func() {
+				<-throttle
 				if r := recover(); r != nil {
 					log.Printf("crashed shard: %s: %s, %s", s.String(), r, debug.Stack())
 
@@ -294,6 +302,7 @@ func (ss *shardedSearcher) Search(ctx context.Context, pat query.Q, opts *Search
 					all <- res{&r, nil}
 				}
 			}()
+
 			ms, err := s.Search(childCtx, pat, opts)
 			all <- res{ms, err}
 		}(s)
@@ -339,6 +348,7 @@ func (ss *shardedSearcher) List(ctx context.Context, r query.Q) (*RepoList, erro
 	shards := ss.getShards()
 	shardCount := len(shards)
 	all := make(chan res, shardCount)
+
 	for _, s := range shards {
 		go func(s Searcher) {
 			defer func() {
