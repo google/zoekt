@@ -22,6 +22,8 @@ import (
 	"regexp/syntax"
 	"strings"
 	"testing"
+	"unicode"
+	"unicode/utf8"
 
 	"golang.org/x/net/context"
 
@@ -1218,5 +1220,39 @@ func TestUnicodeNonCoverContent(t *testing.T) {
 
 	if got, want := res.Files[0].LineMatches[0].LineFragments[0].Offset, uint32(strings.Index(string(content), needle)); got != want {
 		t.Errorf("got %d want %d", got, want)
+	}
+}
+
+func TestUnicodeVariableLength(t *testing.T) {
+	var lower, upper rune
+	var buf [4]byte
+	for l := rune(0); l < (1 << 21); l++ {
+		u := unicode.SimpleFold(l)
+
+		lSz := utf8.EncodeRune(buf[:], l)
+		uSz := utf8.EncodeRune(buf[:], u)
+
+		if lSz != uSz {
+			lower = l
+			upper = u
+			t.Logf("char %c (%d sz %d) %c (%d sz %d)", l, l, lSz, u, u, uSz)
+			break
+		}
+	}
+
+	if lower == 0 {
+		t.Fatal("rune not found")
+	}
+	needle := "nee" + string([]rune{lower}) + "eed"
+	corpus := []byte("nee" + string([]rune{upper}) + "eed" +
+		" ee" + string([]rune{lower}) + "ee" +
+		" ee" + string([]rune{upper}) + "ee")
+
+	b := testIndexBuilder(t, nil,
+		Document{Name: "f1", Content: []byte(corpus)})
+
+	res := searchForTest(t, b, &query.Substring{Pattern: needle, Content: true})
+	if len(res.Files) != 1 {
+		t.Fatalf("got %v, wanted 1 match", res.Files)
 	}
 }

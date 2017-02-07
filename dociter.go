@@ -29,7 +29,6 @@ var _ = log.Println
 type candidateMatch struct {
 	caseSensitive bool
 	fileName      bool
-	isASCIISubstr bool
 
 	substrBytes   []byte
 	substrLowered []byte
@@ -48,14 +47,17 @@ func (m *candidateMatch) String() string {
 
 func (m *candidateMatch) matchContent(content []byte) bool {
 	if m.caseSensitive {
-		comp := bytes.Compare(content[m.byteOffset:m.byteOffset+uint32(m.byteMatchSz)], m.substrBytes) == 0
+		comp := bytes.Compare(m.substrBytes, content[m.byteOffset:m.byteOffset+uint32(len(m.substrBytes))]) == 0
 		return comp
 	} else {
-		if m.isASCIISubstr {
-			return caseFoldingEqualsASCII(m.substrLowered, content[m.byteOffset:m.byteOffset+uint32(m.byteMatchSz)])
-		}
-
-		return caseFoldingEqualsRunes(m.substrLowered, content[m.byteOffset:m.byteOffset+uint32(m.byteMatchSz)])
+		// It is tempting to try a simple ASCII based
+		// comparison if possible, but we need more
+		// information. Simple ASCII chars have unicode upper
+		// case variants (the ASCII 'k' has the Kelvin symbol
+		// as upper case variant). We can only degrade to
+		// ASCII if we are sure that both the corpus and the
+		// query is ASCII only
+		return caseFoldingEqualsRunes(m.substrLowered, content[m.byteOffset:])
 	}
 }
 
@@ -115,8 +117,6 @@ func (s *ngramDocIterator) next() []*candidateMatch {
 	patBytes := []byte(s.query.Pattern)
 	lowerPatBytes := toLower(patBytes)
 
-	isASCIIPattern := isASCII(lowerPatBytes)
-
 	var candidates []*candidateMatch
 	for {
 		if len(s.first) == 0 || len(s.last) == 0 {
@@ -151,10 +151,9 @@ func (s *ngramDocIterator) next() []*candidateMatch {
 				substrBytes:   patBytes,
 				substrLowered: lowerPatBytes,
 				// TODO - this is wrong for casefolding searches.
-				byteMatchSz:   uint32(len(lowerPatBytes)),
-				file:          uint32(s.fileIdx),
-				runeOffset:    p1 - fileStart - s.leftPad,
-				isASCIISubstr: isASCIIPattern,
+				byteMatchSz: uint32(len(lowerPatBytes)),
+				file:        uint32(s.fileIdx),
+				runeOffset:  p1 - fileStart - s.leftPad,
 			}
 			candidates = append(candidates, cand)
 		}

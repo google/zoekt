@@ -15,7 +15,6 @@
 package zoekt
 
 import (
-	"log"
 	"unicode"
 	"unicode/utf8"
 )
@@ -64,11 +63,12 @@ func isASCII(in []byte) bool {
 	return true
 }
 
+// compare 'lower' and 'mixed', where 'lower' is thought to be the
+// needle.
 func caseFoldingEqualsASCII(lower, mixed []byte) bool {
-	if len(lower) != len(mixed) {
-		log.Panic("lengths", len(lower), len(mixed))
+	if len(lower) > len(mixed) {
+		return false
 	}
-
 	for i, c := range lower {
 		d := mixed[i]
 		if d >= 'A' && d <= 'Z' {
@@ -82,6 +82,8 @@ func caseFoldingEqualsASCII(lower, mixed []byte) bool {
 	return true
 }
 
+// compare 'lower' and 'mixed', where lower is the needle. 'mixed' may
+// be larger than 'lower'.
 func caseFoldingEqualsRunes(lower, mixed []byte) bool {
 	for len(lower) > 0 && len(mixed) > 0 {
 		lr, lsz := utf8.DecodeRune(lower)
@@ -95,7 +97,7 @@ func caseFoldingEqualsRunes(lower, mixed []byte) bool {
 		}
 	}
 
-	return len(lower) == len(mixed)
+	return len(lower) == 0
 }
 
 type ngram uint64
