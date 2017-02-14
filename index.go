@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"unicode/utf8"
 
 	"github.com/google/zoekt/query"
 )
@@ -86,9 +87,9 @@ func (d *indexData) memoryUse() int {
 func (data *indexData) getDocIterator(q query.Q) (docIterator, error) {
 	switch s := q.(type) {
 	case *query.Substring:
-		if len(s.Pattern) < ngramSize {
+		if utf8.RuneCountInString(s.Pattern) < ngramSize {
 			if !s.FileName {
-				return nil, fmt.Errorf("pattern %q less than %d bytes", s.Pattern, ngramSize)
+				return nil, fmt.Errorf("pattern %q less than %d characters", s.Pattern, ngramSize)
 			}
 
 			return data.getBruteForceFileNameDocIterator(s), nil

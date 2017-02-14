@@ -1256,3 +1256,22 @@ func TestUnicodeVariableLength(t *testing.T) {
 		t.Fatalf("got %v, wanted 1 match", res.Files)
 	}
 }
+
+func TestShortUnicode(t *testing.T) {
+	world := "世界"
+	content := []byte("world = " + world)
+	// ----------------012345678901234
+	b := testIndexBuilder(t, nil,
+		Document{
+			Name:    "f1",
+			Content: content,
+		})
+	q := &query.Substring{Pattern: world}
+
+	searcher := searcherForTest(t, b)
+	var opts SearchOptions
+	_, err := searcher.Search(context.Background(), q, &opts)
+	if err == nil {
+		t.Error("search should have failed")
+	}
+}
