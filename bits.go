@@ -126,7 +126,8 @@ func ngramToRunes(n ngram) [ngramSize]rune {
 }
 
 func (n ngram) String() string {
-	return string(ngramToBytes(n))
+	rs := ngramToRunes(n)
+	return string(rs[:])
 }
 
 type runeNgramOff struct {
