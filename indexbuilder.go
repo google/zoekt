@@ -47,7 +47,9 @@ type postingsBuilder struct {
 	// mapping if the index shard is 100% lo-bit ascii.
 	runeOffsets []uint32
 	runeCount   uint32
-	end         uint32 // in bytes
+
+	endRunes []uint32
+	endByte  uint32
 }
 
 func newPostingsBuilder() *postingsBuilder {
@@ -68,6 +70,8 @@ func (s *postingsBuilder) newSearchableString(data []byte) *searchableString {
 
 	dataSz := uint32(len(data))
 	i := 0
+
+	endRune := s.runeCount
 	for len(data) > 0 {
 		c, sz := utf8.DecodeRune(data)
 		data = data[sz:]
@@ -77,7 +81,7 @@ func (s *postingsBuilder) newSearchableString(data []byte) *searchableString {
 
 		s.runeCount++
 		if idx := s.runeCount - 1; idx%runeOffsetFrequency == 0 {
-			s.runeOffsets = append(s.runeOffsets, s.end+uint32(i))
+			s.runeOffsets = append(s.runeOffsets, s.endByte+uint32(i))
 		}
 		i += sz
 
@@ -87,13 +91,15 @@ func (s *postingsBuilder) newSearchableString(data []byte) *searchableString {
 
 		ng := runesToNGram(runeGram)
 		lastOff := s.lastOffsets[ng]
-		newOff := s.end + uint32(runeIndex) - 2
+		newOff := endRune + uint32(runeIndex) - 2
+
 		m := binary.PutUvarint(buf[:], uint64(newOff-lastOff))
 		s.postings[ng] = append(s.postings[ng], buf[:m]...)
 		s.lastOffsets[ng] = newOff
 	}
 
-	s.end += dataSz
+	s.endRunes = append(s.endRunes, s.runeCount)
+	s.endByte += dataSz
 	return &dest
 }
 
@@ -311,9 +317,11 @@ func (b *IndexBuilder) Add(doc Document) error {
 
 	b.subRepos = append(b.subRepos, subRepoIdx)
 
-	b.files = append(b.files, b.contents.newSearchableString(doc.Content))
-	b.fileNames = append(b.fileNames, b.names.newSearchableString([]byte(doc.Name)))
+	docStr := b.contents.newSearchableString(doc.Content)
+	b.files = append(b.files, docStr)
 
+	nameStr := b.names.newSearchableString([]byte(doc.Name))
+	b.fileNames = append(b.fileNames, nameStr)
 	b.docSections = append(b.docSections, doc.Symbols)
 
 	b.branchMasks = append(b.branchMasks, mask)

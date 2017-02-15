@@ -40,12 +40,14 @@ type indexData struct {
 	// offsets of file contents. Includes end of last file.
 	boundaries []uint32
 
-	fileEnds []uint32
+	fileEnds     []uint32
+	fileEndRunes []uint32
 
 	fileNameContent     []byte
 	fileNameIndex       []uint32
 	fileNameNgrams      map[ngram][]uint32
 	fileNameRuneOffsets []uint32
+	fileNameEndRunes    []uint32
 
 	fileBranchMasks []uint32
 
@@ -74,6 +76,7 @@ func (d *indexData) memoryUse() int {
 		d.newlinesIndex, d.docSectionsIndex,
 		d.fileEnds, d.fileNameIndex, d.fileBranchMasks,
 		d.runeOffsets, d.fileNameRuneOffsets,
+		d.fileEndRunes, d.fileNameEndRunes,
 	} {
 		sz += 4 * len(a)
 	}
@@ -218,9 +221,9 @@ func (data *indexData) getNgramDocIterator(query *query.Substring) (docIterator,
 	}
 
 	if query.FileName {
-		input.ends = data.fileNameIndex[1:]
+		input.ends = data.fileNameEndRunes
 	} else {
-		input.ends = data.fileEnds
+		input.ends = data.fileEndRunes
 	}
 
 	str := query.Pattern
@@ -256,7 +259,7 @@ func (data *indexData) getNgramDocIterator(query *query.Substring) (docIterator,
 	lastNG := ngramOffs[lastI].ngram
 	input.distance = lastI - firstI
 	input.leftPad = firstI
-	input.rightPad = uint32(len(str)-ngramSize) - lastI
+	input.rightPad = uint32(utf8.RuneCountInString(str)-ngramSize) - lastI
 
 	postings, err := data.readPostings(firstNG, query.CaseSensitive, query.FileName)
 	if err != nil {

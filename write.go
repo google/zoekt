@@ -32,7 +32,8 @@ import (
 // 8: move repoMetaData out of indexMetadata
 // 9: use bigendian uint64 for trigrams.
 // 10: sections for rune offsets.
-const IndexFormatVersion = 10
+// 11: file ends in rune offsets.
+const IndexFormatVersion = 11
 
 // FeatureVersion is increased if a feature is added that requires reindexing data.
 const FeatureVersion = 0
@@ -47,6 +48,7 @@ type indexTOC struct {
 	newlines     compoundSection
 	ngramText    simpleSection
 	runeOffsets  simpleSection
+	fileEndRunes simpleSection
 
 	branchMasks simpleSection
 	subRepos    simpleSection
@@ -56,6 +58,7 @@ type indexTOC struct {
 	nameRuneOffsets simpleSection
 	metaData        simpleSection
 	repoMetaData    simpleSection
+	nameEndRunes    simpleSection
 }
 
 func (t *indexTOC) sections() []section {
@@ -76,6 +79,8 @@ func (t *indexTOC) sections() []section {
 		&t.subRepos,
 		&t.runeOffsets,
 		&t.nameRuneOffsets,
+		&t.fileEndRunes,
+		&t.nameEndRunes,
 	}
 }
 
@@ -96,8 +101,7 @@ func (s *compoundSection) writeStrings(w *writer, strs []*searchableString) {
 }
 
 func writePostings(w *writer, s *postingsBuilder, ngramText *simpleSection,
-	charOffsets *simpleSection,
-	postings *compoundSection) {
+	charOffsets *simpleSection, postings *compoundSection, endRunes *simpleSection) {
 	var keys ngramSlice
 	for k := range s.postings {
 		keys = append(keys, k)
@@ -121,6 +125,10 @@ func writePostings(w *writer, s *postingsBuilder, ngramText *simpleSection,
 	charOffsets.start(w)
 	w.Write(toSizedDeltas(s.runeOffsets))
 	charOffsets.end(w)
+
+	endRunes.start(w)
+	w.Write(toSizedDeltas(s.endRunes))
+	endRunes.end(w)
 }
 
 func (b *IndexBuilder) Write(out io.Writer) error {
@@ -150,12 +158,12 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 	}
 	toc.fileSections.end(w)
 
-	writePostings(w, b.contents, &toc.ngramText, &toc.runeOffsets, &toc.postings)
+	writePostings(w, b.contents, &toc.ngramText, &toc.runeOffsets, &toc.postings, &toc.fileEndRunes)
 
 	// names.
 	toc.fileNames.writeStrings(w, b.fileNames)
 
-	writePostings(w, b.names, &toc.nameNgramText, &toc.nameRuneOffsets, &toc.namePostings)
+	writePostings(w, b.names, &toc.nameNgramText, &toc.nameRuneOffsets, &toc.namePostings, &toc.nameEndRunes)
 
 	toc.subRepos.start(w)
 	w.Write(toSizedDeltas(b.subRepos))

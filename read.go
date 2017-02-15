@@ -203,6 +203,8 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 		toc.subRepos:        &d.subRepos,
 		toc.runeOffsets:     &d.runeOffsets,
 		toc.nameRuneOffsets: &d.fileNameRuneOffsets,
+		toc.nameEndRunes:    &d.fileNameEndRunes,
+		toc.fileEndRunes:    &d.fileEndRunes,
 	} {
 		if blob, err := d.readSectionBlob(sect); err != nil {
 			return nil, err
