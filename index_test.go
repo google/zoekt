@@ -1297,3 +1297,26 @@ func TestUnicodeFileStartOffsets(t *testing.T) {
 		t.Fatalf("got %v, wanted 1 match", res.Files)
 	}
 }
+
+func TestLongFileUTF8(t *testing.T) {
+	needle := "neeedle"
+
+	// 6 bytes.
+	unicode := "世界"
+	content := []byte(strings.Repeat(unicode, 100) + needle)
+	b := testIndexBuilder(t, nil,
+		Document{
+			Name:    "f1",
+			Content: []byte(strings.Repeat("a", 50)),
+		},
+		Document{
+			Name:    "f2",
+			Content: content,
+		})
+
+	q := &query.Substring{Pattern: needle, Content: true}
+	res := searchForTest(t, b, q)
+	if len(res.Files) != 1 {
+		t.Errorf("got %v, want 1 result", res)
+	}
+}

@@ -82,23 +82,41 @@ func (p *contentProvider) data(fileName bool) []byte {
 	return p._data
 }
 
+// Find offset in bytes (relative to file start) for an offset in
+// runes (relative to file start).
 func (p *contentProvider) findOffset(filename bool, r uint32) uint32 {
 	sample := p.id.runeOffsets
+	runeEnds := p.id.fileEndRunes
+	fileStartByte := p.id.boundaries[p.idx]
 	if filename {
 		sample = p.id.fileNameRuneOffsets
+		runeEnds = p.id.fileNameEndRunes
+		fileStartByte = p.id.fileNameIndex[p.idx]
 	}
-	start := sample[r/runeOffsetFrequency]
-	left := r % runeOffsetFrequency
 
-	data := p.data(filename)[start:]
+	absR := r
+	if p.idx > 0 {
+		absR += runeEnds[p.idx-1]
+	}
+
+	byteOff := sample[absR/runeOffsetFrequency]
+	left := absR % runeOffsetFrequency
+
+	var data []byte
+	data, p.err = p.id.readContentSlice(byteOff, 3*runeOffsetFrequency)
+	if p.err != nil {
+		return 0
+	}
+
 	for left > 0 {
 		_, sz := utf8.DecodeRune(data)
-		start += uint32(sz)
+		byteOff += uint32(sz)
 		data = data[sz:]
 		left--
 	}
 
-	return start
+	byteOff -= fileStartByte
+	return byteOff
 }
 
 func (p *contentProvider) matchContent(m *candidateMatch) bool {

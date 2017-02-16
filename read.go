@@ -259,6 +259,14 @@ func (d *indexData) readContents(i uint32) ([]byte, error) {
 	})
 }
 
+func (d *indexData) readContentSlice(off uint32, sz uint32) ([]byte, error) {
+	// TODO(hanwen): cap result if it is at the end of the content
+	// section.
+	return d.readSectionBlob(simpleSection{
+		off: d.boundaries[0] + off,
+		sz:  sz})
+}
+
 func (d *indexData) readNewlines(i uint32, buf []uint32) ([]uint32, error) {
 	blob, err := d.readSectionBlob(simpleSection{
 		off: d.newlinesIndex[i],
