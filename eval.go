@@ -497,6 +497,11 @@ func (d *indexData) Search(ctx context.Context, q query.Q, opts *SearchOptions) 
 		return &res, nil
 	}
 
+	if opts.EstimateDocCount {
+		res.Stats.ShardFilesConsidered = len(d.fileBranchMasks)
+		return &res, nil
+	}
+
 	q = query.Map(q, query.ExpandFileContent)
 
 	atoms := map[*substrMatchTree]struct{}{}

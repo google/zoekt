@@ -1320,3 +1320,30 @@ func TestLongFileUTF8(t *testing.T) {
 		t.Errorf("got %v, want 1 result", res)
 	}
 }
+
+func TestEstimateDocCount(t *testing.T) {
+	content := []byte("bla needle bla")
+	b := testIndexBuilder(t, &Repository{Name: "reponame"},
+		Document{Name: "f1", Content: content},
+		Document{Name: "f2", Content: content},
+	)
+
+	if sres := searchForTest(t, b,
+		query.NewAnd(
+			&query.Substring{Pattern: "needle"},
+			&query.Repo{Pattern: "reponame"},
+		), SearchOptions{
+			EstimateDocCount: true,
+		}); sres.Stats.ShardFilesConsidered != 2 {
+		t.Errorf("got FilesConsidered = %d, want 2", sres.Stats.FilesConsidered)
+	}
+	if sres := searchForTest(t, b,
+		query.NewAnd(
+			&query.Substring{Pattern: "needle"},
+			&query.Repo{Pattern: "nomatch"},
+		), SearchOptions{
+			EstimateDocCount: true,
+		}); sres.Stats.ShardFilesConsidered != 0 {
+		t.Errorf("got FilesConsidered = %d, want 0", sres.Stats.FilesConsidered)
+	}
+}

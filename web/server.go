@@ -202,27 +202,31 @@ func (s *Server) serveSearchErr(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	sOpts := zoekt.SearchOptions{
-		ShardMaxImportantMatch: num / 10,
-		MaxWallTime:            10 * time.Second,
+		MaxWallTime: 10 * time.Second,
 	}
 
-	repoFound := false
-	query.VisitAtoms(q, func(q query.Q) {
-		if _, ok := q.(*query.Repo); ok {
-			repoFound = true
-		}
-	})
-
-	if !repoFound {
-		// If the search is not restricted to any repo, we
-		// assume the user doesn't really know what they are
-		// looking for, so we restrict the number of matches
-		// to avoid overwhelming the search engine.
-		sOpts.ShardMaxMatchCount = num * 10
-	}
 	sOpts.SetDefaults()
 
 	ctx := context.Background()
+	if result, err := s.Searcher.Search(ctx, q, &zoekt.SearchOptions{EstimateDocCount: true}); err != nil {
+		return err
+	} else if numdocs := result.ShardFilesConsidered; numdocs > 10000 {
+		// If the search touches many shards and many files, we
+		// have to limit the number of matches.  This setting
+		// is based on the number of documents eligible after
+		// considering reponames, so large repos (both
+		// android, chromium are about 500k files) aren't
+		// covered fairly.
+
+		// 10k docs, 50 num -> max match = (250 + 250 / 10)
+		sOpts.ShardMaxMatchCount = num*5 + (5*num)/(numdocs/1000)
+
+		// 10k docs, 50 num -> max important match = 4
+		sOpts.ShardMaxImportantMatch = num/20 + num/(numdocs/500)
+	} else {
+		sOpts.ShardMaxImportantMatch = 100
+	}
+
 	result, err := s.Searcher.Search(ctx, q, &sOpts)
 	if err != nil {
 		return err
