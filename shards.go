@@ -64,6 +64,7 @@ func loadShard(fn string) (*searchShard, error) {
 	}
 	s, err := NewSearcher(iFile)
 	if err != nil {
+		iFile.Close()
 		return nil, fmt.Errorf("NewSearcher(%s): %v", fn, err)
 	}
 
