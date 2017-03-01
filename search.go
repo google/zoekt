@@ -82,8 +82,9 @@ func (p *contentProvider) data(fileName bool) []byte {
 	return p._data
 }
 
-// Find offset in bytes (relative to file start) for an offset in
-// runes (relative to file start).
+// Find offset in bytes (relative to corpus start) for an offset in
+// runes (relative to document start). If filename is set, the corpus
+// is the set of filenames, with the document being the name itself.
 func (p *contentProvider) findOffset(filename bool, r uint32) uint32 {
 	sample := p.id.runeOffsets
 	runeEnds := p.id.fileEndRunes
@@ -103,11 +104,15 @@ func (p *contentProvider) findOffset(filename bool, r uint32) uint32 {
 	left := absR % runeOffsetFrequency
 
 	var data []byte
-	data, p.err = p.id.readContentSlice(byteOff, 3*runeOffsetFrequency)
-	if p.err != nil {
-		return 0
-	}
 
+	if filename {
+		data = p.id.fileNameContent[byteOff:]
+	} else {
+		data, p.err = p.id.readContentSlice(byteOff, 3*runeOffsetFrequency)
+		if p.err != nil {
+			return 0
+		}
+	}
 	for left > 0 {
 		_, sz := utf8.DecodeRune(data)
 		byteOff += uint32(sz)

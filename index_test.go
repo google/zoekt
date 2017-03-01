@@ -1347,3 +1347,25 @@ func TestEstimateDocCount(t *testing.T) {
 		t.Errorf("got FilesConsidered = %d, want 0", sres.Stats.FilesConsidered)
 	}
 }
+
+func TestUTF8CorrectCorpus(t *testing.T) {
+	needle := "neeedle"
+
+	// 6 bytes.
+	unicode := "世界"
+	b := testIndexBuilder(t, nil,
+		Document{
+			Name:    "f1",
+			Content: []byte(strings.Repeat(unicode, 100)),
+		},
+		Document{
+			Name:    "xxxxxneeedle",
+			Content: []byte("hello"),
+		})
+
+	q := &query.Substring{Pattern: needle, FileName: true}
+	res := searchForTest(t, b, q)
+	if len(res.Files) != 1 {
+		t.Errorf("got %v, want 1 result", res)
+	}
+}
