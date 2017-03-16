@@ -43,10 +43,11 @@ type postingsBuilder struct {
 	// To support UTF-8 searching, we must map back runes to byte
 	// offsets. As a first attempt, we sample regularly. The
 	// precise offset can be found by walking from the recorded
-	// offset to the desired rune.  TODO(hanwen): disable the
-	// mapping if the index shard is 100% lo-bit ascii.
+	// offset to the desired rune.
 	runeOffsets []uint32
 	runeCount   uint32
+
+	isPlainASCII bool
 
 	endRunes []uint32
 	endByte  uint32
@@ -54,8 +55,9 @@ type postingsBuilder struct {
 
 func newPostingsBuilder() *postingsBuilder {
 	return &postingsBuilder{
-		postings:    map[ngram][]byte{},
-		lastOffsets: map[ngram]uint32{},
+		postings:     map[ngram][]byte{},
+		lastOffsets:  map[ngram]uint32{},
+		isPlainASCII: true,
 	}
 }
 
@@ -74,6 +76,9 @@ func (s *postingsBuilder) newSearchableString(data []byte) *searchableString {
 	endRune := s.runeCount
 	for len(data) > 0 {
 		c, sz := utf8.DecodeRune(data)
+		if sz > 1 {
+			s.isPlainASCII = false
+		}
 		data = data[sz:]
 
 		runeGram[0], runeGram[1], runeGram[2] = runeGram[1], runeGram[2], c

@@ -86,6 +86,10 @@ func (p *contentProvider) data(fileName bool) []byte {
 // runes (relative to document start). If filename is set, the corpus
 // is the set of filenames, with the document being the name itself.
 func (p *contentProvider) findOffset(filename bool, r uint32) uint32 {
+	if p.id.metaData.PlainASCII {
+		return r
+	}
+
 	sample := p.id.runeOffsets
 	runeEnds := p.id.fileEndRunes
 	fileStartByte := p.id.boundaries[p.idx]

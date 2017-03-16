@@ -36,7 +36,7 @@ import (
 const IndexFormatVersion = 11
 
 // FeatureVersion is increased if a feature is added that requires reindexing data.
-const FeatureVersion = 0
+const FeatureVersion = 1
 
 var _ = log.Println
 
@@ -173,6 +173,7 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 		IndexFormatVersion:  IndexFormatVersion,
 		IndexTime:           time.Now(),
 		IndexFeatureVersion: FeatureVersion,
+		PlainASCII:          b.contents.isPlainASCII && b.names.isPlainASCII,
 	}, &toc.metaData, w); err != nil {
 		return err
 	}
