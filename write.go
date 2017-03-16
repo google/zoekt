@@ -138,10 +138,10 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 	w := &writer{w: buffered}
 	toc := indexTOC{}
 
-	toc.fileContents.writeStrings(w, b.files)
+	toc.fileContents.writeStrings(w, b.contentStrings)
 
 	toc.newlines.start(w)
-	for _, f := range b.files {
+	for _, f := range b.contentStrings {
 		toc.newlines.addItem(w, toSizedDeltas(newLinesIndices(f.data)))
 	}
 	toc.newlines.end(w)
@@ -158,12 +158,12 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 	}
 	toc.fileSections.end(w)
 
-	writePostings(w, b.contents, &toc.ngramText, &toc.runeOffsets, &toc.postings, &toc.fileEndRunes)
+	writePostings(w, b.contentPostings, &toc.ngramText, &toc.runeOffsets, &toc.postings, &toc.fileEndRunes)
 
 	// names.
-	toc.fileNames.writeStrings(w, b.fileNames)
+	toc.fileNames.writeStrings(w, b.nameStrings)
 
-	writePostings(w, b.names, &toc.nameNgramText, &toc.nameRuneOffsets, &toc.namePostings, &toc.nameEndRunes)
+	writePostings(w, b.namePostings, &toc.nameNgramText, &toc.nameRuneOffsets, &toc.namePostings, &toc.nameEndRunes)
 
 	toc.subRepos.start(w)
 	w.Write(toSizedDeltas(b.subRepos))
@@ -173,7 +173,7 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 		IndexFormatVersion:  IndexFormatVersion,
 		IndexTime:           time.Now(),
 		IndexFeatureVersion: FeatureVersion,
-		PlainASCII:          b.contents.isPlainASCII && b.names.isPlainASCII,
+		PlainASCII:          b.contentPostings.isPlainASCII && b.namePostings.isPlainASCII,
 	}, &toc.metaData, w); err != nil {
 		return err
 	}

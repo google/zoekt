@@ -113,15 +113,15 @@ type IndexBuilder struct {
 	contentEnd uint32
 	nameEnd    uint32
 
-	files       []*searchableString
-	fileNames   []*searchableString
-	docSections [][]DocumentSection
+	contentStrings []*searchableString
+	nameStrings    []*searchableString
+	docSections    [][]DocumentSection
 
 	branchMasks []uint32
 	subRepos    []uint32
 
-	contents *postingsBuilder
-	names    *postingsBuilder
+	contentPostings *postingsBuilder
+	namePostings    *postingsBuilder
 
 	// root repository
 	repo Repository
@@ -150,8 +150,8 @@ func (b *IndexBuilder) ContentSize() uint32 {
 // Repository contains repo metadata, and may be set to nil.
 func NewIndexBuilder(r *Repository) (*IndexBuilder, error) {
 	b := &IndexBuilder{
-		contents: newPostingsBuilder(),
-		names:    newPostingsBuilder(),
+		contentPostings: newPostingsBuilder(),
+		namePostings:    newPostingsBuilder(),
 	}
 
 	if r == nil {
@@ -164,7 +164,7 @@ func NewIndexBuilder(r *Repository) (*IndexBuilder, error) {
 }
 
 func (b *IndexBuilder) setRepository(desc *Repository) error {
-	if len(b.files) > 0 {
+	if len(b.contentStrings) > 0 {
 		return fmt.Errorf("AddSubRepository called after adding files.")
 	}
 	if err := desc.verify(); err != nil {
@@ -322,11 +322,11 @@ func (b *IndexBuilder) Add(doc Document) error {
 
 	b.subRepos = append(b.subRepos, subRepoIdx)
 
-	docStr := b.contents.newSearchableString(doc.Content)
-	b.files = append(b.files, docStr)
+	docStr := b.contentPostings.newSearchableString(doc.Content)
+	b.contentStrings = append(b.contentStrings, docStr)
 
-	nameStr := b.names.newSearchableString([]byte(doc.Name))
-	b.fileNames = append(b.fileNames, nameStr)
+	nameStr := b.namePostings.newSearchableString([]byte(doc.Name))
+	b.nameStrings = append(b.nameStrings, nameStr)
 	b.docSections = append(b.docSections, doc.Symbols)
 
 	b.branchMasks = append(b.branchMasks, mask)
