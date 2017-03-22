@@ -38,19 +38,26 @@ type indexData struct {
 
 	docSectionsStart uint32
 	docSectionsIndex []uint32
-	runeOffsets      []uint32
 
-	// offsets of file contents. Includes end of last file.
+	// rune offset=>byte offset mapping, relative to the start of the content corpus
+	runeOffsets []uint32
+
+	// offsets of file contents; includes end of last file
 	boundariesStart uint32
 	boundaries      []uint32
 
+	// rune offsets for the file content boundaries
 	fileEndRunes []uint32
 
-	fileNameContent     []byte
-	fileNameIndex       []uint32
-	fileNameNgrams      map[ngram][]uint32
+	fileNameContent []byte
+	fileNameIndex   []uint32
+	fileNameNgrams  map[ngram][]uint32
+
+	// rune offset=>byte offset mapping, relative to the start of the filename corpus
 	fileNameRuneOffsets []uint32
-	fileNameEndRunes    []uint32
+
+	// rune offsets for the file name boundaries
+	fileNameEndRunes []uint32
 
 	fileBranchMasks []uint32
 
