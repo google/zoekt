@@ -33,12 +33,16 @@ type indexData struct {
 
 	ngrams map[ngram]simpleSection
 
-	newlinesIndex    []uint32
+	newlinesStart uint32
+	newlinesIndex []uint32
+
+	docSectionsStart uint32
 	docSectionsIndex []uint32
 	runeOffsets      []uint32
 
 	// offsets of file contents. Includes end of last file.
-	boundaries []uint32
+	boundariesStart uint32
+	boundaries      []uint32
 
 	fileEnds     []uint32
 	fileEndRunes []uint32

@@ -139,7 +139,6 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 	toc := indexTOC{}
 
 	toc.fileContents.writeStrings(w, b.contentStrings)
-
 	toc.newlines.start(w)
 	for _, f := range b.contentStrings {
 		toc.newlines.addItem(w, toSizedDeltas(newLinesIndices(f.data)))

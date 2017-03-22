@@ -141,14 +141,6 @@ func (s *compoundSection) read(r *reader) error {
 	return err
 }
 
-// absoluteIndex returns the offsets of items, plus a final marking the end of the
-// last item.
-func (s *compoundSection) absoluteIndex() []uint32 {
-	index := s.offsets
-	index = append(index, s.data.off+s.data.sz)
-	return index
-}
-
 // relativeIndex returns the relative offsets of the items (first
 // element is 0), plus a final marking the end of the last item.
 func (s *compoundSection) relativeIndex() []uint32 {

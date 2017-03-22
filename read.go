@@ -139,22 +139,25 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 		return nil, err
 	}
 
-	d.boundaries = toc.fileContents.absoluteIndex()
-	d.newlinesIndex = toc.newlines.absoluteIndex()
-	d.docSectionsIndex = toc.fileSections.absoluteIndex()
+	d.boundariesStart = toc.fileContents.data.off
+	d.boundaries = toc.fileContents.relativeIndex()
+	d.newlinesStart = toc.newlines.data.off
+	d.newlinesIndex = toc.newlines.relativeIndex()
+	d.docSectionsStart = toc.fileSections.data.off
+	d.docSectionsIndex = toc.fileSections.relativeIndex()
 
 	textContent, err := d.readSectionBlob(toc.ngramText)
 	if err != nil {
 		return nil, err
 	}
-	postingsIndex := toc.postings.absoluteIndex()
+	postingsIndex := toc.postings.relativeIndex()
 
 	const ngramEncoding = 8
 	for i := 0; i < len(textContent); i += ngramEncoding {
 		j := i / ngramEncoding
 		ng := ngram(binary.BigEndian.Uint64(textContent[i : i+ngramEncoding]))
 		d.ngrams[ng] = simpleSection{
-			postingsIndex[j],
+			toc.postings.data.off + postingsIndex[j],
 			postingsIndex[j+1] - postingsIndex[j],
 		}
 	}
@@ -254,7 +257,7 @@ func (d *indexData) verify() error {
 
 func (d *indexData) readContents(i uint32) ([]byte, error) {
 	return d.readSectionBlob(simpleSection{
-		off: d.boundaries[i],
+		off: d.boundariesStart + d.boundaries[i],
 		sz:  d.boundaries[i+1] - d.boundaries[i],
 	})
 }
@@ -263,13 +266,13 @@ func (d *indexData) readContentSlice(off uint32, sz uint32) ([]byte, error) {
 	// TODO(hanwen): cap result if it is at the end of the content
 	// section.
 	return d.readSectionBlob(simpleSection{
-		off: d.boundaries[0] + off,
+		off: d.boundariesStart + off,
 		sz:  sz})
 }
 
 func (d *indexData) readNewlines(i uint32, buf []uint32) ([]uint32, error) {
 	blob, err := d.readSectionBlob(simpleSection{
-		off: d.newlinesIndex[i],
+		off: d.newlinesStart + d.newlinesIndex[i],
 		sz:  d.newlinesIndex[i+1] - d.newlinesIndex[i],
 	})
 	if err != nil {
@@ -281,7 +284,7 @@ func (d *indexData) readNewlines(i uint32, buf []uint32) ([]uint32, error) {
 
 func (d *indexData) readDocSections(i uint32) ([]DocumentSection, error) {
 	blob, err := d.readSectionBlob(simpleSection{
-		off: d.docSectionsIndex[i],
+		off: d.docSectionsStart + d.docSectionsIndex[i],
 		sz:  d.docSectionsIndex[i+1] - d.docSectionsIndex[i],
 	})
 	if err != nil {
@@ -337,7 +340,11 @@ func ReadMetadata(inf IndexFile) (*Repository, *IndexMetadata, error) {
 }
 
 func (d *indexData) calculateStats() {
-	last := d.boundaries[len(d.boundaries)-1]
+	var last uint32
+	if len(d.boundaries) > 0 {
+		last += d.boundaries[len(d.boundaries)-1]
+	}
+
 	lastFN := last
 	if len(d.fileNameIndex) > 0 {
 		lastFN = d.fileNameIndex[len(d.fileNameIndex)-1]
