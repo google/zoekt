@@ -41,13 +41,10 @@ type contentProvider struct {
 }
 
 func (p *contentProvider) setDocument(docID uint32) {
-	var fileStart uint32
-	if docID > 0 {
-		fileStart = p.id.fileEnds[docID-1]
-	}
+	fileStart := p.id.boundaries[docID]
 
 	p.idx = docID
-	p.fileSize = p.id.fileEnds[docID] - fileStart
+	p.fileSize = p.id.boundaries[docID+1] - fileStart
 
 	p._nl = nil
 	p._sects = nil

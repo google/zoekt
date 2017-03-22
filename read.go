@@ -162,9 +162,6 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 		}
 	}
 
-	if r := toc.fileContents.relativeIndex(); len(r) > 0 {
-		d.fileEnds = r[1:]
-	}
 	d.fileBranchMasks, err = d.readSectionU32(toc.branchMasks)
 	if err != nil {
 		return nil, err
@@ -242,7 +239,6 @@ func (d *indexData) verify() error {
 
 	n--
 	for what, got := range map[string]int{
-		"file ends":         len(d.fileEnds),
 		"boundaries":        len(d.boundaries) - 1,
 		"branch masks":      len(d.fileBranchMasks),
 		"doc section index": len(d.docSectionsIndex) - 1,

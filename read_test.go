@@ -61,10 +61,6 @@ func TestReadWrite(t *testing.T) {
 		t.Fatalf("got ngrams %v, want 3 ngrams", data.ngrams)
 	}
 
-	if want := []uint32{5}; !reflect.DeepEqual(data.fileEnds, want) {
-		t.Fatalf("got fileEnds %v, want %v", data.fileEnds, want)
-	}
-
 	if _, ok := data.ngrams[stringToNGram("bcq")]; ok {
 		t.Errorf("found ngram bcd in %v", data.ngrams)
 	}

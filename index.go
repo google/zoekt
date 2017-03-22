@@ -44,7 +44,6 @@ type indexData struct {
 	boundariesStart uint32
 	boundaries      []uint32
 
-	fileEnds     []uint32
 	fileEndRunes []uint32
 
 	fileNameContent     []byte
@@ -78,7 +77,7 @@ func (d *indexData) memoryUse() int {
 	sz := 0
 	for _, a := range [][]uint32{
 		d.newlinesIndex, d.docSectionsIndex,
-		d.fileEnds, d.fileNameIndex, d.fileBranchMasks,
+		d.boundaries, d.fileNameIndex, d.fileBranchMasks,
 		d.runeOffsets, d.fileNameRuneOffsets,
 		d.fileEndRunes, d.fileNameEndRunes,
 	} {
