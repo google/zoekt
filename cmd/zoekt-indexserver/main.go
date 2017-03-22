@@ -202,8 +202,6 @@ func deleteStaleIndexes(indexDir, repoDir string, watchInterval time.Duration) {
 
 	expr := indexDir + "/*"
 	for {
-		<-t.C
-
 		fs, err := filepath.Glob(expr)
 		if err != nil {
 			log.Println("Glob(%q): %v", expr, err)
@@ -214,6 +212,7 @@ func deleteStaleIndexes(indexDir, repoDir string, watchInterval time.Duration) {
 				log.Println("deleteIfStale(%q): %v", f, err)
 			}
 		}
+		<-t.C
 	}
 }
 
