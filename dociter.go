@@ -89,6 +89,9 @@ type docIterator interface {
 	// candidateMatch in one go?
 	next() []*candidateMatch
 	coversContent() bool
+
+	// amount of I/O reads
+	ioBytes() uint32
 }
 
 type ngramDocIterator struct {
@@ -107,6 +110,13 @@ type ngramDocIterator struct {
 	// The ngram matches cover the pattern, so no need to check
 	// contents.
 	_coversContent bool
+
+	// The number of posting bytes
+	bytesRead uint32
+}
+
+func (s *ngramDocIterator) ioBytes() uint32 {
+	return s.bytesRead
 }
 
 func (s *ngramDocIterator) coversContent() bool {

@@ -81,8 +81,11 @@ type LineFragmentMatch struct {
 
 // Stats contains interesting numbers on the search
 type Stats struct {
-	// Total length of files loaded.
-	BytesLoaded int64
+	// Amount of I/O for reading contents.
+	ContentBytesLoaded int64
+
+	// Amount of I/O for reading from index.
+	IndexBytesLoaded int64
 
 	// Number of search shards that had a crash.
 	Crashes int
@@ -118,7 +121,8 @@ type Stats struct {
 }
 
 func (s *Stats) Add(o Stats) {
-	s.BytesLoaded += o.BytesLoaded
+	s.ContentBytesLoaded += o.ContentBytesLoaded
+	s.IndexBytesLoaded += o.IndexBytesLoaded
 	s.Crashes += o.Crashes
 	s.FileCount += o.FileCount
 	s.FilesConsidered += o.FilesConsidered

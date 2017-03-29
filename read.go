@@ -266,28 +266,30 @@ func (d *indexData) readContentSlice(off uint32, sz uint32) ([]byte, error) {
 		sz:  sz})
 }
 
-func (d *indexData) readNewlines(i uint32, buf []uint32) ([]uint32, error) {
-	blob, err := d.readSectionBlob(simpleSection{
+func (d *indexData) readNewlines(i uint32, buf []uint32) ([]uint32, uint32, error) {
+	sec := simpleSection{
 		off: d.newlinesStart + d.newlinesIndex[i],
 		sz:  d.newlinesIndex[i+1] - d.newlinesIndex[i],
-	})
+	}
+	blob, err := d.readSectionBlob(sec)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return fromSizedDeltas(blob, buf), nil
+	return fromSizedDeltas(blob, buf), sec.sz, nil
 }
 
-func (d *indexData) readDocSections(i uint32) ([]DocumentSection, error) {
-	blob, err := d.readSectionBlob(simpleSection{
+func (d *indexData) readDocSections(i uint32) ([]DocumentSection, uint32, error) {
+	sec := simpleSection{
 		off: d.docSectionsStart + d.docSectionsIndex[i],
 		sz:  d.docSectionsIndex[i+1] - d.docSectionsIndex[i],
-	})
+	}
+	blob, err := d.readSectionBlob(sec)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return unmarshalDocSections(blob), nil
+	return unmarshalDocSections(blob), sec.sz, nil
 }
 
 // IndexFile is a file suitable for concurrent read access. For performance

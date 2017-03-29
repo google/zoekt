@@ -84,7 +84,8 @@ type branchQueryMatchTree struct {
 	docID uint32
 }
 
-// prepare
+// all prepare methods
+
 func (t *andMatchTree) prepare(doc uint32) {
 	for _, c := range t.children {
 		c.prepare(doc)
@@ -124,7 +125,7 @@ func (t *branchQueryMatchTree) prepare(doc uint32) {
 	t.docID = doc
 }
 
-// String.
+// all String methods
 
 func (t *andMatchTree) String() string {
 	return fmt.Sprintf("and%v", t.children)
@@ -274,6 +275,8 @@ func (p *contentProvider) evalRegexpMatches(s *regexpMatchTree) {
 	s.reEvaluated = true
 }
 
+// all matches() methods.
+
 func (t *andMatchTree) matches(known map[matchTree]bool) (bool, bool) {
 	sure := true
 
@@ -350,7 +353,7 @@ func (t *substrMatchTree) matches(known map[matchTree]bool) (bool, bool) {
 	return true, sure
 }
 
-func (d *indexData) newMatchTree(q query.Q, sq map[*substrMatchTree]struct{}) (matchTree, error) {
+func (d *indexData) newMatchTree(q query.Q, sq map[*substrMatchTree]struct{}, stats *Stats) (matchTree, error) {
 	switch s := q.(type) {
 	case *query.Regexp:
 		sz := ngramSize
@@ -363,7 +366,7 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*substrMatchTree]struct{}) (m
 			return q
 		})
 
-		subMT, err := d.newMatchTree(subQ, sq)
+		subMT, err := d.newMatchTree(subQ, sq, stats)
 		if err != nil {
 			return nil, err
 		}
@@ -382,7 +385,7 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*substrMatchTree]struct{}) (m
 	case *query.And:
 		var r []matchTree
 		for _, ch := range s.Children {
-			ct, err := d.newMatchTree(ch, sq)
+			ct, err := d.newMatchTree(ch, sq, stats)
 			if err != nil {
 				return nil, err
 			}
@@ -392,7 +395,7 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*substrMatchTree]struct{}) (m
 	case *query.Or:
 		var r []matchTree
 		for _, ch := range s.Children {
-			ct, err := d.newMatchTree(ch, sq)
+			ct, err := d.newMatchTree(ch, sq, stats)
 			if err != nil {
 				return nil, err
 			}
@@ -400,7 +403,7 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*substrMatchTree]struct{}) (m
 		}
 		return &orMatchTree{r}, nil
 	case *query.Not:
-		ct, err := d.newMatchTree(s.Child, sq)
+		ct, err := d.newMatchTree(s.Child, sq, stats)
 		return &notMatchTree{
 			child: ct,
 		}, err
@@ -416,6 +419,7 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*substrMatchTree]struct{}) (m
 			coversContent: iter.coversContent(),
 			cands:         iter.next(),
 		}
+		stats.IndexBytesLoaded += int64(iter.ioBytes())
 		sq[st] = struct{}{}
 		return st, nil
 
@@ -505,7 +509,7 @@ func (d *indexData) Search(ctx context.Context, q query.Q, opts *SearchOptions) 
 	q = query.Map(q, query.ExpandFileContent)
 
 	atoms := map[*substrMatchTree]struct{}{}
-	mt, err := d.newMatchTree(q, atoms)
+	mt, err := d.newMatchTree(q, atoms, &res.Stats)
 	if err != nil {
 		return nil, err
 	}
@@ -675,6 +679,7 @@ nextFileMatch:
 	for _, v := range d.repoMetaData.SubRepoMap {
 		addRepo(&res, v)
 	}
+
 	return &res, nil
 }
 

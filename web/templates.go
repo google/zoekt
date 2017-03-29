@@ -134,9 +134,12 @@ To list repositories, try:
   {{template "searchbox" .Last}}
 <hr>
   {{if .Stats.Crashes}}<br><b>{{.Stats.Crashes}} shards crashed</b><br>{{end}}
-  Found {{.Stats.MatchCount}} results in {{.Stats.FileCount}} files ({{.Stats.NgramMatches}} ngram matches,
-    {{.Stats.FilesConsidered}} docs considered, {{.Stats.FilesLoaded}} docs ({{HumanUnit .Stats.BytesLoaded}}B) loaded,
-    {{.Stats.FilesSkipped}} docs skipped): for
+  Found {{.Stats.MatchCount}} results in {{.Stats.FileCount}} files
+    ({{HumanUnit .Stats.IndexBytesLoaded}}B index data,
+     {{.Stats.NgramMatches}} ngram matches,
+     {{.Stats.FilesConsidered}} docs considered,
+     {{.Stats.FilesLoaded}} docs ({{HumanUnit .Stats.ContentBytesLoaded}}B) loaded,
+     {{.Stats.FilesSkipped}} docs skipped): for
   <pre style="background: #ffc;">{{.Query}} with options {{.SearchOptions}}</pre>
   in {{.Stats.Duration}} (queued: {{.Stats.Wait}})
   <p>

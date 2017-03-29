@@ -38,6 +38,7 @@ type contentProvider struct {
 	_runeOffsets []uint32
 	_sects       []DocumentSection
 	fileSize     uint32
+	bytesRead    uint32
 }
 
 func (p *contentProvider) setDocument(docID uint32) {
@@ -53,15 +54,19 @@ func (p *contentProvider) setDocument(docID uint32) {
 
 func (p *contentProvider) docSections() []DocumentSection {
 	if p._sects == nil {
-		p._sects, p.err = p.id.readDocSections(p.idx)
+		var sz uint32
+		p._sects, sz, p.err = p.id.readDocSections(p.idx)
+		p.stats.ContentBytesLoaded += int64(sz)
 	}
 	return p._sects
 }
 
 func (p *contentProvider) newlines() []uint32 {
 	if p._nl == nil {
-		p._nl, p.err = p.id.readNewlines(p.idx, p._nlBuf)
+		var sz uint32
+		p._nl, sz, p.err = p.id.readNewlines(p.idx, p._nlBuf)
 		p._nlBuf = p._nl
+		p.stats.ContentBytesLoaded += int64(sz)
 	}
 	return p._nl
 }
@@ -74,7 +79,7 @@ func (p *contentProvider) data(fileName bool) []byte {
 	if p._data == nil {
 		p._data, p.err = p.id.readContents(p.idx)
 		p.stats.FilesLoaded++
-		p.stats.BytesLoaded += int64(len(p._data))
+		p.stats.ContentBytesLoaded += int64(len(p._data))
 	}
 	return p._data
 }

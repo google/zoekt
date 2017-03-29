@@ -254,12 +254,13 @@ func TestAndSearch(t *testing.T) {
 	}
 
 	wantStats := Stats{
-		FilesLoaded:     1,
-		BytesLoaded:     16,
-		NgramMatches:    4,
-		MatchCount:      1,
-		FileCount:       1,
-		FilesConsidered: 3,
+		FilesLoaded:        1,
+		ContentBytesLoaded: 18,
+		IndexBytesLoaded:   4,
+		NgramMatches:       4,
+		MatchCount:         1,
+		FileCount:          1,
+		FilesConsidered:    3,
 	}
 	if !reflect.DeepEqual(sres.Stats, wantStats) {
 		t.Errorf("got stats %#v, want %#v", sres.Stats, wantStats)
@@ -1367,5 +1368,26 @@ func TestUTF8CorrectCorpus(t *testing.T) {
 	res := searchForTest(t, b, q)
 	if len(res.Files) != 1 {
 		t.Errorf("got %v, want 1 result", res)
+	}
+}
+
+func TestIOStats(t *testing.T) {
+	b := testIndexBuilder(t, nil,
+		Document{
+			Name:    "f1",
+			Content: []byte(strings.Repeat("abcd", 1024)),
+		})
+	q := &query.Substring{Pattern: "abc", CaseSensitive: true, Content: true}
+	res := searchForTest(t, b, q)
+
+	// 4096 (content) + 2 (overhead: newlines or doc sections)
+	if got, want := res.Stats.ContentBytesLoaded, int64(4098); got != want {
+		t.Errorf("got content I/O %d, want %d", got, want)
+	}
+
+	// 1024 entries, each 4 bytes apart. 4 fits into single byte
+	// delta encoded.
+	if got, want := res.Stats.IndexBytesLoaded, int64(1024); got != want {
+		t.Errorf("got index I/O %d, want %d", got, want)
 	}
 }
