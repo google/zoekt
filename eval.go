@@ -265,6 +265,7 @@ func (p *contentProvider) evalContentMatches(s *substrMatchTree) {
 
 func (p *contentProvider) evalRegexpMatches(s *regexpMatchTree) {
 	idxs := s.regexp.FindAllIndex(p.data(s.fileName), -1)
+	s.found = make([]*candidateMatch, 0, len(idxs))
 	for _, idx := range idxs {
 		s.found = append(s.found, &candidateMatch{
 			byteOffset:  uint32(idx[0]),
