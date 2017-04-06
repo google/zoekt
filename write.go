@@ -102,7 +102,7 @@ func (s *compoundSection) writeStrings(w *writer, strs []*searchableString) {
 
 func writePostings(w *writer, s *postingsBuilder, ngramText *simpleSection,
 	charOffsets *simpleSection, postings *compoundSection, endRunes *simpleSection) {
-	var keys ngramSlice
+	keys := make(ngramSlice, 0, len(s.postings))
 	for k := range s.postings {
 		keys = append(keys, k)
 	}
