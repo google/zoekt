@@ -85,6 +85,7 @@ func runCTags(bin string, sandboxBin string, inputs map[string][]byte) ([]*ctags
 			"-s", sandboxDir, "-b", dir + "=input", "-d", "/input",
 			// Make sure the binary is available in the sandbox.
 			"-b", bin + "=" + "ctags",
+			"-u", "3333", "-g", "3333",
 		}
 		args[0] = "/ctags"
 		for _, d := range []string{"/lib", "/lib64"} {
