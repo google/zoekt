@@ -244,3 +244,48 @@ func TestDeleteOldShards(t *testing.T) {
 		t.Fatalf("Glob(%s): got %v, want 1 shard", glob, fs)
 	}
 }
+
+func TestPartialSuccess(t *testing.T) {
+	dir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatalf("TempDir: %v", err)
+	}
+
+	opts := Options{
+		IndexDir: dir,
+		ShardMax: 1024,
+		RepoDir:  "/a",
+		SizeMax:  1 << 20,
+	}
+	opts.SetDefaults()
+
+	b, err := NewBuilder(opts)
+	if err != nil {
+		t.Fatalf("NewBuilder: %v", err)
+	}
+
+	for i := 0; i < 4; i++ {
+		nm := fmt.Sprintf("F%d", i)
+
+		// no error checking: the 2nd call will fail
+		b.AddFile(nm, []byte(strings.Repeat("01234567\n", 128)))
+		if i == 1 {
+			// force writes to fail.
+			if err := os.Chmod(dir, 0555); err != nil {
+				t.Fatalf("chmod(%s): %s", dir, err)
+			}
+		}
+	}
+
+	if err := os.Chmod(dir, 0755); err != nil {
+		t.Fatalf("chmod(%s, writable): %s", dir, err)
+	}
+
+	b.Finish()
+
+	if fs, err := filepath.Glob(dir + "/*"); err != nil {
+		t.Errorf("glob(%s): %v", dir, err)
+	} else if len(fs) != 0 {
+		t.Errorf("got shards %v, want []", fs)
+	}
+}

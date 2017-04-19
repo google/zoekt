@@ -88,6 +88,10 @@ type Builder struct {
 
 	errMu      sync.Mutex
 	buildError error
+
+	// temp name => final name for finished shards. We only rename
+	// them once all shards succeed to avoid Frankstein corpuses.
+	finishedShards map[string]string
 }
 
 // SetDefaults sets reasonable default options.
@@ -170,8 +174,9 @@ func NewBuilder(opt Options) (*Builder, error) {
 	}
 
 	b := &Builder{
-		opts:     opt,
-		throttle: make(chan int, opt.Parallelism),
+		opts:           opt,
+		throttle:       make(chan int, opt.Parallelism),
+		finishedShards: map[string]string{},
 	}
 
 	if _, err := b.newShardBuilder(); err != nil {
@@ -206,6 +211,20 @@ func (b *Builder) Add(doc zoekt.Document) error {
 func (b *Builder) Finish() error {
 	b.flush()
 	b.building.Wait()
+
+	if b.buildError != nil {
+		for tmp := range b.finishedShards {
+			os.Remove(tmp)
+		}
+		return b.buildError
+	}
+
+	for tmp, final := range b.finishedShards {
+		if err := os.Rename(tmp, final); err != nil {
+			b.buildError = err
+		}
+	}
+
 	if b.nextShardNum > 0 {
 		b.deleteRemainingShards()
 	}
@@ -319,7 +338,11 @@ func (b *Builder) buildShard(todo []*zoekt.Document, nextShardNum int) error {
 	for _, t := range todo {
 		shardBuilder.Add(*t)
 	}
-	return writeShard(name, shardBuilder)
+
+	if err := b.writeShard(name, shardBuilder); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (b *Builder) newShardBuilder() (*zoekt.IndexBuilder, error) {
@@ -333,7 +356,7 @@ func (b *Builder) newShardBuilder() (*zoekt.IndexBuilder, error) {
 	return shardBuilder, nil
 }
 
-func writeShard(fn string, b *zoekt.IndexBuilder) error {
+func (b *Builder) writeShard(fn string, ib *zoekt.IndexBuilder) error {
 	dir := filepath.Dir(fn)
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
@@ -345,7 +368,7 @@ func writeShard(fn string, b *zoekt.IndexBuilder) error {
 	}
 
 	defer f.Close()
-	if err := b.Write(f); err != nil {
+	if err := ib.Write(f); err != nil {
 		return err
 	}
 	fi, err := f.Stat()
@@ -355,11 +378,10 @@ func writeShard(fn string, b *zoekt.IndexBuilder) error {
 	if err := f.Close(); err != nil {
 		return err
 	}
-	if err := os.Rename(f.Name(), fn); err != nil {
-		return err
-	}
 
-	log.Printf("wrote %s: %d index bytes (overhead %3.1f)", fn, fi.Size(),
-		float64(fi.Size())/float64(b.ContentSize()+1))
+	b.finishedShards[f.Name()] = fn
+	log.Printf("finished %s: %d index bytes (overhead %3.1f)", fn, fi.Size(),
+		float64(fi.Size())/float64(ib.ContentSize()+1))
+
 	return nil
 }
