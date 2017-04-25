@@ -12,16 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// This binary fetches all repos of a Gitiles host.
+// This binary fetches all repos of a Gitiles host.  It does double
+// duty for other "simple" web hosts
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"flag"
-	"io/ioutil"
 	"log"
-	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -30,16 +27,68 @@ import (
 	"github.com/google/zoekt/gitindex"
 )
 
+type filter struct {
+	inc, exc *regexp.Regexp
+}
+
+func (f *filter) include(name string) bool {
+	if f.inc != nil {
+		if !f.inc.MatchString(name) {
+			return false
+		}
+	}
+	if f.exc != nil {
+		if f.exc.MatchString(name) {
+			return false
+		}
+	}
+	return true
+}
+
+func newFilter(inc, exc string) (*filter, error) {
+	f := &filter{}
+	var err error
+	if inc != "" {
+		f.inc, err = regexp.Compile(inc)
+
+		if err != nil {
+			return nil, err
+		}
+	}
+	if exc != "" {
+		f.exc, err = regexp.Compile(exc)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return f, nil
+}
+
+type hostCrawler func(*url.URL, func(string) bool) (map[string]string, error)
+
 func main() {
 	dest := flag.String("dest", "", "destination directory")
 	namePattern := flag.String("name", "", "only clone repos whose name matches the regexp.")
 	excludePattern := flag.String("exclude", "", "don't mirror repos whose names match this regexp.")
+	hostType := flag.String("type", "gitiles", "which webserver to crawl. Choices: gitiles, cgit")
 	flag.Parse()
 
 	if len(flag.Args()) < 1 {
-		log.Fatal("must provide Gitiles URL as argument.")
+		log.Fatal("must provide URL argument.")
 	}
-	gitilesURL, err := url.Parse(flag.Arg(0))
+
+	var crawler hostCrawler
+	switch *hostType {
+	case "gitiles":
+		crawler = getGitilesRepos
+	case "cgit":
+		crawler = getCGitRepos
+	default:
+		log.Fatal("unknown host type %q", hostType)
+	}
+
+	rootURL, err := url.Parse(flag.Arg(0))
 	if err != nil {
 		log.Fatal("url.Parse(): %v", err)
 	}
@@ -48,85 +97,21 @@ func main() {
 		log.Fatal("must set --dest")
 	}
 
-	destDir := filepath.Join(*dest, gitilesURL.Host)
+	destDir := filepath.Join(*dest, rootURL.Host)
 	if err := os.MkdirAll(destDir, 0755); err != nil {
 		log.Fatal(err)
 	}
 
-	repos, err := getRepos(gitilesURL)
-	if *namePattern != "" {
-		re, err := regexp.Compile(*namePattern)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		trimmed := map[string]string{}
-		for k, v := range repos {
-			if re.MatchString(k) {
-				trimmed[k] = v
-			}
-		}
-		repos = trimmed
+	filter, err := newFilter(*namePattern, *excludePattern)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	{
-		trimmed := map[string]string{}
-		for k, v := range repos {
-			if k != "All-Users" && k != "All-Projects" {
-				trimmed[k] = v
-			}
-		}
-		repos = trimmed
-	}
-
-	if *excludePattern != "" {
-		re, err := regexp.Compile(*excludePattern)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		trimmed := map[string]string{}
-		for k, v := range repos {
-			if !re.MatchString(k) {
-				trimmed[k] = v
-			}
-		}
-		repos = trimmed
+	repos, err := crawler(rootURL, filter.include)
+	if err != nil {
+		log.Fatal(err)
 	}
 	if err := gitindex.CloneRepos(destDir, repos); err != nil {
 		log.Fatal(err)
 	}
-}
-
-type Project struct {
-	Name     string
-	CloneURL string `json:"clone_url"`
-}
-
-func getRepos(URL *url.URL) (map[string]string, error) {
-	URL.RawQuery = "format=JSON"
-	resp, err := http.Get(URL.String())
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	content, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	const xssTag = ")]}'\n"
-	content = bytes.TrimPrefix(content, []byte(xssTag))
-
-	m := map[string]*Project{}
-	if err := json.Unmarshal(content, &m); err != nil {
-		return nil, err
-	}
-
-	result := map[string]string{}
-	for k, v := range m {
-		result[k] = v.CloneURL
-	}
-	return result, nil
 }
