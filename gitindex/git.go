@@ -88,64 +88,39 @@ func FindGitRepos(arg string) ([]string, error) {
 	return dirs, nil
 }
 
-type templates struct {
-	repo, commit, file, line string
+func templatesForOrigin(u *url.URL) (*zoekt.Repository, error) {
+	return nil, fmt.Errorf("unknown URL %s", u)
 }
 
-// RepoURL returns the canonical URL for a repo, based on its
-// configured remotes.
-func RepoURL(repoDir string) (*url.URL, error) {
-	base, err := git.NewConfig()
-	if err != nil {
-		return nil, err
-	}
-	defer base.Free()
-	cfg, err := git.OpenOndisk(base, filepath.Join(repoDir, "config"))
-	if err != nil {
-		return nil, err
-	}
-	defer cfg.Free()
-
-	remoteURL, err := cfg.LookupString("remote.origin.url")
-	if err != nil {
-		return nil, err
-	}
-
-	parsed, err := url.Parse(remoteURL)
-	if err != nil {
-		return nil, err
-	}
-
-	return parsed, nil
-}
-
-// Templates fills in URL templates for known git hosting sites.
-func Templates(u *url.URL) (*zoekt.Repository, error) {
-	if strings.HasSuffix(u.Host, "googlesource.com") {
+// setTemplates fills in URL templates for known git hosting
+// sites.
+func setTemplates(repo *zoekt.Repository, u *url.URL, typ string) error {
+	switch typ {
+	case "gitiles":
 		/// eg. https://gerrit.googlesource.com/gitiles/+/master/tools/run_dev.sh#20
-		return &zoekt.Repository{
-			Name:                 filepath.Join(u.Host, u.Path),
-			URL:                  u.String(),
-			CommitURLTemplate:    u.String() + "/+/{{.Version}}",
-			FileURLTemplate:      u.String() + "/+/{{.Version}}/{{.Path}}",
-			LineFragmentTemplate: "{{.LineNumber}}",
-		}, nil
-	} else if u.Host == "github.com" {
-		t := *u
-		// CloneURL from the JSON API has .git
-		t.Path = strings.TrimSuffix(t.Path, ".git")
-
+		repo.URL = u.String()
+		repo.CommitURLTemplate = u.String() + "/+/{{.Version}}"
+		repo.FileURLTemplate = u.String() + "/+/{{.Version}}/{{.Path}}"
+		repo.LineFragmentTemplate = "{{.LineNumber}}"
+	case "github":
 		// eg. https://github.com/hanwen/go-fuse/blob/notify/genversion.sh#L10
-		return &zoekt.Repository{
-			Name:                 filepath.Join(t.Host, t.Path),
-			URL:                  t.String(),
-			CommitURLTemplate:    t.String() + "/commit/{{.Version}}",
-			FileURLTemplate:      t.String() + "/blob/{{.Version}}/{{.Path}}",
-			LineFragmentTemplate: "L{{.LineNumber}}",
-		}, nil
-	}
+		repo.URL = u.String()
+		repo.CommitURLTemplate = u.String() + "/commit/{{.Version}}"
+		repo.FileURLTemplate = u.String() + "/blob/{{.Version}}/{{.Path}}"
+		repo.LineFragmentTemplate = "L{{.LineNumber}}"
 
-	return nil, fmt.Errorf("scheme unknown for URL %s", u)
+	case "cgit":
+
+		// http://git.savannah.gnu.org/cgit/lilypond.git/tree/elisp/lilypond-mode.el?h=dev/philh&id=b2ca0fefe3018477aaca23b6f672c7199ba5238e#n100
+
+		repo.URL = u.String()
+		repo.CommitURLTemplate = u.String() + "/commit/?id={{.Version}}"
+		repo.FileURLTemplate = u.String() + "/tree/{{.Path}}/?id={{.Version}}"
+		repo.LineFragmentTemplate = "n{{.LineNumber}}"
+	default:
+		return fmt.Errorf("URL scheme type %q unknown", typ)
+	}
+	return nil
 }
 
 // getCommit returns a tree object for the given reference.
@@ -163,6 +138,100 @@ func getCommit(repo *git.Repository, ref string) (*git.Commit, error) {
 	return commitObj.AsCommit()
 }
 
+func clearEmptyConfig(err error) error {
+	if git.IsErrorClass(err, git.ErrClassConfig) && git.IsErrorCode(err, git.ErrNotFound) {
+		return nil
+	}
+	return err
+}
+
+func setTemplatesFromConfig(desc *zoekt.Repository, repoDir string) error {
+	base, err := git.NewConfig()
+	if err != nil {
+		return err
+	}
+	defer base.Free()
+	cfg, err := git.OpenOndisk(base, filepath.Join(repoDir, "config"))
+	if err != nil {
+		return err
+	}
+	defer cfg.Free()
+
+	webURLStr, err := cfg.LookupString("zoekt.web-url")
+	err = clearEmptyConfig(err)
+	if err != nil {
+		return err
+	}
+
+	webURLType, err := cfg.LookupString("zoekt.web-url-type")
+	err = clearEmptyConfig(err)
+	if err != nil {
+		return err
+	}
+
+	if webURLType != "" && webURLStr != "" {
+		webURL, err := url.Parse(webURLStr)
+		if err != nil {
+			return err
+		}
+		if err := setTemplates(desc, webURL, webURLType); err != nil {
+			return err
+		}
+	}
+
+	name, err := cfg.LookupString("zoekt.name")
+	err = clearEmptyConfig(err)
+	if err != nil {
+		return err
+	}
+
+	if name != "" {
+		desc.Name = name
+	} else {
+		remoteURL, err := cfg.LookupString("remote.origin.url")
+		err = clearEmptyConfig(err)
+		if err != nil || remoteURL == "" {
+			return err
+		}
+		u, err := url.Parse(remoteURL)
+		if err != nil {
+			return err
+		}
+		log.Printf("%q %q", remoteURL, u)
+		if err := SetTemplatesFromOrigin(desc, u); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// SetTemplates fills in templates based on the origin URL.
+func SetTemplatesFromOrigin(desc *zoekt.Repository, u *url.URL) error {
+	desc.Name = filepath.Join(u.Host, strings.TrimSuffix(u.Path, ".git"))
+
+	if strings.HasSuffix(u.Host, ".googlesource.com") {
+		return setTemplates(desc, u, "gitiles")
+	} else if u.Host == "github.com" {
+		u.Path = strings.TrimSuffix(u.Path, ".git")
+		return setTemplates(desc, u, "github")
+	} else {
+		return fmt.Errorf("unknown git hosting site %q", u)
+	}
+
+	found, err := templatesForOrigin(u)
+
+	if err != nil {
+		return err
+
+	}
+
+	desc.URL = found.URL
+	desc.CommitURLTemplate = found.CommitURLTemplate
+	desc.FileURLTemplate = found.FileURLTemplate
+	desc.LineFragmentTemplate = found.LineFragmentTemplate
+	return nil
+}
+
 // IndexGitRepo indexes the git repository as specified by the options and arguments.
 func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, submodules, incremental bool, repoCacheDir string) error {
 	repo, err := git.OpenRepository(opts.RepoDir)
@@ -170,15 +239,8 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 		return err
 	}
 
-	if url, err := RepoURL(opts.RepoDir); err != nil {
-		log.Printf("RepoURL(%s): %s", opts.RepoDir, err)
-	} else if desc, err := Templates(url); err != nil {
-		log.Printf("Templates(%s): %s", url, err)
-	} else {
-		opts.RepositoryDescription.URL = desc.URL
-		opts.RepositoryDescription.CommitURLTemplate = desc.CommitURLTemplate
-		opts.RepositoryDescription.FileURLTemplate = desc.FileURLTemplate
-		opts.RepositoryDescription.LineFragmentTemplate = desc.LineFragmentTemplate
+	if err := setTemplatesFromConfig(&opts.RepositoryDescription, opts.RepoDir); err != nil {
+		log.Printf("setTemplatesFromConfig(%s): %s", opts.RepoDir, err)
 	}
 
 	repoCache := NewRepoCache(repoCacheDir)
@@ -247,12 +309,14 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 
 	opts.SubRepositories = map[string]*zoekt.Repository{}
 	for path, location := range reposByPath {
-		tpl, err := Templates(location.URL)
-		if err != nil {
-			log.Printf("Templates(%s): %s", location.URL, err)
-			tpl = &zoekt.Repository{URL: location.URL.String()}
+		tpl := opts.RepositoryDescription
+		if path != "" {
+			tpl = zoekt.Repository{URL: location.URL.String()}
+			if err := SetTemplatesFromOrigin(&tpl, location.URL); err != nil {
+				log.Printf("setTemplatesFromOrigin(%s, %s): %s", path, location.URL, err)
+			}
 		}
-		opts.SubRepositories[path] = tpl
+		opts.SubRepositories[path] = &tpl
 	}
 	for _, br := range opts.RepositoryDescription.Branches {
 		for path, repo := range opts.SubRepositories {

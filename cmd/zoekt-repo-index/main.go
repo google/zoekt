@@ -188,9 +188,9 @@ func main() {
 				continue
 			}
 
-			desc, err := gitindex.Templates(loc.URL)
-			if err != nil {
-				log.Fatalf("Templates: %v", err)
+			desc := &zoekt.Repository{}
+			if err := gitindex.SetTemplatesFromOrigin(desc, loc.URL); err != nil {
+				log.Fatalf("SetTemplatesFromOrigin(%s): %v", loc.URL, err)
 			}
 
 			opts.SubRepositories[key.SubRepoPath] = desc
