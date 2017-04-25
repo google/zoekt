@@ -49,13 +49,13 @@ func normalizedGet(u *url.URL) ([]byte, error) {
 	return c, nil
 }
 
-func getCGitRepos(u *url.URL, filter func(string) bool) (map[string]string, error) {
+func getCGitRepos(u *url.URL, filter func(string) bool) (map[string]*crawlTarget, error) {
 	c, err := normalizedGet(u)
 	if err != nil {
 		return nil, err
 	}
 
-	pages := map[string]*url.URL{}
+	pages := map[string]*crawlTarget{}
 	for _, m := range cgitRepoEntryRE.FindAllSubmatch(c, -1) {
 		nm := strings.TrimSuffix(string(m[1]), ".git")
 
@@ -70,22 +70,24 @@ func getCGitRepos(u *url.URL, filter func(string) bool) (map[string]string, erro
 			log.Printf("ignoring u.Parse(%q): %v", relUrl, err)
 			continue
 		}
-		pages[nm] = u
+		pages[nm] = &crawlTarget{
+			webURL:     u.String(),
+			webURLType: "cgit",
+		}
 	}
-	log.Println("pages", pages)
 
 	// TODO - parallel?
-	clones := map[string]string{}
-	for nm, u := range pages {
+	for _, target := range pages {
+		u, _ := url.Parse(target.webURL)
 		c, err := cgitCloneURL(u)
 		if err != nil {
 			log.Printf("ignoring cgitCloneURL(%s): %v", u, c)
 			continue
 		}
 
-		clones[nm] = c.String()
+		target.cloneURL = c.String()
 	}
-	return clones, nil
+	return pages, nil
 }
 
 // We'll take the first URL we get. This may put the git:// URL (which

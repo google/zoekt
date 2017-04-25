@@ -24,7 +24,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/google/go-github/github"
@@ -92,29 +91,15 @@ func main() {
 		repos = trimmed
 	}
 
-	if *namePattern != "" {
-		re, err := regexp.Compile(*namePattern)
-		if err != nil {
-			log.Fatal(err)
-		}
-		trimmed := repos[:0]
-		for _, r := range repos {
-			if r.Name != nil && re.MatchString(*r.Name) {
-				trimmed = append(trimmed, r)
-			}
-		}
-		repos = trimmed
+	filter, err := gitindex.NewFilter(*namePattern, *excludePattern)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	if *excludePattern != "" {
-		re, err := regexp.Compile(*excludePattern)
-		if err != nil {
-			log.Fatal(err)
-		}
-
+	{
 		trimmed := repos[:0]
 		for _, r := range repos {
-			if !re.MatchString(*r.Name) {
+			if filter.Include(*r.Name) {
 				trimmed = append(trimmed, r)
 			}
 		}
@@ -180,10 +165,17 @@ func getUserRepos(client *github.Client, user string) ([]*github.Repository, err
 }
 
 func cloneRepos(destDir string, repos []*github.Repository) error {
-	urlMap := map[string]string{}
 	for _, r := range repos {
-		urlMap[*r.FullName] = *r.CloneURL
+		config := map[string]string{
+			"zoekt.web-url-type": "github",
+			"zoekt.web-url":      *r.HTMLURL,
+			"zoekt.name":         filepath.Join("github.com", *r.FullName),
+			// TODO - insert stars/forks for repo ranking too.
+		}
+		if err := gitindex.CloneRepo(destDir, *r.FullName, *r.CloneURL, config); err != nil {
+			return err
+		}
 	}
 
-	return gitindex.CloneRepos(destDir, urlMap)
+	return nil
 }

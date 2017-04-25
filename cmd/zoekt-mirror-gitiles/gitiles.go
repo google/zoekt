@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"path"
 )
 
 type Project struct {
@@ -27,9 +28,9 @@ type Project struct {
 	CloneURL string `json:"clone_url"`
 }
 
-func getGitilesRepos(URL *url.URL, filter func(string) bool) (map[string]string, error) {
-	URL.RawQuery = "format=JSON"
-	resp, err := http.Get(URL.String())
+func getGitilesRepos(root *url.URL, filter func(string) bool) (map[string]*crawlTarget, error) {
+	root.RawQuery = "format=JSON"
+	resp, err := http.Get(root.String())
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +49,7 @@ func getGitilesRepos(URL *url.URL, filter func(string) bool) (map[string]string,
 		return nil, err
 	}
 
-	result := map[string]string{}
+	result := map[string]*crawlTarget{}
 	for k, v := range m {
 		if k == "All-Users" || k == "All-Projects" {
 			continue
@@ -56,7 +57,12 @@ func getGitilesRepos(URL *url.URL, filter func(string) bool) (map[string]string,
 		if !filter(k) {
 			continue
 		}
-		result[k] = v.CloneURL
+		web := *root
+		web.Path = path.Join(web.Path, v.Name)
+		result[k] = &crawlTarget{
+			cloneURL: v.CloneURL,
+			webURL:   web.String(),
+		}
 	}
 	return result, nil
 }

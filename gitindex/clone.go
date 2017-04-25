@@ -20,31 +20,45 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 )
 
-func CloneRepos(destDir string, repos map[string]string) error {
-	for name, cloneURL := range repos {
-		parent := filepath.Join(destDir, filepath.Dir(name))
-		if err := os.MkdirAll(parent, 0755); err != nil {
-			return err
-		}
+// CloneRepo clones one repository, adding the given config
+// settings. It returns the bare repo directory.
+func CloneRepo(destDir, name, cloneURL string, settings map[string]string) error {
+	parent := filepath.Join(destDir, filepath.Dir(name))
+	if err := os.MkdirAll(parent, 0755); err != nil {
+		return err
+	}
 
-		repoDest := filepath.Join(parent, filepath.Base(name)+".git")
-		if _, err := os.Lstat(repoDest); err == nil {
-			continue
-		}
+	repoDest := filepath.Join(parent, filepath.Base(name)+".git")
+	if _, err := os.Lstat(repoDest); err == nil {
+		return nil
+	}
 
-		cmd := exec.Command(
-			"git", "clone", "--bare", "--verbose", "--progress",
-			// Only fetch branch heads, and ignore note branches.
-			"--config", "remote.origin.fetch=+refs/heads/*:refs/heads/*",
-			cloneURL, repoDest)
-		// Prevent prompting
-		cmd.Stdin = &bytes.Buffer{}
-		log.Println("running:", cmd.Args)
-		if err := cmd.Run(); err != nil {
-			return err
-		}
+	var keys []string
+	for k := range settings {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	var config []string
+	for _, k := range keys {
+		config = append(config, "--config", k+"="+settings[k])
+	}
+
+	cmd := exec.Command(
+		"git", "clone", "--bare", "--verbose", "--progress",
+		// Only fetch branch heads, and ignore note branches.
+		"--config", "remote.origin.fetch=+refs/heads/*:refs/heads/*")
+	cmd.Args = append(cmd.Args, config...)
+	cmd.Args = append(cmd.Args, cloneURL, repoDest)
+
+	// Prevent prompting
+	cmd.Stdin = &bytes.Buffer{}
+	log.Println("running:", cmd.Args)
+	if err := cmd.Run(); err != nil {
+		return err
 	}
 	return nil
 }

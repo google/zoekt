@@ -22,50 +22,17 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 
 	"github.com/google/zoekt/gitindex"
 )
 
-type filter struct {
-	inc, exc *regexp.Regexp
+type crawlTarget struct {
+	cloneURL   string
+	webURL     string
+	webURLType string
 }
 
-func (f *filter) include(name string) bool {
-	if f.inc != nil {
-		if !f.inc.MatchString(name) {
-			return false
-		}
-	}
-	if f.exc != nil {
-		if f.exc.MatchString(name) {
-			return false
-		}
-	}
-	return true
-}
-
-func newFilter(inc, exc string) (*filter, error) {
-	f := &filter{}
-	var err error
-	if inc != "" {
-		f.inc, err = regexp.Compile(inc)
-
-		if err != nil {
-			return nil, err
-		}
-	}
-	if exc != "" {
-		f.exc, err = regexp.Compile(exc)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return f, nil
-}
-
-type hostCrawler func(*url.URL, func(string) bool) (map[string]string, error)
+type hostCrawler func(*url.URL, func(string) bool) (map[string]*crawlTarget, error)
 
 func main() {
 	dest := flag.String("dest", "", "destination directory")
@@ -102,16 +69,25 @@ func main() {
 		log.Fatal(err)
 	}
 
-	filter, err := newFilter(*namePattern, *excludePattern)
+	filter, err := gitindex.NewFilter(*namePattern, *excludePattern)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	repos, err := crawler(rootURL, filter.include)
+	repos, err := crawler(rootURL, filter.Include)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := gitindex.CloneRepos(destDir, repos); err != nil {
-		log.Fatal(err)
+
+	for nm, target := range repos {
+		config := map[string]string{
+			"zoekt.web-url":      target.webURL,
+			"zoekt.web-url-type": target.webURLType,
+			"zoekt.name":         nm,
+		}
+
+		if err := gitindex.CloneRepo(destDir, nm, target.cloneURL, config); err != nil {
+			log.Fatal(err)
+		}
 	}
 }
