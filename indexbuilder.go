@@ -110,9 +110,6 @@ func (s *postingsBuilder) newSearchableString(data []byte) *searchableString {
 
 // IndexBuilder builds a single index shard.
 type IndexBuilder struct {
-	contentEnd uint32
-	nameEnd    uint32
-
 	contentStrings []*searchableString
 	nameStrings    []*searchableString
 	docSections    [][]DocumentSection
@@ -143,7 +140,7 @@ func (d *Repository) verify() error {
 func (b *IndexBuilder) ContentSize() uint32 {
 	// Add the name too so we don't skip building index if we have
 	// lots of empty files.
-	return b.contentEnd + b.nameEnd
+	return b.contentPostings.endByte + b.namePostings.endByte
 }
 
 // NewIndexBuilder creates a fresh IndexBuilder. The passed in

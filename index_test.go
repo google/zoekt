@@ -1371,12 +1371,27 @@ func TestUTF8CorrectCorpus(t *testing.T) {
 	}
 }
 
+func TestBuilderStats(t *testing.T) {
+	b := testIndexBuilder(t, nil,
+		Document{
+			Name:    "f1",
+			Content: []byte(strings.Repeat("abcd", 1024)),
+		})
+	var buf bytes.Buffer
+	b.Write(&buf)
+
+	if got, want := b.ContentSize(), uint32(2+4*1024); got != want {
+		t.Errorf("got %d, want %d", got, want)
+	}
+}
+
 func TestIOStats(t *testing.T) {
 	b := testIndexBuilder(t, nil,
 		Document{
 			Name:    "f1",
 			Content: []byte(strings.Repeat("abcd", 1024)),
 		})
+
 	q := &query.Substring{Pattern: "abc", CaseSensitive: true, Content: true}
 	res := searchForTest(t, b, q)
 
