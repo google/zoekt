@@ -148,13 +148,21 @@ func TestSubmoduleIndex(t *testing.T) {
 	}
 	defer os.RemoveAll(indexDir)
 
-	opts := build.Options{
+	buildOpts := build.Options{
 		IndexDir: indexDir,
 		RepoDir:  filepath.Join(dir, "gerrit.googlesource.com", "adir.git"),
 	}
-	opts.SetDefaults()
+	buildOpts.SetDefaults()
 
-	if err := IndexGitRepo(opts, "refs/heads/", []string{"master"}, true, true, dir); err != nil {
+	opts := Options{
+		BuildOptions: buildOpts,
+		BranchPrefix: "refs/heads/",
+		Branches:     []string{"master"},
+		Submodules:   true,
+		Incremental:  true,
+		RepoCacheDir: dir,
+	}
+	if err := IndexGitRepo(opts); err != nil {
 		t.Fatalf("IndexGitRepo: %v", err)
 	}
 
@@ -194,5 +202,44 @@ func TestSubmoduleIndex(t *testing.T) {
 		t.Errorf("got %v, want 1 result", results.Files)
 	} else if f := results.Files[0]; f.Version == subVersion {
 		t.Errorf("version in super repo matched version is subrepo.")
+	}
+}
+
+func TestAllowMissingBranch(t *testing.T) {
+	dir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatalf("TempDir: %v", err)
+	}
+
+	if err := createSubmoduleRepo(dir); err != nil {
+		t.Fatalf("createSubmoduleRepo: %v", err)
+	}
+
+	indexDir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(indexDir)
+
+	buildOpts := build.Options{
+		IndexDir: indexDir,
+		RepoDir:  filepath.Join(dir, "gerrit.googlesource.com", "adir.git"),
+	}
+	buildOpts.SetDefaults()
+
+	opts := Options{
+		BuildOptions: buildOpts,
+		BranchPrefix: "refs/heads/",
+		Branches:     []string{"master", "nonexist"},
+		Submodules:   true,
+		Incremental:  true,
+		RepoCacheDir: dir,
+	}
+	if err := IndexGitRepo(opts); err == nil {
+		t.Fatalf("IndexGitRepo(nonexist) succeeded")
+	}
+	opts.AllowMissingBranch = true
+	if err := IndexGitRepo(opts); err != nil {
+		t.Fatalf("IndexGitRepo(nonexist, allow): %v", err)
 	}
 }

@@ -145,6 +145,10 @@ func clearEmptyConfig(err error) error {
 	return err
 }
 
+func isMissingBranchError(err error) bool {
+	return git.IsErrorClass(err, git.ErrClassReference) && git.IsErrorCode(err, git.ErrNotFound)
+}
+
 func setTemplatesFromConfig(desc *zoekt.Repository, repoDir string) error {
 	base, err := git.NewConfig()
 	if err != nil {
@@ -232,18 +236,29 @@ func SetTemplatesFromOrigin(desc *zoekt.Repository, u *url.URL) error {
 	return nil
 }
 
-// IndexGitRepo indexes the git repository as specified by the options and arguments.
-func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, submodules, incremental bool, repoCacheDir string) error {
-	repo, err := git.OpenRepository(opts.RepoDir)
+type Options struct {
+	Submodules         bool
+	Incremental        bool
+	AllowMissingBranch bool
+	RepoCacheDir       string
+	BuildOptions       build.Options
+
+	BranchPrefix string
+	Branches     []string
+}
+
+// IndexGitRepo indexes the git repository as specified by the options.
+func IndexGitRepo(opts Options) error {
+	repo, err := git.OpenRepository(opts.BuildOptions.RepoDir)
 	if err != nil {
 		return err
 	}
 
-	if err := setTemplatesFromConfig(&opts.RepositoryDescription, opts.RepoDir); err != nil {
-		log.Printf("setTemplatesFromConfig(%s): %s", opts.RepoDir, err)
+	if err := setTemplatesFromConfig(&opts.BuildOptions.RepositoryDescription, opts.BuildOptions.RepoDir); err != nil {
+		log.Printf("setTemplatesFromConfig(%s): %s", opts.BuildOptions.RepoDir, err)
 	}
 
-	repoCache := NewRepoCache(repoCacheDir)
+	repoCache := NewRepoCache(opts.RepoCacheDir)
 	defer repoCache.Close()
 
 	// branch => (path, sha1) => repo.
@@ -254,10 +269,10 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 
 	// Branch => Repo => SHA1
 	branchVersions := map[string]map[string]git.Oid{}
-	for _, b := range branches {
+	for _, b := range opts.Branches {
 		fullName := b
 		if b != "HEAD" {
-			fullName = filepath.Join(branchPrefix, b)
+			fullName = filepath.Join(opts.BranchPrefix, b)
 		} else {
 			_, ref, err := repo.RevparseExt(b)
 			if err != nil {
@@ -265,14 +280,18 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 			}
 
 			fullName = ref.Name()
-			b = strings.TrimPrefix(fullName, branchPrefix)
+			b = strings.TrimPrefix(fullName, opts.BranchPrefix)
 		}
 		commit, err := getCommit(repo, fullName)
+		if opts.AllowMissingBranch && isMissingBranchError(err) {
+			continue
+		}
+
 		if err != nil {
 			return err
 		}
 		defer commit.Free()
-		opts.RepositoryDescription.Branches = append(opts.RepositoryDescription.Branches, zoekt.RepositoryBranch{
+		opts.BuildOptions.RepositoryDescription.Branches = append(opts.BuildOptions.RepositoryDescription.Branches, zoekt.RepositoryBranch{
 			Name:    b,
 			Version: commit.Id().String(),
 		})
@@ -283,7 +302,7 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 		}
 		defer tree.Free()
 
-		files, subVersions, err := TreeToFiles(repo, tree, opts.RepositoryDescription.URL, repoCache)
+		files, subVersions, err := TreeToFiles(repo, tree, opts.BuildOptions.RepositoryDescription.URL, repoCache)
 		if err != nil {
 			return err
 		}
@@ -295,9 +314,9 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 		branchVersions[b] = subVersions
 	}
 
-	if incremental {
-		versions := opts.IndexVersions()
-		if reflect.DeepEqual(versions, opts.RepositoryDescription.Branches) {
+	if opts.Incremental {
+		versions := opts.BuildOptions.IndexVersions()
+		if reflect.DeepEqual(versions, opts.BuildOptions.RepositoryDescription.Branches) {
 			return nil
 		}
 	}
@@ -307,19 +326,19 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 		reposByPath[key.SubRepoPath] = location
 	}
 
-	opts.SubRepositories = map[string]*zoekt.Repository{}
+	opts.BuildOptions.SubRepositories = map[string]*zoekt.Repository{}
 	for path, location := range reposByPath {
-		tpl := opts.RepositoryDescription
+		tpl := opts.BuildOptions.RepositoryDescription
 		if path != "" {
 			tpl = zoekt.Repository{URL: location.URL.String()}
 			if err := SetTemplatesFromOrigin(&tpl, location.URL); err != nil {
 				log.Printf("setTemplatesFromOrigin(%s, %s): %s", path, location.URL, err)
 			}
 		}
-		opts.SubRepositories[path] = &tpl
+		opts.BuildOptions.SubRepositories[path] = &tpl
 	}
-	for _, br := range opts.RepositoryDescription.Branches {
-		for path, repo := range opts.SubRepositories {
+	for _, br := range opts.BuildOptions.RepositoryDescription.Branches {
+		for path, repo := range opts.BuildOptions.SubRepositories {
 			id := branchVersions[br.Name][path]
 			repo.Branches = append(repo.Branches, zoekt.RepositoryBranch{
 				Name:    br.Name,
@@ -328,7 +347,7 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 		}
 	}
 
-	builder, err := build.NewBuilder(opts)
+	builder, err := build.NewBuilder(opts.BuildOptions)
 	if err != nil {
 		return err
 	}
@@ -352,7 +371,7 @@ func IndexGitRepo(opts build.Options, branchPrefix string, branches []string, su
 				return err
 			}
 
-			if blob.Size() > int64(opts.SizeMax) {
+			if blob.Size() > int64(opts.BuildOptions.SizeMax) {
 				continue
 			}
 

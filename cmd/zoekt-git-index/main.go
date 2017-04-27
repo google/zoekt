@@ -31,6 +31,7 @@ func main() {
 	var sizeMax = flag.Int("file_limit", 128*1024, "maximum file size")
 	var shardLimit = flag.Int("shard_limit", 100<<20, "maximum corpus size for a shard")
 	var parallelism = flag.Int("parallelism", 4, "maximum number of parallel indexing processes.")
+	allowMissing := flag.Bool("allow_missing_branches", false, "allow missing branches.")
 	submodules := flag.Bool("submodules", true, "if set to false, do not recurse into submodules")
 	branchesStr := flag.String("branches", "HEAD", "git branches to index.")
 	branchPrefix := flag.String("prefix", "refs/heads/", "prefix for branch names")
@@ -90,7 +91,17 @@ func main() {
 		opts.RepositoryDescription.Name = name
 		opts.RepoDir = filepath.Clean(dir)
 
-		if err := gitindex.IndexGitRepo(opts, *branchPrefix, branches, *submodules, *incremental, *repoCacheDir); err != nil {
+		gitOpts := gitindex.Options{
+			BranchPrefix:       *branchPrefix,
+			Incremental:        *incremental,
+			Submodules:         *submodules,
+			RepoCacheDir:       *repoCacheDir,
+			AllowMissingBranch: *allowMissing,
+			BuildOptions:       opts,
+			Branches:           branches,
+		}
+
+		if err := gitindex.IndexGitRepo(gitOpts); err != nil {
 			log.Printf("indexGitRepo(%s): %v", dir, err)
 			exitStatus = 1
 		}
