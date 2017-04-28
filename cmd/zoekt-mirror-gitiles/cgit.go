@@ -94,6 +94,9 @@ func getCGitRepos(u *url.URL, filter func(string) bool) (map[string]*crawlTarget
 // is insecure) at the top, but individual machines (such as
 // git.savannah.gnu) probably would rather receive git:// traffic
 // which is more efficient.
+
+// TODO - do something like `Clone.*<a.*href=` to get the first
+// URL. Older versions don't say vcs-git.
 var cloneURLRe = regexp.MustCompile(
 	`rel=["']vcs-git["'] *href=["']([^"']*)["']`)
 
