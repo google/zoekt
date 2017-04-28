@@ -95,16 +95,15 @@ func templatesForOrigin(u *url.URL) (*zoekt.Repository, error) {
 // setTemplates fills in URL templates for known git hosting
 // sites.
 func setTemplates(repo *zoekt.Repository, u *url.URL, typ string) error {
+	repo.URL = u.String()
 	switch typ {
 	case "gitiles":
 		/// eg. https://gerrit.googlesource.com/gitiles/+/master/tools/run_dev.sh#20
-		repo.URL = u.String()
 		repo.CommitURLTemplate = u.String() + "/+/{{.Version}}"
 		repo.FileURLTemplate = u.String() + "/+/{{.Version}}/{{.Path}}"
 		repo.LineFragmentTemplate = "{{.LineNumber}}"
 	case "github":
 		// eg. https://github.com/hanwen/go-fuse/blob/notify/genversion.sh#L10
-		repo.URL = u.String()
 		repo.CommitURLTemplate = u.String() + "/commit/{{.Version}}"
 		repo.FileURLTemplate = u.String() + "/blob/{{.Version}}/{{.Path}}"
 		repo.LineFragmentTemplate = "L{{.LineNumber}}"
@@ -113,10 +112,16 @@ func setTemplates(repo *zoekt.Repository, u *url.URL, typ string) error {
 
 		// http://git.savannah.gnu.org/cgit/lilypond.git/tree/elisp/lilypond-mode.el?h=dev/philh&id=b2ca0fefe3018477aaca23b6f672c7199ba5238e#n100
 
-		repo.URL = u.String()
 		repo.CommitURLTemplate = u.String() + "/commit/?id={{.Version}}"
 		repo.FileURLTemplate = u.String() + "/tree/{{.Path}}/?id={{.Version}}"
 		repo.LineFragmentTemplate = "n{{.LineNumber}}"
+
+	case "gitweb":
+		// https://gerrit.libreoffice.org/gitweb?p=online.git;a=blob;f=Makefile.am;h=cfcfd7c36fbae10e269653dc57a9b68c92d4c10b;hb=848145503bf7b98ce4a4aa0a858a0d71dd0dbb26#l10
+		repo.FileURLTemplate = u.String() + ";a=blob;f={{.Path}};hb={{.Version}}"
+		repo.CommitURLTemplate = u.String() + ";a=commit;h={{.Version}}"
+		repo.LineFragmentTemplate = "l{{.LineNumber}}"
+
 	default:
 		return fmt.Errorf("URL scheme type %q unknown", typ)
 	}
