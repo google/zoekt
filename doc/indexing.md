@@ -8,4 +8,5 @@ Parameters are in the `zoekt` section of the git-config.
 * `web-url`: base URL for linking to files, commits, and the repository, eg.
 `https://github.com/hanwen/usb`
 
-* `web-url-type`: type of URL, eg. github. Supported are cgit, gitiles, and cgit.
+* `web-url-type`: type of URL, eg. github. Supported are cgit,
+  gitiles, gitweb and cgit.
