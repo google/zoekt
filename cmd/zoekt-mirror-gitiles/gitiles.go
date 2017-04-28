@@ -29,8 +29,9 @@ type Project struct {
 }
 
 func getGitilesRepos(root *url.URL, filter func(string) bool) (map[string]*crawlTarget, error) {
-	root.RawQuery = "format=JSON"
-	resp, err := http.Get(root.String())
+	jsRoot := *root
+	jsRoot.RawQuery = "format=JSON"
+	resp, err := http.Get(jsRoot.String())
 	if err != nil {
 		return nil, err
 	}
@@ -60,8 +61,9 @@ func getGitilesRepos(root *url.URL, filter func(string) bool) (map[string]*crawl
 		web := *root
 		web.Path = path.Join(web.Path, v.Name)
 		result[k] = &crawlTarget{
-			cloneURL: v.CloneURL,
-			webURL:   web.String(),
+			cloneURL:   v.CloneURL,
+			webURL:     web.String(),
+			webURLType: "gitiles",
 		}
 	}
 	return result, nil

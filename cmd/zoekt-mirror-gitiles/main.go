@@ -83,7 +83,7 @@ func main() {
 		config := map[string]string{
 			"zoekt.web-url":      target.webURL,
 			"zoekt.web-url-type": target.webURLType,
-			"zoekt.name":         nm,
+			"zoekt.name":         filepath.Join(rootURL.Host, rootURL.Path, nm),
 		}
 
 		if err := gitindex.CloneRepo(destDir, nm, target.cloneURL, config); err != nil {
