@@ -33,6 +33,9 @@ import (
 )
 
 var Funcmap = template.FuncMap{
+	"Inc": func(orig int) int {
+		return orig + 1
+	},
 	"HumanUnit": func(orig int64) string {
 		b := orig
 		suffix := ""
@@ -442,10 +445,17 @@ func (s *Server) servePrintErr(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	f := result.Files[0]
+
+	byteLines := bytes.Split(f.Content, []byte{'\n'})
+	strLines := make([]string, 0, len(byteLines))
+	for _, l := range byteLines {
+		strLines = append(strLines, string(l))
+	}
+
 	d := PrintInput{
-		Name:    f.FileName,
-		Repo:    f.Repository,
-		Content: string(f.Content),
+		Name:  f.FileName,
+		Repo:  f.Repository,
+		Lines: strLines,
 		Last: LastInput{
 			Query: queryStr,
 			Num:   num,

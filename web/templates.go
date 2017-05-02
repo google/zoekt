@@ -194,7 +194,10 @@ To list repositories, try:
 
 
 <div style="background: #eef;">
-<pre>{{.Content}}
+{{ range $index, $ln := .Lines}}
+  <pre><a name="l{{Inc $index}}" href="#l{{Inc $index}}">{{Inc $index}}</a>: {{$ln}}</pre>
+{{end}}
+<pre>
 </pre>
 </div>
 </body>
