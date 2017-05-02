@@ -98,6 +98,17 @@ case variants, ie. {"abc", "Abc", "aBc", "ABc", ... }, and then
 compare the candidate matches without regard for case.
 
 
+UTF-8
+-----
+
+UTF-8 is the defacto encoding for unicode. Zoekt assumes that files
+are UTF-8 encoded.  Characters have differing widths in UTF-8, so we
+use rune offsets in the trigram index, and convert those back to bytes
+with a lookup table: every 100 runes, we store the rune-index to
+byte-index mapping. For corpuses that are completely ASCII (fairly
+normal for source code), we short-circuit this lookup.
+
+
 Branches
 --------
 
