@@ -210,7 +210,7 @@ func TestAllowMissingBranch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TempDir: %v", err)
 	}
-
+	defer os.RemoveAll(dir)
 	if err := createSubmoduleRepo(dir); err != nil {
 		t.Fatalf("createSubmoduleRepo: %v", err)
 	}
@@ -241,5 +241,85 @@ func TestAllowMissingBranch(t *testing.T) {
 	opts.AllowMissingBranch = true
 	if err := IndexGitRepo(opts); err != nil {
 		t.Fatalf("IndexGitRepo(nonexist, allow): %v", err)
+	}
+}
+
+func createMultibranchRepo(dir string) error {
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	script := `mkdir repo
+cd repo
+git init
+mkdir subdir
+echo acont > afile
+echo sub-cont > subdir/sub-file
+git add afile subdir/sub-file
+git commit -am amsg
+
+git branch branchdir/a
+
+echo acont >> afile
+git add afile subdir/sub-file
+git commit -am amsg
+
+git branch branchdir/b
+
+git branch c
+`
+	cmd := exec.Command("/bin/sh", "-euxc", script)
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("execution error: %v, output %s", err, out)
+	}
+	return nil
+}
+
+func TestBranchWildcard(t *testing.T) {
+	dir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatalf("TempDir: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	if err := createMultibranchRepo(dir); err != nil {
+		t.Fatalf("createMultibranchRepo: %v", err)
+	}
+
+	indexDir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(indexDir)
+
+	buildOpts := build.Options{
+		IndexDir: indexDir,
+		RepoDir:  filepath.Join(dir + "/repo"),
+	}
+	buildOpts.SetDefaults()
+
+	opts := Options{
+		BuildOptions: buildOpts,
+		BranchPrefix: "refs/heads",
+		Branches:     []string{"branchdir/*"},
+		Submodules:   true,
+		Incremental:  true,
+	}
+	if err := IndexGitRepo(opts); err != nil {
+		t.Fatalf("IndexGitRepo: %v", err)
+	}
+
+	searcher, err := zoekt.NewShardedSearcher(indexDir)
+	if err != nil {
+		t.Fatal("NewShardedSearcher", err)
+	}
+	defer searcher.Close()
+
+	if rlist, err := searcher.List(context.Background(), &query.Repo{Pattern: ""}); err != nil {
+		t.Fatalf("List(): %v", err)
+	} else if len(rlist.Repos) != 1 {
+		t.Errorf("got %v, want 1 result", rlist.Repos)
+	} else if repo := rlist.Repos[0]; len(repo.Repository.Branches) != 2 {
+		t.Errorf("got branches %v, want 2", repo.Repository.Branches)
 	}
 }

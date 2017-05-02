@@ -252,6 +252,58 @@ type Options struct {
 	Branches     []string
 }
 
+func expandBranches(repo *git.Repository, bs []string, prefix string) ([]string, error) {
+	var result []string
+	for _, b := range bs {
+		if b == "HEAD" {
+			_, ref, err := repo.RevparseExt(b)
+			if err != nil {
+				return nil, err
+			}
+
+			result = append(result, strings.TrimPrefix(ref.Name(), prefix))
+			continue
+		}
+
+		if strings.Contains(b, "*") {
+			iter, err := repo.NewBranchIterator(git.BranchAll)
+			if err != nil {
+				log.Println("boem")
+				return nil, err
+			}
+
+			for {
+				br, _, err := iter.Next()
+				if git.IsErrorCode(err, git.ErrIterOver) {
+					break
+				}
+				if err != nil {
+					log.Printf("bam %#v", err)
+					return nil, err
+				}
+
+				name, err := br.Name()
+				if err != nil {
+					return nil, err
+				}
+				if matched, err := filepath.Match(b, name); err != nil {
+					return nil, err
+				} else if !matched {
+					continue
+				}
+
+				result = append(result, strings.TrimPrefix(name, prefix))
+			}
+			continue
+		}
+
+		result = append(result, b)
+	}
+
+	return result, nil
+
+}
+
 // IndexGitRepo indexes the git repository as specified by the options.
 func IndexGitRepo(opts Options) error {
 	repo, err := git.OpenRepository(opts.BuildOptions.RepoDir)
@@ -274,19 +326,14 @@ func IndexGitRepo(opts Options) error {
 
 	// Branch => Repo => SHA1
 	branchVersions := map[string]map[string]git.Oid{}
-	for _, b := range opts.Branches {
-		fullName := b
-		if b != "HEAD" {
-			fullName = filepath.Join(opts.BranchPrefix, b)
-		} else {
-			_, ref, err := repo.RevparseExt(b)
-			if err != nil {
-				return err
-			}
 
-			fullName = ref.Name()
-			b = strings.TrimPrefix(fullName, opts.BranchPrefix)
-		}
+	branches, err := expandBranches(repo, opts.Branches, opts.BranchPrefix)
+	if err != nil {
+		return err
+	}
+	for _, b := range branches {
+		fullName := filepath.Join(opts.BranchPrefix, b)
+
 		commit, err := getCommit(repo, fullName)
 		if opts.AllowMissingBranch && isMissingBranchError(err) {
 			continue
