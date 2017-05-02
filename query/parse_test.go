@@ -22,7 +22,7 @@ import (
 )
 
 func mustParseRE(s string) *syntax.Regexp {
-	r, err := syntax.Parse(s, syntax.Perl)
+	r, err := syntax.Parse(s, syntax.ClassNL|syntax.PerlX|syntax.UnicodeGroups)
 	if err != nil {
 		log.Panicf("parsing %q: %v", s, err)
 	}

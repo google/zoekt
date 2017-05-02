@@ -1406,3 +1406,32 @@ func TestIOStats(t *testing.T) {
 		t.Errorf("got index I/O %d, want %d", got, want)
 	}
 }
+
+func TestStartLineAnchor(t *testing.T) {
+	b := testIndexBuilder(t, nil,
+		Document{
+			Name: "f1",
+			Content: []byte(
+				`hello
+start of middle of line
+`)})
+
+	q, err := query.Parse("^start")
+	if err != nil {
+		t.Errorf("parse: %v", err)
+	}
+
+	res := searchForTest(t, b, q)
+	if len(res.Files) != 1 {
+		t.Errorf("got %v, want 1 file", res.Files)
+	}
+
+	q, err = query.Parse("^middle")
+	if err != nil {
+		t.Errorf("parse: %v", err)
+	}
+	res = searchForTest(t, b, q)
+	if len(res.Files) != 0 {
+		t.Errorf("got %v, want 0 files", res.Files)
+	}
+}
