@@ -23,8 +23,6 @@ import (
 	"github.com/google/zoekt/query"
 )
 
-var _ = log.Println
-
 // indexData holds the pattern-independent data that we have to have
 // in memory to search. Most of the memory is taken up by the ngram =>
 // offset index.
@@ -74,6 +72,29 @@ type indexData struct {
 	subRepoPaths []string
 
 	repoListEntry RepoListEntry
+}
+
+func (d *indexData) calculateStats() {
+	var last uint32
+	if len(d.boundaries) > 0 {
+		last += d.boundaries[len(d.boundaries)-1]
+	}
+
+	lastFN := last
+	if len(d.fileNameIndex) > 0 {
+		lastFN = d.fileNameIndex[len(d.fileNameIndex)-1]
+	}
+
+	stats := RepoStats{
+		IndexBytes:   int64(d.memoryUse()),
+		ContentBytes: int64(int(last) + int(lastFN)),
+		Documents:    len(d.newlinesIndex) - 1,
+	}
+	d.repoListEntry = RepoListEntry{
+		Repository:    d.repoMetaData,
+		IndexMetadata: d.metaData,
+		Stats:         stats,
+	}
 }
 
 func (d *indexData) String() string {

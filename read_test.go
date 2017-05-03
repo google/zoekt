@@ -16,12 +16,9 @@ package zoekt
 
 import (
 	"bytes"
-	"log"
 	"reflect"
 	"testing"
 )
-
-var _ = log.Println
 
 func TestReadWrite(t *testing.T) {
 	b, err := NewIndexBuilder(nil)

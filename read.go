@@ -18,9 +18,17 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"log"
 	"sort"
 )
+
+// IndexFile is a file suitable for concurrent read access. For performance
+// reasons, it allows a mmap'd implementation.
+type IndexFile interface {
+	Read(off uint32, sz uint32) ([]byte, error)
+	Size() (uint32, error)
+	Close()
+	Name() string
+}
 
 // reader is a stateful file
 type reader struct {
@@ -40,8 +48,6 @@ func (r *reader) U32() (uint32, error) {
 	}
 	return binary.BigEndian.Uint32(b), nil
 }
-
-var _ = log.Println
 
 func (r *reader) readTOC(toc *indexTOC) error {
 	sz, err := r.r.Size()
@@ -292,15 +298,6 @@ func (d *indexData) readDocSections(i uint32) ([]DocumentSection, uint32, error)
 	return unmarshalDocSections(blob), sec.sz, nil
 }
 
-// IndexFile is a file suitable for concurrent read access. For performance
-// reasons, it allows a mmap'd implementation.
-type IndexFile interface {
-	Read(off uint32, sz uint32) ([]byte, error)
-	Size() (uint32, error)
-	Close()
-	Name() string
-}
-
 // NewSearcher creates a Searcher for a single index file.
 func NewSearcher(r IndexFile) (Searcher, error) {
 	rd := &reader{r: r}
@@ -317,6 +314,8 @@ func NewSearcher(r IndexFile) (Searcher, error) {
 	return indexData, nil
 }
 
+// ReadMetadata returns the metadata of index shard without reading
+// the index data. The IndexFile is not closed.
 func ReadMetadata(inf IndexFile) (*Repository, *IndexMetadata, error) {
 	rd := &reader{r: inf}
 	var toc indexTOC
@@ -335,27 +334,4 @@ func ReadMetadata(inf IndexFile) (*Repository, *IndexMetadata, error) {
 	}
 
 	return &repo, &md, nil
-}
-
-func (d *indexData) calculateStats() {
-	var last uint32
-	if len(d.boundaries) > 0 {
-		last += d.boundaries[len(d.boundaries)-1]
-	}
-
-	lastFN := last
-	if len(d.fileNameIndex) > 0 {
-		lastFN = d.fileNameIndex[len(d.fileNameIndex)-1]
-	}
-
-	stats := RepoStats{
-		IndexBytes:   int64(d.memoryUse()),
-		ContentBytes: int64(int(last) + int(lastFN)),
-		Documents:    len(d.newlinesIndex) - 1,
-	}
-	d.repoListEntry = RepoListEntry{
-		Repository:    d.repoMetaData,
-		IndexMetadata: d.metaData,
-		Stats:         stats,
-	}
 }

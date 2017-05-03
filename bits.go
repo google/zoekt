@@ -15,6 +15,7 @@
 package zoekt
 
 import (
+	"encoding/binary"
 	"unicode"
 	"unicode/utf8"
 )
@@ -232,4 +233,61 @@ func (p ngramSlice) Less(i, j int) bool {
 
 func (p ngramSlice) Swap(i, j int) {
 	p[i], p[j] = p[j], p[i]
+}
+
+func toSizedDeltas(offsets []uint32) []byte {
+	var enc [8]byte
+
+	deltas := make([]byte, 0, len(offsets)*2)
+
+	m := binary.PutUvarint(enc[:], uint64(len(offsets)))
+	deltas = append(deltas, enc[:m]...)
+
+	var last uint32
+	for _, p := range offsets {
+		delta := p - last
+		last = p
+
+		m := binary.PutUvarint(enc[:], uint64(delta))
+		deltas = append(deltas, enc[:m]...)
+	}
+	return deltas
+}
+
+func fromSizedDeltas(data []byte, ps []uint32) []uint32 {
+	sz, m := binary.Uvarint(data)
+	data = data[m:]
+
+	if cap(ps) < int(sz) {
+		ps = make([]uint32, 0, sz)
+	} else {
+		ps = ps[:0]
+	}
+
+	var last uint32
+	for len(data) > 0 {
+		delta, m := binary.Uvarint(data)
+		offset := last + uint32(delta)
+		last = offset
+		data = data[m:]
+		ps = append(ps, offset)
+	}
+	return ps
+}
+
+func fromDeltas(data []byte, buf []uint32) []uint32 {
+	buf = buf[:0]
+	if cap(buf) < len(data)/2 {
+		buf = make([]uint32, 0, len(data)/2)
+	}
+
+	var last uint32
+	for len(data) > 0 {
+		delta, m := binary.Uvarint(data)
+		offset := last + uint32(delta)
+		last = offset
+		data = data[m:]
+		buf = append(buf, offset)
+	}
+	return buf
 }
