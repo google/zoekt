@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package zoekt
+package shards
 
 import (
 	"bytes"
@@ -22,15 +22,16 @@ import (
 
 	"golang.org/x/net/context"
 
+	"github.com/google/zoekt"
 	"github.com/google/zoekt/query"
 )
 
 type testLoader struct {
-	searchers []Searcher
+	searchers []zoekt.Searcher
 }
 
 func (l *testLoader) Close() {}
-func (l *testLoader) getShards() []Searcher {
+func (l *testLoader) getShards() []zoekt.Searcher {
 	return l.searchers
 }
 
@@ -40,16 +41,16 @@ func (l *testLoader) String() string { return "test" }
 
 type crashSearcher struct{}
 
-func (s *crashSearcher) Search(ctx context.Context, q query.Q, opts *SearchOptions) (*SearchResult, error) {
+func (s *crashSearcher) Search(ctx context.Context, q query.Q, opts *zoekt.SearchOptions) (*zoekt.SearchResult, error) {
 	panic("search")
 }
 
-func (s *crashSearcher) List(ctx context.Context, q query.Q) (*RepoList, error) {
+func (s *crashSearcher) List(ctx context.Context, q query.Q) (*zoekt.RepoList, error) {
 	panic("list")
 }
 
-func (s *crashSearcher) Stats() (*RepoStats, error) {
-	return &RepoStats{}, nil
+func (s *crashSearcher) Stats() (*zoekt.RepoStats, error) {
+	return &zoekt.RepoStats{}, nil
 }
 
 func (s *crashSearcher) Close() {}
@@ -60,10 +61,10 @@ func TestCrashResilience(t *testing.T) {
 	out := &bytes.Buffer{}
 	log.SetOutput(out)
 	defer log.SetOutput(os.Stderr)
-	ss := &shardedSearcher{&testLoader{[]Searcher{&crashSearcher{}}}}
+	ss := &shardedSearcher{&testLoader{[]zoekt.Searcher{&crashSearcher{}}}}
 
 	q := &query.Substring{Pattern: "hoi"}
-	opts := &SearchOptions{}
+	opts := &zoekt.SearchOptions{}
 	if res, err := ss.Search(context.Background(), q, opts); err != nil {
 		t.Fatalf("Search: %v", err)
 	} else if res.Stats.Crashes != 1 {

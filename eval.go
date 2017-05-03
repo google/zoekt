@@ -674,7 +674,7 @@ nextFileMatch:
 		res.Stats.MatchCount += len(fileMatch.LineMatches)
 		res.Stats.FileCount++
 	}
-	sortFilesByScore(res.Files)
+	SortFilesByScore(res.Files)
 
 	addRepo(&res, &d.repoMetaData)
 	for _, v := range d.repoMetaData.SubRepoMap {

@@ -27,8 +27,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
+	"github.com/google/zoekt/shards"
 	"github.com/google/zoekt/web"
 )
 
@@ -135,7 +135,7 @@ func main() {
 		go divertLogs(*logDir, *logRefresh)
 	}
 
-	searcher, err := zoekt.NewShardedSearcher(*index)
+	searcher, err := shards.NewShardedSearcher(*index)
 	if err != nil {
 		log.Fatal(err)
 	}

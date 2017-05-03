@@ -30,6 +30,7 @@ import (
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
 	"github.com/google/zoekt/query"
+	"github.com/google/zoekt/shards"
 )
 
 func createSubmoduleRepo(dir string) error {
@@ -166,7 +167,7 @@ func TestSubmoduleIndex(t *testing.T) {
 		t.Fatalf("IndexGitRepo: %v", err)
 	}
 
-	searcher, err := zoekt.NewShardedSearcher(indexDir)
+	searcher, err := shards.NewShardedSearcher(indexDir)
 	if err != nil {
 		t.Fatal("NewShardedSearcher", err)
 	}
@@ -309,7 +310,7 @@ func TestBranchWildcard(t *testing.T) {
 		t.Fatalf("IndexGitRepo: %v", err)
 	}
 
-	searcher, err := zoekt.NewShardedSearcher(indexDir)
+	searcher, err := shards.NewShardedSearcher(indexDir)
 	if err != nil {
 		t.Fatal("NewShardedSearcher", err)
 	}

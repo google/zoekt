@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package zoekt
+package shards
 
 import (
 	"fmt"
@@ -27,11 +27,12 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/google/zoekt"
 	"github.com/google/zoekt/query"
 )
 
 type searchShard struct {
-	Searcher
+	zoekt.Searcher
 	mtime time.Time
 }
 
@@ -58,11 +59,11 @@ func loadShard(fn string) (*searchShard, error) {
 		return nil, err
 	}
 
-	iFile, err := NewIndexFile(f)
+	iFile, err := zoekt.NewIndexFile(f)
 	if err != nil {
 		return nil, err
 	}
-	s, err := NewSearcher(iFile)
+	s, err := zoekt.NewSearcher(iFile)
 	if err != nil {
 		iFile.Close()
 		return nil, fmt.Errorf("NewSearcher(%s): %v", fn, err)
@@ -139,8 +140,8 @@ func (s *shardWatcher) rlock() {
 
 // getShards returns the currently loaded shards. The shards must be
 // accessed under a rlock call.
-func (s *shardWatcher) getShards() []Searcher {
-	var res []Searcher
+func (s *shardWatcher) getShards() []zoekt.Searcher {
+	var res []zoekt.Searcher
 	for _, sh := range s.shards {
 		res = append(res, sh)
 	}
@@ -210,7 +211,7 @@ func (s *shardWatcher) watch() error {
 
 // NewShardedSearcher returns a searcher instance that loads all
 // shards corresponding to a glob into memory.
-func NewShardedSearcher(dir string) (Searcher, error) {
+func NewShardedSearcher(dir string) (zoekt.Searcher, error) {
 	ss := shardWatcher{
 		dir:      dir,
 		shards:   make(map[string]*searchShard),
@@ -241,7 +242,7 @@ func (ss *shardWatcher) Close() {
 
 type shardLoader interface {
 	Close()
-	getShards() []Searcher
+	getShards() []zoekt.Searcher
 	rlock()
 	runlock()
 	String() string
@@ -251,14 +252,14 @@ type shardedSearcher struct {
 	shardLoader
 }
 
-func (ss *shardedSearcher) Search(ctx context.Context, pat query.Q, opts *SearchOptions) (*SearchResult, error) {
+func (ss *shardedSearcher) Search(ctx context.Context, pat query.Q, opts *zoekt.SearchOptions) (*zoekt.SearchResult, error) {
 	start := time.Now()
 	type res struct {
-		sr  *SearchResult
+		sr  *zoekt.SearchResult
 		err error
 	}
 
-	aggregate := SearchResult{
+	aggregate := zoekt.SearchResult{
 		RepoURLs:      map[string]string{},
 		LineFragments: map[string]string{},
 	}
@@ -291,14 +292,14 @@ func (ss *shardedSearcher) Search(ctx context.Context, pat query.Q, opts *Search
 	// when looking for the string "com".
 	throttle := make(chan int, 10*runtime.NumCPU())
 	for _, s := range shards {
-		go func(s Searcher) {
+		go func(s zoekt.Searcher) {
 			throttle <- 1
 			defer func() {
 				<-throttle
 				if r := recover(); r != nil {
 					log.Printf("crashed shard: %s: %s, %s", s.String(), r, debug.Stack())
 
-					var r SearchResult
+					var r zoekt.SearchResult
 					r.Stats.Crashes = 1
 					all <- res{&r, nil}
 				}
@@ -332,14 +333,14 @@ func (ss *shardedSearcher) Search(ctx context.Context, pat query.Q, opts *Search
 		}
 	}
 
-	sortFilesByScore(aggregate.Files)
+	zoekt.SortFilesByScore(aggregate.Files)
 	aggregate.Duration = time.Now().Sub(start)
 	return &aggregate, nil
 }
 
-func (ss *shardedSearcher) List(ctx context.Context, r query.Q) (*RepoList, error) {
+func (ss *shardedSearcher) List(ctx context.Context, r query.Q) (*zoekt.RepoList, error) {
 	type res struct {
-		rl  *RepoList
+		rl  *zoekt.RepoList
 		err error
 	}
 
@@ -351,11 +352,11 @@ func (ss *shardedSearcher) List(ctx context.Context, r query.Q) (*RepoList, erro
 	all := make(chan res, shardCount)
 
 	for _, s := range shards {
-		go func(s Searcher) {
+		go func(s zoekt.Searcher) {
 			defer func() {
 				if r := recover(); r != nil {
 					all <- res{
-						&RepoList{Crashes: 1}, nil,
+						&zoekt.RepoList{Crashes: 1}, nil,
 					}
 				}
 			}()
@@ -365,7 +366,7 @@ func (ss *shardedSearcher) List(ctx context.Context, r query.Q) (*RepoList, erro
 	}
 
 	crashes := 0
-	uniq := map[string]*RepoListEntry{}
+	uniq := map[string]*zoekt.RepoListEntry{}
 
 	var names []string
 	for i := 0; i < shardCount; i++ {
@@ -387,11 +388,11 @@ func (ss *shardedSearcher) List(ctx context.Context, r query.Q) (*RepoList, erro
 	}
 	sort.Strings(names)
 
-	aggregate := make([]*RepoListEntry, 0, len(names))
+	aggregate := make([]*zoekt.RepoListEntry, 0, len(names))
 	for _, k := range names {
 		aggregate = append(aggregate, uniq[k])
 	}
-	return &RepoList{
+	return &zoekt.RepoList{
 		Repos:   aggregate,
 		Crashes: crashes,
 	}, nil

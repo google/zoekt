@@ -26,6 +26,7 @@ import (
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/query"
+	"github.com/google/zoekt/shards"
 )
 
 const CONTEXT = 20
@@ -60,7 +61,7 @@ func main() {
 	}
 	pat := flag.Arg(0)
 
-	searcher, err := zoekt.NewShardedSearcher(*index)
+	searcher, err := shards.NewShardedSearcher(*index)
 	if err != nil {
 		log.Fatal(err)
 	}

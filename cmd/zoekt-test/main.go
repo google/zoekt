@@ -33,6 +33,7 @@ import (
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
 	"github.com/google/zoekt/query"
+	"github.com/google/zoekt/shards"
 )
 
 func readTree(dir string) (map[string][]byte, error) {
@@ -103,7 +104,7 @@ func compare(dir, patfile string, caseSensitive bool) error {
 	if err != nil {
 		return err
 	}
-	searcher, err := zoekt.NewShardedSearcher(indexDir)
+	searcher, err := shards.NewShardedSearcher(indexDir)
 	if err != nil {
 		return err
 	}

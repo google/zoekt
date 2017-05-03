@@ -306,6 +306,7 @@ func sortMatchesByScore(ms []LineMatch) {
 	sort.Sort(matchScoreSlice(ms))
 }
 
-func sortFilesByScore(ms []FileMatch) {
+// Sort a slice of results.
+func SortFilesByScore(ms []FileMatch) {
 	sort.Sort(fileMatchSlice(ms))
 }

@@ -28,6 +28,7 @@ import (
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/query"
+	"github.com/google/zoekt/shards"
 )
 
 func TestBasic(t *testing.T) {
@@ -64,7 +65,7 @@ func TestBasic(t *testing.T) {
 		t.Fatalf("want multiple shards, got %v", fs)
 	}
 
-	ss, err := zoekt.NewShardedSearcher(dir)
+	ss, err := shards.NewShardedSearcher(dir)
 	if err != nil {
 		t.Fatalf("NewShardedSearcher(%s): %v", dir, err)
 	}
@@ -112,7 +113,7 @@ func TestUpdate(t *testing.T) {
 		b.AddFile("F", []byte("hoi"))
 		b.Finish()
 	}
-	ss, err := zoekt.NewShardedSearcher(dir)
+	ss, err := shards.NewShardedSearcher(dir)
 	if err != nil {
 		t.Fatalf("NewShardedSearcher(%s): %v", dir, err)
 	}
