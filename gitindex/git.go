@@ -206,7 +206,6 @@ func setTemplatesFromConfig(desc *zoekt.Repository, repoDir string) error {
 		if err != nil {
 			return err
 		}
-		log.Printf("%q %q", remoteURL, u)
 		if err := SetTemplatesFromOrigin(desc, u); err != nil {
 			return err
 		}
