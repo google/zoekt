@@ -323,3 +323,42 @@ func TestBranchWildcard(t *testing.T) {
 		t.Errorf("got branches %v, want 2", repo.Repository.Branches)
 	}
 }
+
+func TestSkipSubmodules(t *testing.T) {
+	dir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatalf("TempDir: %v", err)
+	}
+	//	defer os.RemoveAll(dir)
+
+	if err := createSubmoduleRepo(dir); err != nil {
+		t.Fatalf("createMultibranchRepo: %v", err)
+	}
+
+	indexDir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(indexDir)
+
+	buildOpts := build.Options{
+		IndexDir: indexDir,
+		RepoDir:  filepath.Join(dir, "gerrit.googlesource.com", "adir.git"),
+	}
+	buildOpts.SetDefaults()
+
+	if err := os.Rename(dir+"/gerrit.googlesource.com/bdir.git",
+		dir+"/gerrit.googlesource.com/notexist.git"); err != nil {
+		t.Fatalf("Rename: %v", err)
+	}
+
+	opts := Options{
+		BuildOptions: buildOpts,
+		BranchPrefix: "refs/heads",
+		Branches:     []string{"master"},
+		Submodules:   false,
+	}
+	if err := IndexGitRepo(opts); err != nil {
+		t.Fatalf("IndexGitRepo: %v", err)
+	}
+}

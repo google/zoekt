@@ -16,6 +16,7 @@ package gitindex
 
 import (
 	"fmt"
+	"log"
 	"net/url"
 	"path"
 	"path/filepath"
@@ -109,12 +110,19 @@ func TreeToFiles(r *git.Repository, t *git.Tree,
 	return ref.tree, ref.subRepoVersions, nil
 }
 
+func (r *repoWalker) tryHandleSubmodule(p string, id *git.Oid) error {
+	err := r.handleSubmodule(p, id)
+	if r.ignoreMissingSubmodules && err != nil {
+		log.Printf("submodule %s: ignoring error %v", p, err)
+		err = nil
+	}
+
+	return nil
+}
+
 func (r *repoWalker) handleSubmodule(p string, id *git.Oid) error {
 	submod := r.submodules[p]
 	if submod == nil {
-		if r.ignoreMissingSubmodules {
-			return nil
-		}
 		return fmt.Errorf("no entry for submodule path %q", r.repoURL)
 	}
 
@@ -167,8 +175,9 @@ func (r *repoWalker) handleSubmodule(p string, id *git.Oid) error {
 func (r *repoWalker) cb(n string, e *git.TreeEntry) error {
 	p := filepath.Join(n, e.Name)
 	if e.Type == git.ObjectCommit && r.repoCache != nil {
-		if err := r.handleSubmodule(p, e.Id); err != nil {
-			return fmt.Errorf("submodule %s: %v", p, err)
+		if err := r.tryHandleSubmodule(p, e.Id); err != nil {
+			return f
+			mt.Errorf("submodule %s: %v", p, err)
 		}
 	}
 
