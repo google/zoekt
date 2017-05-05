@@ -176,8 +176,7 @@ func (r *repoWalker) cb(n string, e *git.TreeEntry) error {
 	p := filepath.Join(n, e.Name)
 	if e.Type == git.ObjectCommit && r.repoCache != nil {
 		if err := r.tryHandleSubmodule(p, e.Id); err != nil {
-			return f
-			mt.Errorf("submodule %s: %v", p, err)
+			return fmt.Errorf("submodule %s: %v", p, err)
 		}
 	}
 
