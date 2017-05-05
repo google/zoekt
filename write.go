@@ -86,7 +86,7 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 
 	toc.branchMasks.start(w)
 	for _, m := range b.branchMasks {
-		w.U32(m)
+		w.U64(m)
 	}
 	toc.branchMasks.end(w)
 

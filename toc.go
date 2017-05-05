@@ -23,7 +23,8 @@ package zoekt
 // 9: use bigendian uint64 for trigrams.
 // 10: sections for rune offsets.
 // 11: file ends in rune offsets.
-const IndexFormatVersion = 11
+// 12: 64-bit branchmasks.
+const IndexFormatVersion = 12
 
 // FeatureVersion is increased if a feature is added that requires reindexing data.
 const FeatureVersion = 1

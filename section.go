@@ -53,6 +53,12 @@ func (w *writer) U32(n uint32) {
 	w.Write(enc[:])
 }
 
+func (w *writer) U64(n uint64) {
+	var enc [8]byte
+	binary.BigEndian.PutUint64(enc[:], n)
+	w.Write(enc[:])
+}
+
 func (w *writer) Varint(n uint32) {
 	var enc [8]byte
 	m := binary.PutUvarint(enc[:], uint64(n))

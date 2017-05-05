@@ -114,7 +114,7 @@ type IndexBuilder struct {
 	nameStrings    []*searchableString
 	docSections    [][]DocumentSection
 
-	branchMasks []uint32
+	branchMasks []uint64
 	subRepos    []uint32
 
 	contentPostings *postingsBuilder
@@ -177,7 +177,7 @@ func (b *IndexBuilder) setRepository(desc *Repository) error {
 		}
 	}
 
-	if len(desc.Branches) > 32 {
+	if len(desc.Branches) > 64 {
 		return fmt.Errorf("too many branches.")
 	}
 
@@ -308,7 +308,7 @@ func (b *IndexBuilder) Add(doc Document) error {
 		return fmt.Errorf("unknown subrepo path %q", doc.SubRepositoryPath)
 	}
 
-	var mask uint32
+	var mask uint64
 	for _, br := range doc.Branches {
 		m := b.branchMask(br)
 		if m == 0 {
@@ -330,10 +330,10 @@ func (b *IndexBuilder) Add(doc Document) error {
 	return nil
 }
 
-func (b *IndexBuilder) branchMask(br string) uint32 {
+func (b *IndexBuilder) branchMask(br string) uint64 {
 	for i, b := range b.repo.Branches {
 		if b.Name == br {
-			return uint32(1) << uint(i)
+			return uint64(1) << uint(i)
 		}
 	}
 	return 0

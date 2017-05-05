@@ -613,6 +613,23 @@ func TestBranchMask(t *testing.T) {
 	}
 }
 
+func TestBranchLimit(t *testing.T) {
+	for limit := 64; limit <= 65; limit++ {
+		r := &Repository{}
+		for i := 0; i < limit; i++ {
+			s := fmt.Sprintf("b%d", i)
+			r.Branches = append(r.Branches, RepositoryBranch{
+				s, "v-" + s})
+		}
+		_, err := NewIndexBuilder(r)
+		if limit == 64 && err != nil {
+			t.Fatalf("NewIndexBuilder: %v", err)
+		} else if limit == 65 && err == nil {
+			t.Fatalf("NewIndexBuilder succeeded")
+		}
+	}
+}
+
 func TestBranchReport(t *testing.T) {
 	branches := []string{"stable", "master"}
 	b := testIndexBuilder(t, &Repository{

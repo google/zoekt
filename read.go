@@ -49,6 +49,15 @@ func (r *reader) U32() (uint32, error) {
 	return binary.BigEndian.Uint32(b), nil
 }
 
+func (r *reader) U64() (uint64, error) {
+	b, err := r.r.Read(r.off, 8)
+	r.off += 8
+	if err != nil {
+		return 0, err
+	}
+	return binary.BigEndian.Uint64(b), nil
+}
+
 func (r *reader) readTOC(toc *indexTOC) error {
 	sz, err := r.r.Size()
 	if err != nil {
@@ -102,6 +111,22 @@ func readSectionU32(f IndexFile, sec simpleSection) ([]uint32, error) {
 	for len(blob) > 0 {
 		arr = append(arr, binary.BigEndian.Uint32(blob))
 		blob = blob[4:]
+	}
+	return arr, nil
+}
+
+func readSectionU64(f IndexFile, sec simpleSection) ([]uint64, error) {
+	if sec.sz%8 != 0 {
+		return nil, fmt.Errorf("barf: section size %% 8 != 0: sz %d ", sec.sz)
+	}
+	blob, err := f.Read(sec.off, sec.sz)
+	if err != nil {
+		return nil, err
+	}
+	arr := make([]uint64, 0, len(blob)/8)
+	for len(blob) > 0 {
+		arr = append(arr, binary.BigEndian.Uint64(blob))
+		blob = blob[8:]
 	}
 	return arr, nil
 }
@@ -168,7 +193,7 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 		}
 	}
 
-	d.fileBranchMasks, err = d.readSectionU32(toc.branchMasks)
+	d.fileBranchMasks, err = readSectionU64(d.file, toc.branchMasks)
 	if err != nil {
 		return nil, err
 	}

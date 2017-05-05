@@ -77,8 +77,8 @@ type substrMatchTree struct {
 }
 
 type branchQueryMatchTree struct {
-	fileMasks []uint32
-	mask      uint32
+	fileMasks []uint64
+	mask      uint64
 
 	// mutable
 	docID uint32
@@ -425,13 +425,13 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*substrMatchTree]struct{}, st
 		return st, nil
 
 	case *query.Branch:
-		mask := uint32(0)
+		mask := uint64(0)
 		if s.Pattern == "HEAD" {
 			mask = 1
 		} else {
 			for nm, m := range d.branchIDs {
 				if strings.Contains(nm, s.Pattern) {
-					mask |= uint32(m)
+					mask |= uint64(m)
 				}
 			}
 		}

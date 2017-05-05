@@ -57,7 +57,7 @@ type indexData struct {
 	// rune offsets for the file name boundaries
 	fileNameEndRunes []uint32
 
-	fileBranchMasks []uint32
+	fileBranchMasks []uint64
 
 	// mask (power of 2) => name
 	branchNames map[uint]string
@@ -105,12 +105,13 @@ func (d *indexData) memoryUse() int {
 	sz := 0
 	for _, a := range [][]uint32{
 		d.newlinesIndex, d.docSectionsIndex,
-		d.boundaries, d.fileNameIndex, d.fileBranchMasks,
+		d.boundaries, d.fileNameIndex,
 		d.runeOffsets, d.fileNameRuneOffsets,
 		d.fileEndRunes, d.fileNameEndRunes,
 	} {
 		sz += 4 * len(a)
 	}
+	sz += 8 * len(d.fileBranchMasks)
 	sz += 12 * len(d.ngrams)
 	for _, v := range d.fileNameNgrams {
 		sz += 4*len(v) + 4
