@@ -17,9 +17,11 @@ I had to implement SSH hashed hostkey checking on a whim recently, and
 here is how I quickly zoomed into the relevant code using
 [our public zoekt instance](http://cs.bazel.build):
 
-[hash host ssh](http://cs.bazel.build/search?q=hash+host+ssh&num=50): more than 20k results in 750 files, in 3 seconds
-[hash host r:openssh](http://cs.bazel.build/search?q=hash+host+r%3Aopenssh&num=50): 6k results in 114 files, in 20ms
-[hash host r:openssh known_host](http://cs.bazel.build/search?q=hash+host+r%3Aopenssh+known_host&num=50): 4k result in 42 files, in 13ms
+* [hash host ssh](http://cs.bazel.build/search?q=hash+host+ssh&num=50): more than 20k results in 750 files, in 3 seconds
+
+* [hash host r:openssh](http://cs.bazel.build/search?q=hash+host+r%3Aopenssh&num=50): 6k results in 114 files, in 20ms
+
+* [hash host r:openssh known_host](http://cs.bazel.build/search?q=hash+host+r%3Aopenssh+known_host&num=50): 4k result in 42 files, in 13ms
 
 the last query still yielded a substantial number of results, but the
 function `hash_host` that I was looking for was the 3rd result from
@@ -54,7 +56,7 @@ this to work, you need the following features:
   googlesource.com.
 
 * Speed: `zoekt` uses an index based on positional trigrams. For rare
-  strings, eg. [nienhuys], this typically yields results in ~10ms if
+  strings, eg. `nienhuys`, this typically yields results in ~10ms if
   the operating system caches are warm.
 
 * Approximate queries: `zoekt` supports substring patterns and regular
@@ -86,7 +88,10 @@ Github's search has great coverage, but unfortunately, its search
 functionality doesn't support arbitrary substrings. For example, a
 query [for part of my
 surname](https://github.com/search?utf8=%E2%9C%93&q=nienhuy&type=Code)
-does not turn up anything, while I am clearly [my complete name](https://github.com/search?utf8=%E2%9C%93&q=nienhuys&type=) does.
+does not turn up anything (except this document), while
+[my complete
+name](https://github.com/search?utf8=%E2%9C%93&q=nienhuys&type=Code)
+does.
 
 ## What about Etsy/Hound?
 
