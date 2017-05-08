@@ -146,12 +146,15 @@ To list repositories, try:
   {{range .FileMatches}}
     {{if .URL}}<a href="{{.URL}}">{{end}}
     <tt><b>{{.Repo}}</b>:<b>{{.FileName}}</b>{{if .URL}}</a>{{end}}:{{if .Branches}}<small>[{{range .Branches}}{{.}}, {{end}}]</small>{{end}} </tt>
-
-      <div style="background: #eef;">
-    {{range .Matches}}
-        <pre>{{if .URL}}<a href="{{.URL}}">{{end}}{{.LineNum}}{{if .URL}}</a>{{end}}: {{range .Fragments}}{{.Pre}}<b>{{.Match}}</b>{{.Post}}{{end}}</pre>
-    {{end}}
-      </div>
+      {{if .DuplicateFile}}
+         duplicate result <tt>{{.DuplicateFile}}</tt>
+      {{else}}
+        <div style="background: #eef;">
+        {{range .Matches}}
+          <pre>{{if .URL}}<a href="{{.URL}}">{{end}}{{.LineNum}}{{if .URL}}</a>{{end}}: {{range .Fragments}}{{.Pre}}<b>{{.Match}}</b>{{.Post}}{{end}}</pre>
+        {{end}}
+        </div>
+      {{end}}
   {{end}}
 </body>
 </html>

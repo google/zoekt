@@ -107,6 +107,10 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 	w.Write(toSizedDeltas(b.subRepos))
 	toc.subRepos.end(w)
 
+	toc.contentChecksums.start(w)
+	w.Write(b.checksums)
+	toc.contentChecksums.end(w)
+
 	if err := b.writeJSON(&IndexMetadata{
 		IndexFormatVersion:  IndexFormatVersion,
 		IndexTime:           time.Now(),

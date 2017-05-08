@@ -38,6 +38,9 @@ type FileMatch struct {
 	// Only set if requested
 	Content []byte
 
+	// Checksum of the content.
+	Checksum []byte
+
 	// SubRepositoryName is the globally unique name of the repo,
 	// if it came from a subrepository
 	SubRepositoryName string

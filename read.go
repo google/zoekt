@@ -176,6 +176,10 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 	d.newlinesIndex = toc.newlines.relativeIndex()
 	d.docSectionsStart = toc.fileSections.data.off
 	d.docSectionsIndex = toc.fileSections.relativeIndex()
+	d.checksums, err = d.readSectionBlob(toc.contentChecksums)
+	if err != nil {
+		return nil, err
+	}
 
 	textContent, err := d.readSectionBlob(toc.ngramText)
 	if err != nil {

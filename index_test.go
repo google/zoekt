@@ -36,6 +36,7 @@ func clearScores(r *SearchResult) {
 		for j := range r.Files[i].LineMatches {
 			r.Files[i].LineMatches[j].Score = 0.0
 		}
+		r.Files[i].Checksum = nil
 	}
 }
 

@@ -618,7 +618,8 @@ nextFileMatch:
 			// Maintain ordering of input files. This
 			// strictly dominates the in-file ordering of
 			// the matches.
-			Score: 10 * float64(nextDoc) / float64(len(d.boundaries)),
+			Score:    10 * float64(nextDoc) / float64(len(d.boundaries)),
+			Checksum: d.getChecksum(nextDoc),
 		}
 
 		if s := d.subRepos[nextDoc]; s > 0 {

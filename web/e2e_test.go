@@ -16,6 +16,7 @@ package web
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -328,6 +329,56 @@ func TestHostCustomization(t *testing.T) {
 	}
 
 	if got, want := string(resultBytes), "r:myproject"; !strings.Contains(got, want) {
+		t.Fatalf("got %s, want substring %q", got, want)
+	}
+}
+
+func TestDupResult(t *testing.T) {
+	b, err := zoekt.NewIndexBuilder(&zoekt.Repository{
+		Name: "name",
+	})
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
+
+	for i := 0; i < 2; i++ {
+		if err := b.Add(zoekt.Document{
+			Name:    fmt.Sprintf("file%d", i),
+			Content: []byte("bla"),
+		}); err != nil {
+			t.Fatalf("Add: %v", err)
+		}
+	}
+	s := searcherForTest(t, b)
+	srv := Server{
+		Searcher: s,
+		Top:      Top,
+		HTML:     true,
+	}
+
+	mux, err := NewMux(&srv)
+	if err != nil {
+		t.Fatalf("NewMux: %v", err)
+	}
+
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+
+	req, err := http.NewRequest("GET", ts.URL+"/search?q=bla", &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("NewRequest: %v", err)
+	}
+	res, err := (&http.Client{}).Do(req)
+	if err != nil {
+		t.Fatal("Do(%v): %v", req, err)
+	}
+	resultBytes, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+
+	if got, want := string(resultBytes), "duplicate result"; !strings.Contains(got, want) {
 		t.Fatalf("got %s, want substring %q", got, want)
 	}
 }

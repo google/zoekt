@@ -41,6 +41,10 @@ type FileMatch struct {
 	FileName string
 	Repo     string
 
+	// If this was a duplicate result, this will contain the file
+	// of the first match.
+	DuplicateFile string
+
 	Branches []string
 	Matches  []Match
 	URL      string

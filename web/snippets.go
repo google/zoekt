@@ -83,11 +83,19 @@ func (s *Server) formatResults(result *zoekt.SearchResult, query string, localPr
 		return ""
 	}
 
+	// hash => filename
+	seenFiles := map[string]string{}
 	for _, f := range result.Files {
+
 		fMatch := FileMatch{
 			FileName: f.FileName,
 			Repo:     f.Repository,
 			Branches: f.Branches,
+		}
+		if fs, ok := seenFiles[string(f.Checksum)]; ok {
+			fMatch.DuplicateFile = fs
+		} else {
+			seenFiles[string(f.Checksum)] = f.Repository + ":" + f.FileName
 		}
 
 		if f.SubRepositoryName != "" {

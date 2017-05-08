@@ -17,6 +17,7 @@ package zoekt
 import (
 	"encoding/binary"
 	"fmt"
+	"hash/crc64"
 	"html/template"
 	"log"
 	"path/filepath"
@@ -113,6 +114,7 @@ type IndexBuilder struct {
 	contentStrings []*searchableString
 	nameStrings    []*searchableString
 	docSections    [][]DocumentSection
+	checksums      []byte
 
 	branchMasks []uint64
 	subRepos    []uint32
@@ -285,6 +287,8 @@ func (b *IndexBuilder) populateSubRepoIndices() {
 // Add a file which only occurs in certain branches. The document
 // should be checked for sanity with IsText first.
 func (b *IndexBuilder) Add(doc Document) error {
+	hasher := crc64.New(crc64.MakeTable(crc64.ISO))
+
 	sort.Sort(docSectionSlice(doc.Symbols))
 	var last DocumentSection
 	for i, s := range doc.Symbols {
@@ -319,14 +323,16 @@ func (b *IndexBuilder) Add(doc Document) error {
 
 	b.subRepos = append(b.subRepos, subRepoIdx)
 
+	hasher.Write(doc.Content)
 	docStr := b.contentPostings.newSearchableString(doc.Content)
 	b.contentStrings = append(b.contentStrings, docStr)
 
 	nameStr := b.namePostings.newSearchableString([]byte(doc.Name))
 	b.nameStrings = append(b.nameStrings, nameStr)
 	b.docSections = append(b.docSections, doc.Symbols)
-
 	b.branchMasks = append(b.branchMasks, mask)
+	b.checksums = append(b.checksums, hasher.Sum(nil)...)
+
 	return nil
 }
 

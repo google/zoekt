@@ -16,6 +16,7 @@ package zoekt
 
 import (
 	"fmt"
+	"hash/crc64"
 	"log"
 	"regexp"
 	"unicode/utf8"
@@ -71,7 +72,15 @@ type indexData struct {
 	subRepos     []uint32
 	subRepoPaths []string
 
+	// Checksums for all the files, at 8-byte intervals
+	checksums []byte
+
 	repoListEntry RepoListEntry
+}
+
+func (d *indexData) getChecksum(idx uint32) []byte {
+	start := crc64.Size * idx
+	return d.checksums[start : start+crc64.Size]
 }
 
 func (d *indexData) calculateStats() {
