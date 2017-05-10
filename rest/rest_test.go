@@ -38,14 +38,22 @@ func (s *memSeeker) Name() string {
 }
 
 func TestUnicodeOffset(t *testing.T) {
-	b := zoekt.NewIndexBuilder()
-	b.SetName("name")
-	b.Add(zoekt.Document{
+	repo := zoekt.Repository{
+		Name:     "name",
+		Branches: []zoekt.RepositoryBranch{{"master", "master-version"}},
+	}
+	b, err := zoekt.NewIndexBuilder(&repo)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
+	if err := b.Add(zoekt.Document{
 		Name:    "f2",
 		Content: []byte("orange\u2318apple"),
 		// --------------0123456     78901
 		Branches: []string{"master"},
-	})
+	}); err != nil {
+		t.Errorf("Add: %v", err)
+	}
 
 	var buf bytes.Buffer
 	b.Write(&buf)

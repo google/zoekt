@@ -43,19 +43,28 @@ func Search(s zoekt.Searcher, w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func serveSearchAPIErr(s zoekt.Searcher, w http.ResponseWriter, r *http.Request) error {
+func verifyAPIInput(w http.ResponseWriter, r *http.Request) ([]byte, error) {
 	if r.Method != http.MethodPost {
-		return &httpError{"must use POST", http.StatusMethodNotAllowed}
+		return nil, &httpError{"must use POST", http.StatusMethodNotAllowed}
 	}
 
 	if got := r.Header.Get("Content-Type"); got != jsonContentType {
-		return &httpError{"must use " + jsonContentType, http.StatusNotAcceptable}
+		return nil, &httpError{"must use " + jsonContentType, http.StatusNotAcceptable}
 
 	}
 
 	content, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		return &httpError{err.Error(), http.StatusBadRequest}
+		return nil, &httpError{err.Error(), http.StatusBadRequest}
+	}
+
+	return content, nil
+}
+
+func serveSearchAPIErr(s zoekt.Searcher, w http.ResponseWriter, r *http.Request) error {
+	content, err := verifyAPIInput(w, r)
+	if err != nil {
+		return err
 	}
 
 	var req SearchRequest
@@ -67,10 +76,14 @@ func serveSearchAPIErr(s zoekt.Searcher, w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		return err
 	}
-	content, err = json.Marshal(rep)
+
+	return dumpAPIOutput(w, rep)
+}
+
+func dumpAPIOutput(w http.ResponseWriter, rep interface{}) error {
+	content, err := json.Marshal(rep)
 	if err != nil {
 		return &httpError{err.Error(), http.StatusInternalServerError}
-
 	}
 
 	w.Header().Set("Content-Type", jsonContentType)
