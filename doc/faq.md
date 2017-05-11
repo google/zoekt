@@ -134,8 +134,8 @@ for speedup.
 
 ## What does [cs.bazel.build](https://cs.bazel.build/) run on?
 
-Currently, it runs on a single Google Cloud VM with 16 vCPUs, 14G RAM
-and an attached physical SSD.
+Currently, it runs on a single Google Cloud VM with 16 vCPUs, 60G RAM and an
+attached physical SSD.
 
 ## How does `zoekt` work?
 
