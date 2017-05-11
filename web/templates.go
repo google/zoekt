@@ -147,7 +147,7 @@ To list repositories, try:
     {{if .URL}}<a href="{{.URL}}">{{end}}
     <tt><b>{{.Repo}}</b>:<b>{{.FileName}}</b>{{if .URL}}</a>{{end}}:{{if .Branches}}<small>[{{range .Branches}}{{.}}, {{end}}]</small>{{end}} </tt>
       {{if .DuplicateFile}}
-         duplicate result <tt>{{.DuplicateFile}}</tt>
+         duplicate result <tt>{{.DuplicateFile}}</tt><br>
       {{else}}
         <div style="background: #eef;">
         {{range .Matches}}
