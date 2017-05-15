@@ -92,15 +92,9 @@ It is recommended to install CTags to improve ranking:
 
 If you index untrusted code, it is strongly recommended to also
 install Bazel's sandbox, to avoid vulnerabilities of ctags opening up
-access to the indexing machine. The sandbox can be compiled as follows:
+access to the indexing machine. A blessed version of the sandbox is under
+`cmd/zoek-sandbox`. It can be compiled with a simple `make` call.
 
-    for f in namespace-sandbox.c namespace-sandbox.c process-tools.c network-tools.c \
-       process-tools.h network-tools.h ; do \
-      wget https://raw.githubusercontent.com/bazelbuild/bazel/master/src/main/tools/$f \
-    done
-    gcc -o namespace-sandbox -std=c99 \
-       namespace-sandbox.c process-tools.c network-tools.c  -lm
-    cp namespace-sandbox /usr/local/bin/
 
 
 
