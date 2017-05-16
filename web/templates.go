@@ -144,10 +144,11 @@ To list repositories, try:
   in {{.Stats.Duration}} (queued: {{.Stats.Wait}})
   <p>
   {{range .FileMatches}}
-    {{if .URL}}<a href="{{.URL}}">{{end}}
-    <tt><b>{{.Repo}}</b>:<b>{{.FileName}}</b>{{if .URL}}</a>{{end}}:{{if .Branches}}<small>[{{range .Branches}}{{.}}, {{end}}]</small>{{end}} </tt>
-      {{if .DuplicateFile}}
-         duplicate result <tt>{{.DuplicateFile}}</tt><br>
+
+    {{if .URL}}<a name="{{.ResultID}}" href="{{.URL}}" >{{else}}<a name="{{.ResultID}}">{{end}}
+    <tt><b>{{.Repo}}</b>:<b>{{.FileName}}</b></a>:{{if .Branches}}<small>[{{range .Branches}}{{.}}, {{end}}]</small>{{end}} </tt>
+      {{if .DuplicateID}}
+        <div style="background: #eff"><a href="#{{.DuplicateID}}"><pre>duplicate result</pre></a></div>
       {{else}}
         <div style="background: #eef;">
         {{range .Matches}}

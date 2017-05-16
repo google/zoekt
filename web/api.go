@@ -40,10 +40,11 @@ type ResultInput struct {
 type FileMatch struct {
 	FileName string
 	Repo     string
+	ResultID string
 
 	// If this was a duplicate result, this will contain the file
 	// of the first match.
-	DuplicateFile string
+	DuplicateID string
 
 	Branches []string
 	Matches  []Match

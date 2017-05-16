@@ -83,19 +83,20 @@ func (s *Server) formatResults(result *zoekt.SearchResult, query string, localPr
 		return ""
 	}
 
-	// hash => filename
+	// hash => result-id
 	seenFiles := map[string]string{}
 	for _, f := range result.Files {
-
 		fMatch := FileMatch{
 			FileName: f.FileName,
 			Repo:     f.Repository,
+			ResultID: f.Repository + ":" + f.FileName,
 			Branches: f.Branches,
 		}
-		if fs, ok := seenFiles[string(f.Checksum)]; ok {
-			fMatch.DuplicateFile = fs
+
+		if dup, ok := seenFiles[string(f.Checksum)]; ok {
+			fMatch.DuplicateID = dup
 		} else {
-			seenFiles[string(f.Checksum)] = f.Repository + ":" + f.FileName
+			seenFiles[string(f.Checksum)] = fMatch.ResultID
 		}
 
 		if f.SubRepositoryName != "" {
