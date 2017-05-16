@@ -53,7 +53,6 @@ type notMatchTree struct {
 }
 
 type regexpMatchTree struct {
-	query  *query.Regexp
 	regexp *regexp.Regexp
 
 	child    matchTree
@@ -357,8 +356,7 @@ func (t *substrMatchTree) matches(known map[matchTree]bool) (bool, bool) {
 func (d *indexData) newMatchTree(q query.Q, sq map[*substrMatchTree]struct{}, stats *Stats) (matchTree, error) {
 	switch s := q.(type) {
 	case *query.Regexp:
-		sz := ngramSize
-		subQ := query.RegexpToQuery(s.Regexp, sz)
+		subQ := query.RegexpToQuery(s.Regexp, ngramSize)
 		subQ = query.Map(subQ, func(q query.Q) query.Q {
 			if sub, ok := q.(*query.Substring); ok {
 				sub.FileName = s.FileName
