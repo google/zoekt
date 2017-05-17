@@ -26,17 +26,20 @@ import (
 	"github.com/google/zoekt/query"
 )
 
-var _ = log.Println
-
 // An expression tree coupled with matches
 type matchTree interface {
-	// returns whether this matches, and if we are sure.
-	matches(known map[matchTree]bool) (match bool, sure bool)
+	// provide the next document where we can may find something
+	// interesting.
+	nextDoc() uint32
 
 	// clears any per-document state of the matchTree, and
 	// prepares for evaluating the given doc. The argument is
 	// strictly increasing over time.
 	prepare(nextDoc uint32)
+
+	// returns whether this matches, and if we are sure.
+	matches(known map[matchTree]bool) (match bool, sure bool)
+
 	String() string
 }
 
@@ -80,7 +83,8 @@ type branchQueryMatchTree struct {
 	mask      uint64
 
 	// mutable
-	docID uint32
+	firstDone bool
+	docID     uint32
 }
 
 // all prepare methods
@@ -121,7 +125,61 @@ func (t *substrMatchTree) prepare(nextDoc uint32) {
 }
 
 func (t *branchQueryMatchTree) prepare(doc uint32) {
+	t.firstDone = true
 	t.docID = doc
+}
+
+// nextDoc
+
+func (t *andMatchTree) nextDoc() uint32 {
+	var max uint32
+	for _, c := range t.children {
+		m := c.nextDoc()
+		if m > max {
+			max = m
+		}
+	}
+	return max
+}
+
+func (t *regexpMatchTree) nextDoc() uint32 {
+	return t.child.nextDoc()
+}
+
+func (t *orMatchTree) nextDoc() uint32 {
+	min := uint32(maxUInt32)
+	for _, c := range t.children {
+		m := c.nextDoc()
+		if m < min {
+			min = m
+		}
+	}
+	return min
+}
+
+func (t *notMatchTree) nextDoc() uint32 {
+	return 0
+}
+
+func (t *substrMatchTree) nextDoc() uint32 {
+	if len(t.cands) > 0 {
+		return t.cands[0].file
+	}
+	return maxUInt32
+}
+
+func (t *branchQueryMatchTree) nextDoc() uint32 {
+	var start uint32
+	if t.firstDone {
+		start = t.docID + 1
+	}
+
+	for i := start; i < uint32(len(t.fileMasks)); i++ {
+		if (t.mask & t.fileMasks[i]) != 0 {
+			return i
+		}
+	}
+	return maxUInt32
 }
 
 // all String methods
@@ -517,16 +575,12 @@ func (d *indexData) Search(ctx context.Context, q query.Q, opts *SearchOptions) 
 		res.Stats.NgramMatches += len(st.cands)
 	}
 
-	var positiveAtoms, fileAtoms []*substrMatchTree
-	collectPositiveSubstrings(mt, func(sq *substrMatchTree) {
-		positiveAtoms = append(positiveAtoms, sq)
-	})
-
 	var regexpAtoms []*regexpMatchTree
 	collectRegexps(mt, func(re *regexpMatchTree) {
 		regexpAtoms = append(regexpAtoms, re)
 	})
 
+	var fileAtoms []*substrMatchTree
 	for st := range atoms {
 		if st.fileName {
 			fileAtoms = append(fileAtoms, st)
@@ -553,14 +607,7 @@ nextFileMatch:
 			}
 		}
 
-		var nextDoc uint32
-		nextDoc = maxUInt32
-		for _, st := range positiveAtoms {
-			if len(st.cands) > 0 && st.cands[0].file < nextDoc {
-				nextDoc = st.cands[0].file
-			}
-		}
-
+		nextDoc := mt.nextDoc()
 		if nextDoc == maxUInt32 {
 			break
 		}

@@ -25,6 +25,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/kylelemons/godebug/pretty"
 	"golang.org/x/net/context"
 
 	"github.com/google/zoekt/query"
@@ -261,10 +262,10 @@ func TestAndSearch(t *testing.T) {
 		NgramMatches:       4,
 		MatchCount:         1,
 		FileCount:          1,
-		FilesConsidered:    3,
+		FilesConsidered:    2,
 	}
-	if !reflect.DeepEqual(sres.Stats, wantStats) {
-		t.Errorf("got stats %#v, want %#v", sres.Stats, wantStats)
+	if diff := pretty.Compare(sres.Stats, wantStats); diff != "" {
+		t.Errorf("got stats diff %s", diff)
 	}
 }
 
@@ -1451,5 +1452,30 @@ start of middle of line
 	res = searchForTest(t, b, q)
 	if len(res.Files) != 0 {
 		t.Errorf("got %v, want 0 files", res.Files)
+	}
+}
+
+func TestAndOrUnicode(t *testing.T) {
+	q, err := query.Parse("orange.*apple")
+	if err != nil {
+		t.Errorf("parse: %v", err)
+	}
+	finalQ := query.NewAnd(q,
+		query.NewOr(query.NewAnd(&query.Repo{"name"},
+			query.NewOr(&query.Branch{"master"}))))
+
+	b := testIndexBuilder(t, &Repository{
+		Name:     "name",
+		Branches: []RepositoryBranch{{"master", "master-version"}},
+	}, Document{
+		Name:    "f2",
+		Content: []byte("orange\u2318apple"),
+		// --------------0123456     78901
+		Branches: []string{"master"},
+	})
+
+	res := searchForTest(t, b, finalQ)
+	if len(res.Files) != 1 {
+		t.Errorf("got %v, want 1 result", res.Files)
 	}
 }
