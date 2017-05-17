@@ -84,49 +84,22 @@ func (m *candidateMatch) line(newlines []uint32, fileSize uint32) (lineNum, line
 	return idx + 1, start, end
 }
 
-type docIterator interface {
-	// TODO - reconsider this name? Or don't get all the
-	// candidateMatch in one go?
-	next() []*candidateMatch
-	coversContent() bool
-
-	// amount of I/O reads
-	ioBytes() uint32
-}
-
 type ngramDocIterator struct {
-	ng1, ng2 ngram
-	query    *query.Substring
+	query *query.Substring
 
 	leftPad  uint32
 	rightPad uint32
 	distance uint32
 	first    []uint32
 	last     []uint32
-
-	fileIdx int
-	ends    []uint32
-
-	// The ngram matches cover the pattern, so no need to check
-	// contents.
-	_coversContent bool
-
-	// The number of posting bytes
-	bytesRead uint32
+	ends     []uint32
 }
 
-func (s *ngramDocIterator) ioBytes() uint32 {
-	return s.bytesRead
-}
-
-func (s *ngramDocIterator) coversContent() bool {
-	return s._coversContent
-}
-
-func (s *ngramDocIterator) next() []*candidateMatch {
+func (s *ngramDocIterator) candidates() []*candidateMatch {
 	patBytes := []byte(s.query.Pattern)
 	lowerPatBytes := toLower(patBytes)
 
+	fileIdx := 0
 	var candidates []*candidateMatch
 	for {
 		if len(s.first) == 0 || len(s.last) == 0 {
@@ -135,8 +108,8 @@ func (s *ngramDocIterator) next() []*candidateMatch {
 		p1 := s.first[0]
 		p2 := s.last[0]
 
-		for s.fileIdx < len(s.ends) && s.ends[s.fileIdx] <= p1 {
-			s.fileIdx++
+		for fileIdx < len(s.ends) && s.ends[fileIdx] <= p1 {
+			fileIdx++
 		}
 
 		if p1+s.distance < p2 {
@@ -148,10 +121,10 @@ func (s *ngramDocIterator) next() []*candidateMatch {
 			s.last = s.last[1:]
 
 			var fileStart uint32
-			if s.fileIdx > 0 {
-				fileStart = s.ends[s.fileIdx-1]
+			if fileIdx > 0 {
+				fileStart = s.ends[fileIdx-1]
 			}
-			if p1 < s.leftPad+fileStart || p1+s.distance+ngramSize+s.rightPad > s.ends[s.fileIdx] {
+			if p1 < s.leftPad+fileStart || p1+s.distance+ngramSize+s.rightPad > s.ends[fileIdx] {
 				continue
 			}
 
@@ -162,7 +135,7 @@ func (s *ngramDocIterator) next() []*candidateMatch {
 				substrLowered: lowerPatBytes,
 				// TODO - this is wrong for casefolding searches.
 				byteMatchSz: uint32(len(lowerPatBytes)),
-				file:        uint32(s.fileIdx),
+				file:        uint32(fileIdx),
 				runeOffset:  p1 - fileStart - s.leftPad,
 			}
 			candidates = append(candidates, cand)

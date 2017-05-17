@@ -127,33 +127,7 @@ func (d *indexData) memoryUse() int {
 	return sz
 }
 
-func (data *indexData) getDocIterator(s *query.Substring) (docIterator, error) {
-	if utf8.RuneCountInString(s.Pattern) < ngramSize {
-		if !s.FileName {
-			return nil, fmt.Errorf("pattern %q less than %d characters", s.Pattern, ngramSize)
-		}
-
-		return data.getBruteForceFileNameDocIterator(s), nil
-	}
-
-	return data.getNgramDocIterator(s)
-}
-
-type bruteForceIter struct {
-	cands []*candidateMatch
-}
-
-func (i *bruteForceIter) ioBytes() uint32 { return 0 }
-
-func (i *bruteForceIter) next() []*candidateMatch {
-	return i.cands
-}
-
-func (i *bruteForceIter) coversContent() bool {
-	return true
-}
-
-func (data *indexData) getBruteForceFileNameDocIterator(query *query.Substring) docIterator {
+func (data *indexData) bruteForceMatchFilenames(query *query.Substring) []*candidateMatch {
 	quoted := regexp.QuoteMeta(query.Pattern)
 	if !query.CaseSensitive {
 		quoted = "(?i)" + quoted
@@ -197,7 +171,7 @@ func (data *indexData) getBruteForceFileNameDocIterator(query *query.Substring) 
 		})
 	}
 
-	return &bruteForceIter{cands}
+	return cands
 }
 
 const maxUInt32 = 0xffffffff
@@ -222,7 +196,18 @@ func (data *indexData) ngramFrequency(ng ngram, filename bool) uint32 {
 	return data.ngrams[ng].sz
 }
 
-func (data *indexData) getNgramDocIterator(query *query.Substring) (docIterator, error) {
+type ngramIterationResults struct {
+	cands []*candidateMatch
+
+	// The ngram matches cover the pattern, so no need to check
+	// contents.
+	coversContent bool
+
+	// The number of posting bytes
+	bytesRead uint32
+}
+
+func (data *indexData) iterateNgrams(query *query.Substring) (*ngramIterationResults, error) {
 	iter := &ngramDocIterator{
 		query: query,
 	}
@@ -249,7 +234,7 @@ func (data *indexData) getNgramDocIterator(query *query.Substring) (docIterator,
 		}
 
 		if freq == 0 {
-			return iter, nil
+			return &ngramIterationResults{}, nil
 		}
 
 		frequencies = append(frequencies, freq)
@@ -274,12 +259,13 @@ func (data *indexData) getNgramDocIterator(query *query.Substring) (docIterator,
 	}
 
 	iter.first = postings
+
 	if firstI != lastI {
 		postings, sz, err := data.readPostings(lastNG, query.CaseSensitive, query.FileName)
+		bytesRead += sz
 		if err != nil {
 			return nil, err
 		}
-		iter.bytesRead += sz
 		iter.last = postings
 	} else {
 		// TODO - we could be a little faster and skip the
@@ -287,13 +273,12 @@ func (data *indexData) getNgramDocIterator(query *query.Substring) (docIterator,
 		iter.last = iter.first
 	}
 
-	iter.bytesRead = bytesRead
-	iter.ng1 = firstNG
-	iter.ng2 = lastNG
-	if lastI-firstI <= ngramSize && iter.leftPad == 0 && iter.rightPad == 0 {
-		iter._coversContent = true
+	result := ngramIterationResults{
+		bytesRead:     bytesRead,
+		cands:         iter.candidates(),
+		coversContent: lastI-firstI <= ngramSize && iter.leftPad == 0 && iter.rightPad == 0,
 	}
-	return iter, nil
+	return &result, nil
 }
 
 func (d *indexData) readPostings(ng ngram, caseSensitive, fileName bool) ([]uint32, uint32, error) {

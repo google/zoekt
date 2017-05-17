@@ -20,6 +20,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"golang.org/x/net/context"
 
@@ -245,6 +246,8 @@ func collectAtoms(t matchTree, f func(matchTree)) {
 		for _, ch := range s.children {
 			collectAtoms(ch, f)
 		}
+	case *notMatchTree:
+		collectAtoms(s.child, f)
 	default:
 		f(t)
 	}
@@ -264,23 +267,6 @@ func collectPositiveSubstrings(t matchTree, f func(*substrMatchTree)) {
 		collectPositiveSubstrings(s.child, f)
 	case *notMatchTree:
 	case *substrMatchTree:
-		f(s)
-	}
-}
-
-func collectRegexps(t matchTree, f func(*regexpMatchTree)) {
-	switch s := t.(type) {
-	case *andMatchTree:
-		for _, ch := range s.children {
-			collectRegexps(ch, f)
-		}
-	case *orMatchTree:
-		for _, ch := range s.children {
-			collectRegexps(ch, f)
-		}
-	case *notMatchTree:
-		collectRegexps(s.child, f)
-	case *regexpMatchTree:
 		f(s)
 	}
 }
@@ -437,7 +423,7 @@ func (t *substrMatchTree) matches(known map[matchTree]bool) (bool, bool) {
 	return true, sure
 }
 
-func (d *indexData) newMatchTree(q query.Q, sq map[*substrMatchTree]struct{}, stats *Stats) (matchTree, error) {
+func (d *indexData) newMatchTree(q query.Q, stats *Stats) (matchTree, error) {
 	switch s := q.(type) {
 	case *query.Regexp:
 		subQ := query.RegexpToQuery(s.Regexp, ngramSize)
@@ -449,7 +435,7 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*substrMatchTree]struct{}, st
 			return q
 		})
 
-		subMT, err := d.newMatchTree(subQ, sq, stats)
+		subMT, err := d.newMatchTree(subQ, stats)
 		if err != nil {
 			return nil, err
 		}
@@ -468,7 +454,7 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*substrMatchTree]struct{}, st
 	case *query.And:
 		var r []matchTree
 		for _, ch := range s.Children {
-			ct, err := d.newMatchTree(ch, sq, stats)
+			ct, err := d.newMatchTree(ch, stats)
 			if err != nil {
 				return nil, err
 			}
@@ -478,7 +464,7 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*substrMatchTree]struct{}, st
 	case *query.Or:
 		var r []matchTree
 		for _, ch := range s.Children {
-			ct, err := d.newMatchTree(ch, sq, stats)
+			ct, err := d.newMatchTree(ch, stats)
 			if err != nil {
 				return nil, err
 			}
@@ -486,25 +472,13 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*substrMatchTree]struct{}, st
 		}
 		return &orMatchTree{r}, nil
 	case *query.Not:
-		ct, err := d.newMatchTree(s.Child, sq, stats)
+		ct, err := d.newMatchTree(s.Child, stats)
 		return &notMatchTree{
 			child: ct,
 		}, err
+
 	case *query.Substring:
-		iter, err := d.getDocIterator(s)
-		if err != nil {
-			return nil, err
-		}
-		st := &substrMatchTree{
-			query:         s,
-			caseSensitive: s.CaseSensitive,
-			fileName:      s.FileName,
-			coversContent: iter.coversContent(),
-			cands:         iter.next(),
-		}
-		stats.IndexBytesLoaded += int64(iter.ioBytes())
-		sq[st] = struct{}{}
-		return st, nil
+		return d.newSubstringMatchTree(s, stats)
 
 	case *query.Branch:
 		mask := uint64(0)
@@ -532,6 +506,33 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*substrMatchTree]struct{}, st
 	}
 	log.Panicf("type %T", q)
 	return nil, nil
+}
+
+func (d *indexData) newSubstringMatchTree(s *query.Substring, stats *Stats) (matchTree, error) {
+	st := &substrMatchTree{
+		query:         s,
+		caseSensitive: s.CaseSensitive,
+		fileName:      s.FileName,
+	}
+
+	if utf8.RuneCountInString(s.Pattern) < ngramSize {
+		if !s.FileName {
+			return nil, fmt.Errorf("pattern %q less than %d characters", s.Pattern, ngramSize)
+		}
+
+		st.cands = d.bruteForceMatchFilenames(s)
+		st.coversContent = true
+		return st, nil
+	}
+
+	result, err := d.iterateNgrams(s)
+	if err != nil {
+		return nil, err
+	}
+	st.coversContent = result.coversContent
+	st.cands = result.cands
+	stats.IndexBytesLoaded += int64(result.bytesRead)
+	return st, nil
 }
 
 func (d *indexData) simplify(in query.Q) query.Q {
@@ -584,35 +585,34 @@ func (d *indexData) Search(ctx context.Context, q query.Q, opts *SearchOptions) 
 
 	q = query.Map(q, query.ExpandFileContent)
 
-	atoms := map[*substrMatchTree]struct{}{}
-	mt, err := d.newMatchTree(q, atoms, &res.Stats)
+	mt, err := d.newMatchTree(q, &res.Stats)
 	if err != nil {
 		return nil, err
 	}
 
-	for st := range atoms {
-		res.Stats.NgramMatches += len(st.cands)
-	}
-
+	totalAtomCount := 0
+	var substrAtoms, fileAtoms []*substrMatchTree
 	var regexpAtoms []*regexpMatchTree
-	collectRegexps(mt, func(re *regexpMatchTree) {
-		regexpAtoms = append(regexpAtoms, re)
-	})
+	collectAtoms(mt, func(t matchTree) {
+		totalAtomCount++
+		if st, ok := t.(*substrMatchTree); ok {
+			res.Stats.NgramMatches += len(st.cands)
+			if st.fileName {
+				fileAtoms = append(fileAtoms, st)
+			} else {
+				substrAtoms = append(substrAtoms, st)
+			}
 
-	var fileAtoms []*substrMatchTree
-	for st := range atoms {
-		if st.fileName {
-			fileAtoms = append(fileAtoms, st)
 		}
-	}
+		if re, ok := t.(*regexpMatchTree); ok {
+			regexpAtoms = append(regexpAtoms, re)
+		}
+	})
 
 	cp := contentProvider{
 		id:    d,
 		stats: &res.Stats,
 	}
-
-	totalAtomCount := 0
-	collectAtoms(mt, func(t matchTree) { totalAtomCount++ })
 
 	docCount := uint32(len(d.fileBranchMasks))
 	canceled := false
@@ -661,7 +661,7 @@ nextFileMatch:
 			}
 		}
 
-		for st := range atoms {
+		for _, st := range substrAtoms {
 			// TODO - this may evaluate too much.
 			cp.evalContentMatches(st)
 		}

@@ -258,13 +258,13 @@ func TestAndSearch(t *testing.T) {
 	wantStats := Stats{
 		FilesLoaded:        1,
 		ContentBytesLoaded: 18,
-		IndexBytesLoaded:   4,
+		IndexBytesLoaded:   8,
 		NgramMatches:       4,
 		MatchCount:         1,
 		FileCount:          1,
 		FilesConsidered:    2,
 	}
-	if diff := pretty.Compare(sres.Stats, wantStats); diff != "" {
+	if diff := pretty.Compare(wantStats, sres.Stats); diff != "" {
 		t.Errorf("got stats diff %s", diff)
 	}
 }
