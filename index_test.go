@@ -306,7 +306,6 @@ func TestNegativeMatchesOnlyShortcut(t *testing.T) {
 	}
 
 	b.AddFile("f1", []byte("x banana y"))
-
 	b.AddFile("f2", []byte("x appelmoes y"))
 	b.AddFile("f3", []byte("x appelmoes y"))
 	b.AddFile("f3", []byte("x appelmoes y"))

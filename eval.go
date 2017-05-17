@@ -43,6 +43,12 @@ type matchTree interface {
 	String() string
 }
 
+type bruteForceMatchTree struct {
+	// mutable
+	firstDone bool
+	docID     uint32
+}
+
 type andMatchTree struct {
 	children []matchTree
 }
@@ -89,6 +95,11 @@ type branchQueryMatchTree struct {
 
 // all prepare methods
 
+func (t *bruteForceMatchTree) prepare(doc uint32) {
+	t.docID = doc
+	t.firstDone = true
+}
+
 func (t *andMatchTree) prepare(doc uint32) {
 	for _, c := range t.children {
 		c.prepare(doc)
@@ -130,6 +141,13 @@ func (t *branchQueryMatchTree) prepare(doc uint32) {
 }
 
 // nextDoc
+
+func (t *bruteForceMatchTree) nextDoc() uint32 {
+	if !t.firstDone {
+		return 0
+	}
+	return t.docID + 1
+}
 
 func (t *andMatchTree) nextDoc() uint32 {
 	var max uint32
@@ -183,6 +201,10 @@ func (t *branchQueryMatchTree) nextDoc() uint32 {
 }
 
 // all String methods
+
+func (t *bruteForceMatchTree) String() string {
+	return "all"
+}
 
 func (t *andMatchTree) String() string {
 	return fmt.Sprintf("and%v", t.children)
@@ -334,6 +356,10 @@ func (p *contentProvider) evalRegexpMatches(s *regexpMatchTree) {
 }
 
 // all matches() methods.
+
+func (t *bruteForceMatchTree) matches(known map[matchTree]bool) (bool, bool) {
+	return true, true
+}
 
 func (t *andMatchTree) matches(known map[matchTree]bool) (bool, bool) {
 	sure := true
@@ -497,14 +523,7 @@ func (d *indexData) newMatchTree(q query.Q, sq map[*substrMatchTree]struct{}, st
 		}, nil
 	case *query.Const:
 		if s.Value {
-			iter := d.matchAllDocIterator()
-			return &substrMatchTree{
-				query:         &query.Substring{Pattern: "TRUE"},
-				coversContent: true,
-				caseSensitive: false,
-				fileName:      true,
-				cands:         iter.next(),
-			}, nil
+			return &bruteForceMatchTree{}, nil
 		} else {
 			return &substrMatchTree{
 				query: &query.Substring{Pattern: "FALSE"},
@@ -595,8 +614,9 @@ func (d *indexData) Search(ctx context.Context, q query.Q, opts *SearchOptions) 
 	totalAtomCount := 0
 	collectAtoms(mt, func(t matchTree) { totalAtomCount++ })
 
+	docCount := uint32(len(d.fileBranchMasks))
 	canceled := false
-
+	lastDoc := int(-1)
 nextFileMatch:
 	for {
 		if !canceled {
@@ -608,9 +628,14 @@ nextFileMatch:
 		}
 
 		nextDoc := mt.nextDoc()
-		if nextDoc == maxUInt32 {
+		if nextDoc >= docCount {
 			break
 		}
+		if int(nextDoc) <= lastDoc {
+			log.Panicf("lastDoc %d, nextDoc %d", lastDoc, nextDoc)
+		}
+		lastDoc = int(nextDoc)
+
 		res.Stats.FilesConsidered++
 		mt.prepare(nextDoc)
 		if canceled || res.Stats.MatchCount >= opts.ShardMaxMatchCount ||
@@ -692,6 +717,20 @@ nextFileMatch:
 		fileMatch.Score += float64(atomMatchCount) / float64(totalAtomCount) * scoreFactorAtomMatch
 		finalCands := gatherMatches(mt, known)
 
+		if len(finalCands) == 0 {
+			nm := d.fileName(nextDoc)
+			finalCands = append(finalCands,
+				&candidateMatch{
+					caseSensitive: false,
+					fileName:      true,
+					substrBytes:   nm,
+					substrLowered: nm,
+					file:          nextDoc,
+					runeOffset:    0,
+					byteOffset:    0,
+					byteMatchSz:   uint32(len(nm)),
+				})
+		}
 		fileMatch.LineMatches = cp.fillMatches(finalCands)
 
 		maxFileScore := 0.0

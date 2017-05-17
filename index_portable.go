@@ -17,7 +17,6 @@ package zoekt
 import (
 	"fmt"
 	"hash/crc64"
-	"log"
 	"regexp"
 	"unicode/utf8"
 
@@ -128,28 +127,16 @@ func (d *indexData) memoryUse() int {
 	return sz
 }
 
-func (data *indexData) getDocIterator(q query.Q) (docIterator, error) {
-	switch s := q.(type) {
-	case *query.Substring:
-		if utf8.RuneCountInString(s.Pattern) < ngramSize {
-			if !s.FileName {
-				return nil, fmt.Errorf("pattern %q less than %d characters", s.Pattern, ngramSize)
-			}
-
-			return data.getBruteForceFileNameDocIterator(s), nil
+func (data *indexData) getDocIterator(s *query.Substring) (docIterator, error) {
+	if utf8.RuneCountInString(s.Pattern) < ngramSize {
+		if !s.FileName {
+			return nil, fmt.Errorf("pattern %q less than %d characters", s.Pattern, ngramSize)
 		}
 
-		return data.getNgramDocIterator(s)
-
-	case *query.Const:
-		if s.Value {
-			return data.matchAllDocIterator(), nil
-		}
-		return &bruteForceIter{}, nil
+		return data.getBruteForceFileNameDocIterator(s), nil
 	}
 
-	log.Panicf("type %T", q)
-	return nil, nil
+	return data.getNgramDocIterator(s)
 }
 
 type bruteForceIter struct {
@@ -164,32 +151,6 @@ func (i *bruteForceIter) next() []*candidateMatch {
 
 func (i *bruteForceIter) coversContent() bool {
 	return true
-}
-
-func (data *indexData) matchAllDocIterator() docIterator {
-	var cands []*candidateMatch
-
-	if len(data.fileNameIndex) == 0 {
-		return &bruteForceIter{cands}
-	}
-
-	cands = make([]*candidateMatch, 0, len(data.fileNameIndex[1:]))
-	var last uint32
-	for i, off := range data.fileNameIndex[1:] {
-		name := data.fileNameContent[last:off]
-		last = off
-		cands = append(cands, &candidateMatch{
-			caseSensitive: false,
-			fileName:      true,
-			substrBytes:   name,
-			substrLowered: name,
-			file:          uint32(i),
-			runeOffset:    0,
-			byteOffset:    0,
-			byteMatchSz:   uint32(len(name)),
-		})
-	}
-	return &bruteForceIter{cands}
 }
 
 func (data *indexData) getBruteForceFileNameDocIterator(query *query.Substring) docIterator {
