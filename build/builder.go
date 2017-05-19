@@ -94,6 +94,10 @@ type Builder struct {
 	finishedShards map[string]string
 }
 
+type finishedShard struct {
+	temp, final string
+}
+
 // SetDefaults sets reasonable default options.
 func (o *Options) SetDefaults() {
 	if o.CTags == "" {
@@ -267,7 +271,7 @@ func (b *Builder) flush() error {
 		b.building.Add(1)
 		go func() {
 			b.throttle <- 1
-			err := b.buildShard(todo, shard)
+			done, err := b.buildShard(todo, shard)
 			<-b.throttle
 
 			b.errMu.Lock()
@@ -275,13 +279,17 @@ func (b *Builder) flush() error {
 			if err != nil && b.buildError == nil {
 				b.buildError = err
 			}
+			b.finishedShards[done.temp] = done.final
 			b.building.Done()
 		}()
 	} else {
 		// No goroutines when we're not parallel. This
 		// simplifies memory profiling.
-		b.buildError = b.buildShard(todo, shard)
-
+		done, err := b.buildShard(todo, shard)
+		b.buildError = err
+		if err == nil {
+			b.finishedShards[done.temp] = done.final
+		}
 		if b.opts.MemProfile != "" {
 			// drop memory, and profile.
 			todo = nil
@@ -311,14 +319,14 @@ func (b *Builder) writeMemProfile(name string) {
 	log.Printf("wrote mem profile %q", nm)
 }
 
-func (b *Builder) buildShard(todo []*zoekt.Document, nextShardNum int) error {
+func (b *Builder) buildShard(todo []*zoekt.Document, nextShardNum int) (*finishedShard, error) {
 	if b.opts.CTags == "" && b.opts.CTagsMustSucceed {
-		return fmt.Errorf("ctags binary not found, but CTagsMustSucceed set.")
+		return nil, fmt.Errorf("ctags binary not found, but CTagsMustSucceed set.")
 	}
 	if b.opts.CTags != "" {
 		err := ctagsAddSymbols(todo, b.opts.CTags, b.opts.NamespaceSandbox)
 		if b.opts.CTagsMustSucceed && err != nil {
-			return err
+			return nil, err
 		}
 		if err != nil {
 			log.Printf("ignoring %s error: %v", b.opts.CTags, err)
@@ -327,22 +335,19 @@ func (b *Builder) buildShard(todo []*zoekt.Document, nextShardNum int) error {
 
 	name, err := b.opts.shardName(nextShardNum)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	shardBuilder, err := b.newShardBuilder()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, t := range todo {
 		shardBuilder.Add(*t)
 	}
 
-	if err := b.writeShard(name, shardBuilder); err != nil {
-		return err
-	}
-	return nil
+	return b.writeShard(name, shardBuilder)
 }
 
 func (b *Builder) newShardBuilder() (*zoekt.IndexBuilder, error) {
@@ -356,32 +361,31 @@ func (b *Builder) newShardBuilder() (*zoekt.IndexBuilder, error) {
 	return shardBuilder, nil
 }
 
-func (b *Builder) writeShard(fn string, ib *zoekt.IndexBuilder) error {
+func (b *Builder) writeShard(fn string, ib *zoekt.IndexBuilder) (*finishedShard, error) {
 	dir := filepath.Dir(fn)
 	if err := os.MkdirAll(dir, 0700); err != nil {
-		return err
+		return nil, err
 	}
 
 	f, err := ioutil.TempFile(dir, filepath.Base(fn))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	defer f.Close()
 	if err := ib.Write(f); err != nil {
-		return err
+		return nil, err
 	}
 	fi, err := f.Stat()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if err := f.Close(); err != nil {
-		return err
+		return nil, err
 	}
 
-	b.finishedShards[f.Name()] = fn
 	log.Printf("finished %s: %d index bytes (overhead %3.1f)", fn, fi.Size(),
 		float64(fi.Size())/float64(ib.ContentSize()+1))
 
-	return nil
+	return &finishedShard{f.Name(), fn}, nil
 }
