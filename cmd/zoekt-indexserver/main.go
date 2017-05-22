@@ -247,7 +247,7 @@ func main() {
 		}
 
 		if err := os.MkdirAll(s, 0755); err != nil {
-			log.Fatal("MkdirAll %s: %v", s, err)
+			log.Fatalf("MkdirAll %s: %v", s, err)
 		}
 	}
 
