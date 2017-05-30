@@ -65,12 +65,14 @@ type notMatchTree struct {
 type regexpMatchTree struct {
 	regexp *regexp.Regexp
 
-	child    matchTree
 	fileName bool
 
 	// mutable
 	reEvaluated bool
 	found       []*candidateMatch
+
+	// nextDoc, prepare.
+	bruteForceMatchTree
 }
 
 type substrMatchTree struct {
@@ -110,7 +112,7 @@ func (t *andMatchTree) prepare(doc uint32) {
 func (t *regexpMatchTree) prepare(doc uint32) {
 	t.found = t.found[:0]
 	t.reEvaluated = false
-	t.child.prepare(doc)
+	t.bruteForceMatchTree.prepare(doc)
 }
 
 func (t *orMatchTree) prepare(doc uint32) {
@@ -161,10 +163,6 @@ func (t *andMatchTree) nextDoc() uint32 {
 	return max
 }
 
-func (t *regexpMatchTree) nextDoc() uint32 {
-	return t.child.nextDoc()
-}
-
 func (t *orMatchTree) nextDoc() uint32 {
 	min := uint32(maxUInt32)
 	for _, c := range t.children {
@@ -212,7 +210,7 @@ func (t *andMatchTree) String() string {
 }
 
 func (t *regexpMatchTree) String() string {
-	return fmt.Sprintf("re(%s,%s)", t.regexp, t.child)
+	return fmt.Sprintf("re(%s)", t.regexp)
 }
 
 func (t *orMatchTree) String() string {
@@ -263,8 +261,6 @@ func collectPositiveSubstrings(t matchTree, f func(*substrMatchTree)) {
 		for _, ch := range s.children {
 			collectPositiveSubstrings(ch, f)
 		}
-	case *regexpMatchTree:
-		collectPositiveSubstrings(s.child, f)
 	case *notMatchTree:
 	case *substrMatchTree:
 		f(s)
@@ -384,11 +380,6 @@ func (t *branchQueryMatchTree) matches(known map[matchTree]bool) (bool, bool) {
 }
 
 func (t *regexpMatchTree) matches(known map[matchTree]bool) (bool, bool) {
-	v, ok := evalMatchTree(known, t.child)
-	if ok && !v {
-		return false, true
-	}
-
 	if !t.reEvaluated {
 		return false, false
 	}
@@ -447,10 +438,20 @@ func (d *indexData) newMatchTree(q query.Q, stats *Stats) (matchTree, error) {
 
 		tr := &regexpMatchTree{
 			regexp:   regexp.MustCompile(prefix + s.Regexp.String()),
-			child:    subMT,
 			fileName: s.FileName,
 		}
-		return tr, nil
+
+		// TODO - simplify here.
+		if and, ok := subMT.(*andMatchTree); ok {
+			and.children = append(and.children, tr)
+			return and, nil
+		}
+
+		return &andMatchTree{
+			children: []matchTree{
+				tr, subMT,
+			},
+		}, nil
 	case *query.And:
 		var r []matchTree
 		for _, ch := range s.Children {
@@ -528,7 +529,6 @@ func (d *indexData) newSubstringMatchTree(s *query.Substring, stats *Stats) (mat
 		}
 		t := &regexpMatchTree{
 			regexp:   regexp.MustCompile(prefix + regexp.QuoteMeta(s.Pattern)),
-			child:    &bruteForceMatchTree{},
 			fileName: s.FileName,
 		}
 		return t, nil
