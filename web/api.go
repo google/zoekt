@@ -23,6 +23,9 @@ import (
 type LastInput struct {
 	Query string
 	Num   int
+
+	// If set, focus on the search box.
+	AutoFocus bool
 }
 
 // Result holds the data provided to the search results template.

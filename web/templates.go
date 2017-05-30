@@ -39,8 +39,10 @@ var TemplateText = map[string]string{
 	"searchbox": `
   <form action="search">
     Search some code: <input
+      {{if .AutoFocus}}
       autofocus
       onfocus="this.value = this.value;"
+      {{end}}
       {{if .Query}}value={{.Query}}
       {{end}}type="text" name="q"> Max results:  <input style="width: 5em;" type="text" name="num" value="{{.Num}}"> <input type="submit" value="Search">
   </form>

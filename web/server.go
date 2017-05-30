@@ -246,8 +246,9 @@ func (s *Server) serveSearchErr(w http.ResponseWriter, r *http.Request) error {
 
 	res := ResultInput{
 		Last: LastInput{
-			Query: queryStr,
-			Num:   num,
+			Query:     queryStr,
+			Num:       num,
+			AutoFocus: true,
 		},
 		Stats:         result.Stats,
 		Query:         q.String(),
@@ -296,7 +297,8 @@ func (s *Server) serveSearchBoxErr(w http.ResponseWriter, r *http.Request) error
 	}
 	d := SearchBoxInput{
 		Last: LastInput{
-			Num: defaultNumResults,
+			Num:       defaultNumResults,
+			AutoFocus: true,
 		},
 		Stats:   stats,
 		Version: s.Version,
@@ -365,7 +367,8 @@ func (s *Server) serveListReposErr(q query.Q, qStr string, w http.ResponseWriter
 
 	res := RepoListInput{
 		Last: LastInput{
-			Query: qStr,
+			Query:     qStr,
+			AutoFocus: true,
 		},
 		RepoCount: len(repos.Repos),
 	}
@@ -457,8 +460,9 @@ func (s *Server) servePrintErr(w http.ResponseWriter, r *http.Request) error {
 		Repo:  f.Repository,
 		Lines: strLines,
 		Last: LastInput{
-			Query: queryStr,
-			Num:   num,
+			Query:     queryStr,
+			Num:       num,
+			AutoFocus: false,
 		},
 	}
 
