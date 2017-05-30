@@ -516,13 +516,22 @@ func (d *indexData) newSubstringMatchTree(s *query.Substring, stats *Stats) (mat
 	}
 
 	if utf8.RuneCountInString(s.Pattern) < ngramSize {
-		if !s.FileName {
-			return nil, fmt.Errorf("pattern %q less than %d characters", s.Pattern, ngramSize)
+		if s.FileName {
+			st.cands = d.bruteForceMatchFilenames(s)
+			st.coversContent = true
+			return st, nil
 		}
 
-		st.cands = d.bruteForceMatchFilenames(s)
-		st.coversContent = true
-		return st, nil
+		prefix := ""
+		if !s.CaseSensitive {
+			prefix = "(?i)"
+		}
+		t := &regexpMatchTree{
+			regexp:   regexp.MustCompile(prefix + regexp.QuoteMeta(s.Pattern)),
+			child:    &bruteForceMatchTree{},
+			fileName: s.FileName,
+		}
+		return t, nil
 	}
 
 	result, err := d.iterateNgrams(s)
@@ -593,6 +602,7 @@ func (d *indexData) Search(ctx context.Context, q query.Q, opts *SearchOptions) 
 	totalAtomCount := 0
 	var substrAtoms, fileAtoms []*substrMatchTree
 	var regexpAtoms []*regexpMatchTree
+
 	collectAtoms(mt, func(t matchTree) {
 		totalAtomCount++
 		if st, ok := t.(*substrMatchTree); ok {

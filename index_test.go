@@ -1278,25 +1278,6 @@ func TestUnicodeVariableLength(t *testing.T) {
 	}
 }
 
-func TestShortUnicode(t *testing.T) {
-	world := "世界"
-	content := []byte("world = " + world)
-	// ----------------012345678901234
-	b := testIndexBuilder(t, nil,
-		Document{
-			Name:    "f1",
-			Content: content,
-		})
-	q := &query.Substring{Pattern: world}
-
-	searcher := searcherForTest(t, b)
-	var opts SearchOptions
-	_, err := searcher.Search(context.Background(), q, &opts)
-	if err == nil {
-		t.Error("search should have failed")
-	}
-}
-
 func TestUnicodeFileStartOffsets(t *testing.T) {
 	unicode := "世界"
 	wat := "waaaaaat"
@@ -1475,6 +1456,23 @@ func TestAndOrUnicode(t *testing.T) {
 
 	res := searchForTest(t, b, finalQ)
 	if len(res.Files) != 1 {
+		t.Errorf("got %v, want 1 result", res.Files)
+	}
+}
+
+func TestAndShort(t *testing.T) {
+	content := []byte("bla needle at orange bla")
+	b := testIndexBuilder(t, &Repository{Name: "reponame"},
+		Document{Name: "f1", Content: content},
+		Document{Name: "f2", Content: []byte("xx at xx")},
+		Document{Name: "f3", Content: []byte("yy orange xx")},
+	)
+
+	q := query.NewAnd(&query.Substring{Pattern: "at"},
+		&query.Substring{Pattern: "orange"})
+
+	res := searchForTest(t, b, q)
+	if len(res.Files) != 1 || res.Files[0].FileName != "f1" {
 		t.Errorf("got %v, want 1 result", res.Files)
 	}
 }
