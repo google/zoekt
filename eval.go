@@ -251,22 +251,6 @@ func collectAtoms(t matchTree, f func(matchTree)) {
 	}
 }
 
-func collectPositiveSubstrings(t matchTree, f func(*substrMatchTree)) {
-	switch s := t.(type) {
-	case *andMatchTree:
-		for _, ch := range s.children {
-			collectPositiveSubstrings(ch, f)
-		}
-	case *orMatchTree:
-		for _, ch := range s.children {
-			collectPositiveSubstrings(ch, f)
-		}
-	case *notMatchTree:
-	case *substrMatchTree:
-		f(s)
-	}
-}
-
 func visitMatches(t matchTree, known map[matchTree]bool, f func(matchTree)) {
 	switch s := t.(type) {
 	case *andMatchTree:
