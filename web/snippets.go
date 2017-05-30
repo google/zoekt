@@ -39,6 +39,9 @@ func (s *Server) formatResults(result *zoekt.SearchResult, query string, localPr
 		}
 	}
 	getFragment := func(repo string, linenum int) string {
+		if localPrint {
+			return "l" + strconv.Itoa(linenum)
+		}
 		if tpl := fragmentMap[repo]; tpl != nil {
 			var buf bytes.Buffer
 			if err := tpl.Execute(&buf, map[string]string{
