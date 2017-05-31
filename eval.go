@@ -501,12 +501,6 @@ func (d *indexData) newSubstringMatchTree(s *query.Substring, stats *Stats) (mat
 	}
 
 	if utf8.RuneCountInString(s.Pattern) < ngramSize {
-		if s.FileName {
-			st.cands = d.bruteForceMatchFilenames(s)
-			st.coversContent = true
-			return st, nil
-		}
-
 		prefix := ""
 		if !s.CaseSensitive {
 			prefix = "(?i)"

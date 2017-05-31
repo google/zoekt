@@ -17,7 +17,6 @@ package zoekt
 import (
 	"fmt"
 	"hash/crc64"
-	"regexp"
 	"unicode/utf8"
 
 	"github.com/google/zoekt/query"
@@ -125,53 +124,6 @@ func (d *indexData) memoryUse() int {
 		sz += 4*len(v) + 4
 	}
 	return sz
-}
-
-func (data *indexData) bruteForceMatchFilenames(query *query.Substring) []*candidateMatch {
-	quoted := regexp.QuoteMeta(query.Pattern)
-	if !query.CaseSensitive {
-		quoted = "(?i)" + quoted
-	}
-
-	lowerPat := toLower([]byte(query.Pattern))
-
-	re := regexp.MustCompile(quoted)
-
-	fileID := 0
-	startName := data.fileNameIndex[fileID]
-	endName := data.fileNameIndex[fileID+1]
-
-	matches := re.FindAllIndex(data.fileNameContent, -1)
-	substrBytes := []byte(query.Pattern)
-	cands := make([]*candidateMatch, 0, len(matches))
-	for _, match := range matches {
-		start := uint32(match[0])
-		end := uint32(match[1])
-
-		for endName < end {
-			fileID++
-			startName = data.fileNameIndex[fileID]
-			endName = data.fileNameIndex[fileID+1]
-		}
-
-		if start < startName {
-			// straddles a filename boundary.
-			continue
-		}
-
-		cands = append(cands, &candidateMatch{
-			caseSensitive: query.CaseSensitive,
-			fileName:      true,
-			substrBytes:   substrBytes,
-			substrLowered: lowerPat,
-			file:          uint32(fileID),
-			// TODO - should also populate runeOffset?
-			byteOffset:  uint32(start - startName),
-			byteMatchSz: uint32(end - start),
-		})
-	}
-
-	return cands
 }
 
 const maxUInt32 = 0xffffffff
