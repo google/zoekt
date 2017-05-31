@@ -81,9 +81,9 @@ type SearchBoxInput struct {
 
 // RepoListInput is provided to the RepoList template.
 type RepoListInput struct {
-	Last      LastInput
-	RepoCount int
-	Repos     []Repository
+	Last  LastInput
+	Stats zoekt.RepoStats
+	Repos []Repository
 }
 
 // Branch holds the metadata for a indexed branch.

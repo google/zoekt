@@ -170,7 +170,7 @@ To list repositories, try:
 <body>
 {{template "searchbox" .Last}}
  <hr>
-  Found {{.RepoCount}} repositories:
+  Found {{.Stats.Repos}} repositories ({{.Stats.Documents}} files, {{HumanUnit .Stats.ContentBytes}}b content):
   <p>
   {{range .Repos}}
     <li>

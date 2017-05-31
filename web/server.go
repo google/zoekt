@@ -365,12 +365,18 @@ func (s *Server) serveListReposErr(q query.Q, qStr string, w http.ResponseWriter
 		return err
 	}
 
+	aggregate := zoekt.RepoStats{
+		Repos: len(repos.Repos),
+	}
+	for _, s := range repos.Repos {
+		aggregate.Add(&s.Stats)
+	}
 	res := RepoListInput{
 		Last: LastInput{
 			Query:     qStr,
 			AutoFocus: true,
 		},
-		RepoCount: len(repos.Repos),
+		Stats: aggregate,
 	}
 
 	for _, r := range repos.Repos {
