@@ -61,6 +61,7 @@ func loadShard(fn string) (*searchShard, error) {
 	}
 	fi, err := f.Stat()
 	if err != nil {
+		f.Close()
 		return nil, err
 	}
 
