@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -137,6 +138,12 @@ func (o *Options) shardName(n int) (string, error) {
 		return "", err
 	}
 
+	if u := o.RepositoryDescription.URL; u != "" {
+		parsed, _ := url.Parse(u)
+		if parsed != nil {
+			abs = url.QueryEscape(filepath.Join(parsed.Host, parsed.Path))
+		}
+	}
 	return filepath.Join(o.IndexDir,
 		fmt.Sprintf("%s_v%d.%05d.zoekt", strings.Replace(abs, "/", "_", -1), zoekt.IndexFormatVersion, n)), nil
 }
