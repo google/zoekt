@@ -62,6 +62,11 @@ type notMatchTree struct {
 	child matchTree
 }
 
+// Don't visit this subtree for collecting matches.
+type noVisitMatchTree struct {
+	matchTree
+}
+
 type regexpMatchTree struct {
 	regexp *regexp.Regexp
 
@@ -244,6 +249,8 @@ func collectAtoms(t matchTree, f func(matchTree)) {
 		for _, ch := range s.children {
 			collectAtoms(ch, f)
 		}
+	case *noVisitMatchTree:
+		collectAtoms(s.matchTree, f)
 	case *notMatchTree:
 		collectAtoms(s.child, f)
 	default:
@@ -266,6 +273,7 @@ func visitMatches(t matchTree, known map[matchTree]bool, f func(matchTree)) {
 			}
 		}
 	case *notMatchTree:
+	case *noVisitMatchTree:
 		// don't collect into negative trees.
 	default:
 		f(s)
@@ -425,15 +433,9 @@ func (d *indexData) newMatchTree(q query.Q, stats *Stats) (matchTree, error) {
 			fileName: s.FileName,
 		}
 
-		// TODO - simplify here.
-		if and, ok := subMT.(*andMatchTree); ok {
-			and.children = append(and.children, tr)
-			return and, nil
-		}
-
 		return &andMatchTree{
 			children: []matchTree{
-				tr, subMT,
+				tr, &noVisitMatchTree{subMT},
 			},
 		}, nil
 	case *query.And:

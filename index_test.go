@@ -1476,3 +1476,31 @@ func TestAndShort(t *testing.T) {
 		t.Errorf("got %v, want 1 result", res.Files)
 	}
 }
+
+func TestNoCollectRegexpSubstring(t *testing.T) {
+	content := []byte("bla final bla\nfoo final, foo")
+	b := testIndexBuilder(t, &Repository{Name: "reponame"},
+		Document{Name: "f1", Content: content},
+	)
+
+	q := &query.Regexp{
+		Regexp: mustParseRE("final[,.]"),
+	}
+
+	res := searchForTest(t, b, q)
+	if len(res.Files) != 1 {
+		t.Fatalf("got %v, want 1 result", res.Files)
+	}
+	if f := res.Files[0]; len(f.LineMatches) != 1 {
+		t.Fatalf("got line matches %v, want 1 line match", printLineMatches(f.LineMatches))
+	}
+}
+
+func printLineMatches(ms []LineMatch) string {
+	var ss []string
+	for _, m := range ms {
+		ss = append(ss, fmt.Sprintf("%d:%q %v", m.LineNumber, m.Line, m.LineFragments))
+	}
+
+	return strings.Join(ss, ", ")
+}
