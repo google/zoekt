@@ -28,10 +28,7 @@ type Entry struct {
 	Parent     string
 	ParentType string
 
-	FileLimited    bool
-	Access         string
-	Implementation bool
-	Inherits       []string
+	FileLimited bool
 }
 
 // Parse parses a single line of exuberant "ctags -n" output.
