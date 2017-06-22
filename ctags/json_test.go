@@ -20,7 +20,7 @@ import (
 )
 
 func TestJSON(t *testing.T) {
-	p, err := newProcess()
+	p, err := newProcess("universal-ctags")
 	if err != nil {
 		t.Fatal("newProcess", err)
 	}
@@ -42,7 +42,7 @@ class Back implements Future extends Frob {
 }
 `
 	name := "io/zoekt/Back.java"
-	got, err := p.Process(name, []byte(java))
+	got, err := p.Parse(name, []byte(java))
 	if err != nil {
 		t.Errorf("Process: %v", err)
 	}

@@ -315,10 +315,9 @@ Since 'zoekt' itself is written in Go, it does not have memory
 security problems: at worst, a bug in the query parser would lead to a
 crash.
 
-As part of the indexing process, we run the code through tools like
-`ctags`. This poses a security risk: especially crafted code could be
-used to own the indexing process.  We propose to mitigate this by
-runnning the tagger in a namespace-based sandbox on Linux.
+The code to index is handled by `ctags` for symbol detection. The
+security risk this poses is mitigated by using a seccomp based
+sandboxing.
 
 
 Privacy

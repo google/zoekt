@@ -9,5 +9,3 @@ for p in zoekt zoekt-webserver zoekt-indexserver \
     zoekt-mirror-gitiles zoekt-test; do
     go install github.com/google/zoekt/cmd/$p
 done
-
-(cd cmd/zoekt-sandbox && make && cp zoekt-sandbox $GOPATH/bin/ )

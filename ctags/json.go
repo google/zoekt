@@ -18,11 +18,15 @@ import (
 	"bufio"
 	"encoding/json"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"sync"
 )
+
+const debug = false
 
 type ctagsProcess struct {
 	cmd     *exec.Cmd
@@ -34,9 +38,7 @@ type ctagsProcess struct {
 	procErr   error
 }
 
-var bin = "universal-ctags"
-
-func newProcess() (*ctagsProcess, error) {
+func newProcess(bin string) (*ctagsProcess, error) {
 	opt := "default"
 	if runtime.GOOS == "linux" {
 		opt = "sandbox"
@@ -87,6 +89,10 @@ func (p *ctagsProcess) read(rep *reply) error {
 		p.in.Close()
 		return err
 	}
+	if debug {
+		log.Printf("read %s", p.out.Text())
+	}
+
 	return json.Unmarshal(p.out.Bytes(), rep)
 }
 
@@ -96,11 +102,17 @@ func (p *ctagsProcess) post(req *request, content []byte) error {
 		return err
 	}
 	body = append(body, '\n')
+	if debug {
+		log.Printf("post %q", body)
+	}
+
 	if _, err = p.in.Write(body); err != nil {
 		return err
 	}
 	_, err = p.in.Write(content)
-
+	if debug {
+		log.Println(string(content))
+	}
 	return err
 }
 
@@ -126,7 +138,7 @@ type reply struct {
 	Kind     string `json:"kind"`
 }
 
-func (p *ctagsProcess) Process(name string, content []byte) ([]*Entry, error) {
+func (p *ctagsProcess) Parse(name string, content []byte) ([]*Entry, error) {
 	req := request{
 		Command:  "generate-tags",
 		Size:     len(content),
@@ -158,4 +170,33 @@ func (p *ctagsProcess) Process(name string, content []byte) ([]*Entry, error) {
 	}
 
 	return es, nil
+}
+
+type Parser interface {
+	Parse(name string, content []byte) ([]*Entry, error)
+}
+
+type lockedParser struct {
+	p Parser
+	l sync.Mutex
+}
+
+func (lp *lockedParser) Parse(name string, content []byte) ([]*Entry, error) {
+	lp.l.Lock()
+	defer lp.l.Unlock()
+	return lp.p.Parse(name, content)
+}
+
+func NewParser(bin string) (Parser, error) {
+	if strings.Contains(bin, "universal-ctags") {
+		// todo: restart, locking, parallelizatoin.
+		proc, err := newProcess(bin)
+		if err != nil {
+			return nil, err
+		}
+		return &lockedParser{p: proc}, nil
+	}
+
+	log.Fatal("not implemented")
+	return nil, nil
 }

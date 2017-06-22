@@ -30,6 +30,7 @@ import (
 	"sync"
 
 	"github.com/google/zoekt"
+	"github.com/google/zoekt/ctags"
 )
 
 var DefaultDir = filepath.Join(os.Getenv("HOME"), ".zoekt")
@@ -69,9 +70,6 @@ type Options struct {
 	// If set, ctags must succeed.
 	CTagsMustSucceed bool
 
-	// Path to namespace-sandbox from Bazel
-	NamespaceSandbox string
-
 	// Write memory profiles to this file.
 	MemProfile string
 }
@@ -84,6 +82,8 @@ type Builder struct {
 	nextShardNum int
 	todo         []*zoekt.Document
 	size         int
+
+	parser ctags.Parser
 
 	building sync.WaitGroup
 
@@ -102,7 +102,7 @@ type finishedShard struct {
 // SetDefaults sets reasonable default options.
 func (o *Options) SetDefaults() {
 	if o.CTags == "" {
-		ctags, err := exec.LookPath("ctags-universal")
+		ctags, err := exec.LookPath("universal-ctags")
 		if err == nil {
 			o.CTags = ctags
 		}
@@ -112,12 +112,6 @@ func (o *Options) SetDefaults() {
 		ctags, err := exec.LookPath("ctags-exuberant")
 		if err == nil {
 			o.CTags = ctags
-		}
-	}
-	if o.NamespaceSandbox == "" {
-		ns, err := exec.LookPath("zoekt-sandbox")
-		if err == nil {
-			o.NamespaceSandbox = ns
 		}
 	}
 	if o.Parallelism == 0 {
@@ -179,17 +173,25 @@ func (o *Options) IndexVersions() []zoekt.RepositoryBranch {
 }
 
 // NewBuilder creates a new Builder instance.
-func NewBuilder(opt Options) (*Builder, error) {
-	if opt.RepoDir == "" {
+func NewBuilder(opts Options) (*Builder, error) {
+	if opts.RepoDir == "" {
 		return nil, fmt.Errorf("must set options.RepoDir")
 	}
 
 	b := &Builder{
-		opts:           opt,
-		throttle:       make(chan int, opt.Parallelism),
+		opts:           opts,
+		throttle:       make(chan int, opts.Parallelism),
 		finishedShards: map[string]string{},
 	}
 
+	if strings.Contains(opts.CTags, "universal-ctags") {
+		parser, err := ctags.NewParser(opts.CTags)
+		if err != nil && opts.CTagsMustSucceed {
+			return nil, fmt.Errorf("ctags.NewParser: %v", err)
+		}
+
+		b.parser = parser
+	}
 	if _, err := b.newShardBuilder(); err != nil {
 		return nil, err
 	}
@@ -330,8 +332,9 @@ func (b *Builder) buildShard(todo []*zoekt.Document, nextShardNum int) (*finishe
 	if b.opts.CTags == "" && b.opts.CTagsMustSucceed {
 		return nil, fmt.Errorf("ctags binary not found, but CTagsMustSucceed set.")
 	}
+
 	if b.opts.CTags != "" {
-		err := ctagsAddSymbols(todo, b.opts.CTags, b.opts.NamespaceSandbox)
+		err := ctagsAddSymbols(todo, b.parser, b.opts.CTags)
 		if b.opts.CTagsMustSucceed && err != nil {
 			return nil, err
 		}

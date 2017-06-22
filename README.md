@@ -82,21 +82,14 @@ It takes care of fetching and indexing new data and cleaning up logfiles.
 The webserver can be started from a standard service management framework, such
 as systemd.
 
+
 SYMBOL SEARCH
 =============
 
-It is recommended to install CTags to improve ranking:
-
-   * [Universal ctags](https://github.com/universal-ctags/ctags) is more up to date, but not commonly packaged for distributions. It must be compiled from source.
-   * [Exuberant ctags](http://ctags.sourceforge.net/) is a languishing, but commonly available through Linux distributions. It has several known vulnerabilities.
-
-If you index untrusted code, it is strongly recommended to also
-install Bazel's sandbox, to avoid vulnerabilities of ctags opening up
-access to the indexing machine. A blessed version of the sandbox is under
-`cmd/zoek-sandbox`. It can be compiled with a simple `make` call.
-
-
-
+It is recommended to install [Universal
+ctags](https://github.com/universal-ctags/ctags) to improve ranking,
+in particular, version `db3d9a6` or newer, which supports seccomp
+sandboxing.
 
 
 ACKNOWLEDGEMENTS
