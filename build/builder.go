@@ -197,8 +197,8 @@ func NewBuilder(opt Options) (*Builder, error) {
 	return b, nil
 }
 
-func (b *Builder) AddFile(name string, content []byte) {
-	b.Add(zoekt.Document{Name: name, Content: content})
+func (b *Builder) AddFile(name string, content []byte) error {
+	return b.Add(zoekt.Document{Name: name, Content: content})
 }
 
 func (b *Builder) Add(doc zoekt.Document) error {
@@ -351,7 +351,9 @@ func (b *Builder) buildShard(todo []*zoekt.Document, nextShardNum int) (*finishe
 	}
 
 	for _, t := range todo {
-		shardBuilder.Add(*t)
+		if err := shardBuilder.Add(*t); err != nil {
+			return nil, err
+		}
 	}
 
 	return b.writeShard(name, shardBuilder)
