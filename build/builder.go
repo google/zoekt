@@ -288,7 +288,9 @@ func (b *Builder) flush() error {
 			if err != nil && b.buildError == nil {
 				b.buildError = err
 			}
-			b.finishedShards[done.temp] = done.final
+			if err == nil {
+				b.finishedShards[done.temp] = done.final
+			}
 			b.building.Done()
 		}()
 	} else {
