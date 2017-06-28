@@ -19,6 +19,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"io/ioutil"
 	"log"
@@ -115,7 +116,7 @@ func getOrgRepos(client *github.Client, org string) ([]*github.Repository, error
 	var allRepos []*github.Repository
 	opt := &github.RepositoryListByOrgOptions{}
 	for {
-		repos, resp, err := client.Repositories.ListByOrg(org, opt)
+		repos, resp, err := client.Repositories.ListByOrg(context.Background(), org, opt)
 		if err != nil {
 			return nil, err
 		}
@@ -141,7 +142,7 @@ func getUserRepos(client *github.Client, user string) ([]*github.Repository, err
 	var allRepos []*github.Repository
 	opt := &github.RepositoryListOptions{}
 	for {
-		repos, resp, err := client.Repositories.List(user, opt)
+		repos, resp, err := client.Repositories.List(context.Background(), user, opt)
 		if err != nil {
 			return nil, err
 		}
