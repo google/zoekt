@@ -44,6 +44,11 @@ type matchTree interface {
 	String() string
 }
 
+type docMatchTree struct {
+	docs     []uint32
+	matches_ bool
+}
+
 type bruteForceMatchTree struct {
 	// mutable
 	firstDone bool
@@ -108,6 +113,13 @@ func (t *bruteForceMatchTree) prepare(doc uint32) {
 	t.firstDone = true
 }
 
+func (t *docMatchTree) prepare(doc uint32) {
+	for len(t.docs) > 0 && t.docs[0] < doc {
+		t.docs = t.docs[1:]
+	}
+	t.matches_ = len(t.docs) > 0 && t.docs[0] == doc
+}
+
 func (t *andMatchTree) prepare(doc uint32) {
 	for _, c := range t.children {
 		c.prepare(doc)
@@ -149,6 +161,13 @@ func (t *branchQueryMatchTree) prepare(doc uint32) {
 }
 
 // nextDoc
+
+func (t *docMatchTree) nextDoc() uint32 {
+	if len(t.docs) == 0 {
+		return maxUInt32
+	}
+	return t.docs[0]
+}
 
 func (t *bruteForceMatchTree) nextDoc() uint32 {
 	if !t.firstDone {
@@ -208,6 +227,10 @@ func (t *branchQueryMatchTree) nextDoc() uint32 {
 
 func (t *bruteForceMatchTree) String() string {
 	return "all"
+}
+
+func (t *docMatchTree) String() string {
+	return fmt.Sprintf("docs%v", t.docs)
 }
 
 func (t *andMatchTree) String() string {
@@ -330,6 +353,10 @@ func (p *contentProvider) evalRegexpMatches(s *regexpMatchTree) {
 }
 
 // all matches() methods.
+
+func (t *docMatchTree) matches(known map[matchTree]bool) (bool, bool) {
+	return t.matches_, true
+}
 
 func (t *bruteForceMatchTree) matches(known map[matchTree]bool) (bool, bool) {
 	return true, true
@@ -490,6 +517,22 @@ func (d *indexData) newMatchTree(q query.Q, stats *Stats) (matchTree, error) {
 				query: &query.Substring{Pattern: "FALSE"},
 			}, nil
 		}
+	case *query.Language:
+		code, ok := d.metaData.LanguageMap[s.Language]
+		if !ok {
+			return &substrMatchTree{
+				query: &query.Substring{Pattern: "LANG"},
+			}, nil
+		}
+		docs := make([]uint32, 0, len(d.languages))
+		for d, l := range d.languages {
+			if l == code {
+				docs = append(docs, uint32(d))
+			}
+		}
+		return &docMatchTree{
+			docs: docs,
+		}, nil
 	}
 	log.Panicf("type %T", q)
 	return nil, nil
@@ -680,6 +723,7 @@ nextFileMatch:
 			// the matches.
 			Score:    10 * float64(nextDoc) / float64(len(d.boundaries)),
 			Checksum: d.getChecksum(nextDoc),
+			Language: d.languageMap[d.languages[nextDoc]],
 		}
 
 		if s := d.subRepos[nextDoc]; s > 0 {

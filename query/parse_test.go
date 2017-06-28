@@ -83,6 +83,8 @@ func TestParseQuery(t *testing.T) {
 		{"c:abc", &Substring{Pattern: "abc", Content: true}},
 		{"content:abc", &Substring{Pattern: "abc", Content: true}},
 
+		{"lang:c++", &Language{"c++"}},
+
 		// case
 		{"abc case:yes", &Substring{Pattern: "abc", CaseSensitive: true}},
 		{"abc case:auto", &Substring{Pattern: "abc", CaseSensitive: false}},

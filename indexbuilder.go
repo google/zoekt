@@ -127,6 +127,12 @@ type IndexBuilder struct {
 
 	// name to index.
 	subRepoIndices map[string]uint32
+
+	// language => language code
+	languageMap map[string]byte
+
+	// languages codes
+	languages []byte
 }
 
 func (d *Repository) verify() error {
@@ -151,6 +157,7 @@ func NewIndexBuilder(r *Repository) (*IndexBuilder, error) {
 	b := &IndexBuilder{
 		contentPostings: newPostingsBuilder(),
 		namePostings:    newPostingsBuilder(),
+		languageMap:     map[string]byte{},
 	}
 
 	if r == nil {
@@ -206,6 +213,7 @@ type Document struct {
 	Content           []byte
 	Branches          []string
 	SubRepositoryPath string
+	Language          string
 
 	Symbols []DocumentSection
 }
@@ -332,6 +340,16 @@ func (b *IndexBuilder) Add(doc Document) error {
 	b.docSections = append(b.docSections, doc.Symbols)
 	b.branchMasks = append(b.branchMasks, mask)
 	b.checksums = append(b.checksums, hasher.Sum(nil)...)
+
+	langCode, ok := b.languageMap[doc.Language]
+	if !ok {
+		if len(b.languageMap) >= 255 {
+			return fmt.Errorf("too many languages")
+		}
+		langCode = byte(len(b.languageMap))
+		b.languageMap[doc.Language] = langCode
+	}
+	b.languages = append(b.languages, langCode)
 
 	return nil
 }

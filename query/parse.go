@@ -185,6 +185,8 @@ func parseExpr(in []byte) (Q, int, error) {
 			return nil, 0, err
 		}
 		expr = q
+	case tokLang:
+		expr = &Language{Language: text}
 
 	case tokParenClose:
 		// Caller must consume paren.
@@ -371,6 +373,7 @@ const (
 	tokRegex      = 9
 	tokOr         = 10
 	tokContent    = 11
+	tokLang       = 12
 )
 
 var tokNames = map[int]string{
@@ -385,6 +388,7 @@ var tokNames = map[int]string{
 	tokRegex:      "Regex",
 	tokRepo:       "Repo",
 	tokText:       "Text",
+	tokLang:       "Language",
 }
 
 var prefixes = map[string]int{
@@ -398,6 +402,7 @@ var prefixes = map[string]int{
 	"r:":       tokRepo,
 	"regex:":   tokRegex,
 	"repo:":    tokRepo,
+	"lang:":    tokLang,
 }
 
 var reservedWords = map[string]int{

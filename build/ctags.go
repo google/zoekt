@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/zoekt"
@@ -184,6 +185,9 @@ func ctagsAddSymbols(todo []*zoekt.Document, parser ctags.Parser, bin string) er
 			return err
 		}
 		todo[pathIndices[k]].Symbols = symOffsets
+		if len(tags) > 0 {
+			todo[pathIndices[k]].Language = strings.ToLower(tags[0].Language)
+		}
 	}
 	return nil
 }

@@ -41,6 +41,9 @@ type FileMatch struct {
 	// Checksum of the content.
 	Checksum []byte
 
+	// Detected language of the result.
+	Language string
+
 	// SubRepositoryName is the globally unique name of the repo,
 	// if it came from a subrepository
 	SubRepositoryName string
@@ -187,6 +190,7 @@ type IndexMetadata struct {
 	IndexFeatureVersion int
 	IndexTime           time.Time
 	PlainASCII          bool
+	LanguageMap         map[string]byte
 }
 
 // Statistics of a (collection of) repositories.

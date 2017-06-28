@@ -56,6 +56,14 @@ func (c *caseQ) String() string {
 	return "case:" + c.Flavor
 }
 
+type Language struct {
+	Language string
+}
+
+func (l *Language) String() string {
+	return "lang:" + l.Language
+}
+
 type Const struct {
 	Value bool
 }

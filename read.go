@@ -181,6 +181,11 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 		return nil, err
 	}
 
+	d.languages, err = d.readSectionBlob(toc.languages)
+	if err != nil {
+		return nil, err
+	}
+
 	textContent, err := d.readSectionBlob(toc.ngramText)
 	if err != nil {
 		return nil, err
@@ -254,6 +259,11 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 	}
 	sort.Strings(keys)
 	d.subRepoPaths = keys
+
+	d.languageMap = map[byte]string{}
+	for k, v := range d.metaData.LanguageMap {
+		d.languageMap[v] = k
+	}
 
 	if err := d.verify(); err != nil {
 		return nil, err

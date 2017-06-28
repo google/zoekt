@@ -17,6 +17,7 @@ package ctags
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -93,7 +94,11 @@ func (p *ctagsProcess) read(rep *reply) error {
 		log.Printf("read %s", p.out.Text())
 	}
 
-	return json.Unmarshal(p.out.Bytes(), rep)
+	err := json.Unmarshal(p.out.Bytes(), rep)
+	if err != nil {
+		return fmt.Errorf("unmarshal(%s): %v", p.out.Text(), err)
+	}
+	return nil
 }
 
 func (p *ctagsProcess) post(req *request, content []byte) error {
@@ -131,8 +136,9 @@ type reply struct {
 	// completed
 	Command string `json:"command"`
 
+	// Ignore pattern: we don't use it and universal-ctags
+	// sometimes generates 'false' as value.
 	Path      string `json:"path"`
-	Pattern   string `json:"pattern"`
 	Language  string `json:"language"`
 	Line      int    `json:"line"`
 	Kind      string `json:"kind"`

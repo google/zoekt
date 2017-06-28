@@ -73,6 +73,12 @@ type indexData struct {
 	// Checksums for all the files, at 8-byte intervals
 	checksums []byte
 
+	// languages for all the files.
+	languages []byte
+
+	// inverse of LanguageMap in metaData
+	languageMap map[byte]string
+
 	repoListEntry RepoListEntry
 }
 

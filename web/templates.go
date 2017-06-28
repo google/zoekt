@@ -148,7 +148,7 @@ To list repositories, try:
   {{range .FileMatches}}
 
     {{if .URL}}<a name="{{.ResultID}}" href="{{.URL}}" >{{else}}<a name="{{.ResultID}}">{{end}}
-    <tt><b>{{.Repo}}</b>:<b>{{.FileName}}</b></a>:{{if .Branches}}<small>[{{range .Branches}}{{.}}, {{end}}]</small>{{end}} </tt>
+    <tt><b>{{.Repo}}</b>:<b>{{.FileName}}</b></a>:{{if .Branches}}<small>[{{range .Branches}}{{.}}, {{end}}] {{if .Language}}<i>lang:{{.Language}}</i>{{end}}</small>{{end}} </tt>
       {{if .DuplicateID}}
         <div style="background: #eff"><a href="#{{.DuplicateID}}"><pre>duplicate result</pre></a></div>
       {{else}}

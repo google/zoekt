@@ -25,7 +25,8 @@ package zoekt
 // 11: file ends in rune offsets.
 // 12: 64-bit branchmasks.
 // 13: content checksums
-const IndexFormatVersion = 13
+// 14: languages
+const IndexFormatVersion = 14
 
 // FeatureVersion is increased if a feature is added that requires reindexing data.
 const FeatureVersion = 1
@@ -39,6 +40,7 @@ type indexTOC struct {
 	ngramText    simpleSection
 	runeOffsets  simpleSection
 	fileEndRunes simpleSection
+	languages    simpleSection
 
 	branchMasks simpleSection
 	subRepos    simpleSection
@@ -73,5 +75,6 @@ func (t *indexTOC) sections() []section {
 		&t.fileEndRunes,
 		&t.nameEndRunes,
 		&t.contentChecksums,
+		&t.languages,
 	}
 }

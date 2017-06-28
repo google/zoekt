@@ -111,11 +111,16 @@ func (b *IndexBuilder) Write(out io.Writer) error {
 	w.Write(b.checksums)
 	toc.contentChecksums.end(w)
 
+	toc.languages.start(w)
+	w.Write(b.languages)
+	toc.languages.end(w)
+
 	if err := b.writeJSON(&IndexMetadata{
 		IndexFormatVersion:  IndexFormatVersion,
 		IndexTime:           time.Now(),
 		IndexFeatureVersion: FeatureVersion,
 		PlainASCII:          b.contentPostings.isPlainASCII && b.namePostings.isPlainASCII,
+		LanguageMap:         b.languageMap,
 	}, &toc.metaData, w); err != nil {
 		return err
 	}
