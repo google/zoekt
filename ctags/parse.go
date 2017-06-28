@@ -25,6 +25,7 @@ type Entry struct {
 	Path       string
 	Line       int
 	Kind       string
+	Language   string
 	Parent     string
 	ParentType string
 

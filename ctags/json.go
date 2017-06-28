@@ -131,11 +131,16 @@ type reply struct {
 	// completed
 	Command string `json:"command"`
 
-	Path     string `json:"path"`
-	Pattern  string `json:"pattern"`
-	Language string `json:"language"`
-	Line     int    `json:"line"`
-	Kind     string `json:"kind"`
+	Path      string `json:"path"`
+	Pattern   string `json:"pattern"`
+	Language  string `json:"language"`
+	Line      int    `json:"line"`
+	Kind      string `json:"kind"`
+	End       int    `json:"end"`
+	Scope     string `json:"scope"`
+	ScopeKind string `json:"scopeKind"`
+	Access    string `json:"access"`
+	Signature string `json:"signature"`
 }
 
 func (p *ctagsProcess) Parse(name string, content []byte) ([]*Entry, error) {
@@ -160,10 +165,11 @@ func (p *ctagsProcess) Parse(name string, content []byte) ([]*Entry, error) {
 		}
 
 		e := Entry{
-			Sym:  rep.Name,
-			Path: rep.Path,
-			Line: rep.Line,
-			Kind: rep.Kind,
+			Sym:      rep.Name,
+			Path:     rep.Path,
+			Line:     rep.Line,
+			Kind:     rep.Kind,
+			Language: rep.Language,
 		}
 
 		es = append(es, &e)
