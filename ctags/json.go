@@ -16,6 +16,7 @@ package ctags
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -92,6 +93,11 @@ func (p *ctagsProcess) read(rep *reply) error {
 	}
 	if debug {
 		log.Printf("read %s", p.out.Text())
+	}
+
+	// See https://github.com/universal-ctags/ctags/issues/1493
+	if bytes.Compare([]byte("(null)"), p.out.Bytes()) == 0 {
+		return nil
 	}
 
 	err := json.Unmarshal(p.out.Bytes(), rep)
