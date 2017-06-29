@@ -140,7 +140,31 @@ func runCTagsChunked(bin string, in map[string][]byte) ([]*ctags.Entry, error) {
 	return res, nil
 }
 
+func ctagsAddSymbolsParser(todo []*zoekt.Document, parser ctags.Parser) error {
+	for _, doc := range todo {
+		if doc.Symbols != nil {
+			continue
+		}
+
+		es, err := parser.Parse(doc.Name, doc.Content)
+		if err != nil {
+			return err
+		}
+		symOffsets, err := tagsToSections(doc.Content, es)
+		if err != nil {
+			return err
+		}
+		doc.Symbols = symOffsets
+	}
+
+	return nil
+}
+
 func ctagsAddSymbols(todo []*zoekt.Document, parser ctags.Parser, bin string) error {
+	if parser != nil {
+		return ctagsAddSymbolsParser(todo, parser)
+	}
+
 	pathIndices := map[string]int{}
 	contents := map[string][]byte{}
 	for i, t := range todo {
@@ -159,19 +183,9 @@ func ctagsAddSymbols(todo []*zoekt.Document, parser ctags.Parser, bin string) er
 
 	var err error
 	var entries []*ctags.Entry
-	if parser != nil {
-		for k, v := range contents {
-			es, err := parser.Parse(k, v)
-			if err != nil {
-				return err
-			}
-			entries = append(entries, es...)
-		}
-	} else {
-		entries, err = runCTagsChunked(bin, contents)
-		if err != nil {
-			return err
-		}
+	entries, err = runCTagsChunked(bin, contents)
+	if err != nil {
+		return err
 	}
 
 	fileTags := map[string][]*ctags.Entry{}
