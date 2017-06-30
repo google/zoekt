@@ -149,6 +149,11 @@ func ctagsAddSymbolsParser(todo []*zoekt.Document, parser ctags.Parser) error {
 		if err != nil {
 			return err
 		}
+		if len(es) == 0 {
+			continue
+		}
+		doc.Language = strings.ToLower(es[0].Language)
+
 		symOffsets, err := tagsToSections(doc.Content, es)
 		if err != nil {
 			return fmt.Errorf("%s: %v", doc.Name, err)
