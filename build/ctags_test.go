@@ -15,8 +15,10 @@
 package build
 
 import (
+	"reflect"
 	"testing"
 
+	"github.com/google/zoekt"
 	"github.com/google/zoekt/ctags"
 )
 
@@ -37,6 +39,35 @@ func TestTagsToSections(t *testing.T) {
 
 	if len(secs) != 1 || secs[0].Start != 17 || secs[0].End != 20 {
 		t.Fatalf("got %#v, want 1 section (17,20)", secs)
+	}
+}
+
+func TestTagsToSectionsMultiple(t *testing.T) {
+	c := []byte("class Foob { int x; int b; }")
+	// ----------012345678901234567890123456789
+
+	tags := []*ctags.Entry{
+		{
+			Sym:  "x",
+			Line: 1,
+		},
+		{
+			Sym:  "b",
+			Line: 1,
+		},
+	}
+
+	got, err := tagsToSections(c, tags)
+	if err != nil {
+		t.Fatal("tagsToSections", err)
+	}
+
+	want := []zoekt.DocumentSection{
+		{17, 18},
+		{24, 25},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
 	}
 }
 

@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -152,7 +151,7 @@ func ctagsAddSymbolsParser(todo []*zoekt.Document, parser ctags.Parser) error {
 		}
 		symOffsets, err := tagsToSections(doc.Content, es)
 		if err != nil {
-			return err
+			return fmt.Errorf("%s: %v", doc.Name, err)
 		}
 		doc.Symbols = symOffsets
 	}
@@ -196,7 +195,7 @@ func ctagsAddSymbols(todo []*zoekt.Document, parser ctags.Parser, bin string) er
 	for k, tags := range fileTags {
 		symOffsets, err := tagsToSections(contents[k], tags)
 		if err != nil {
-			return err
+			return fmt.Errorf("%s: %v", k, err)
 		}
 		todo[pathIndices[k]].Symbols = symOffsets
 		if len(tags) > 0 {
@@ -210,6 +209,9 @@ func tagsToSections(content []byte, tags []*ctags.Entry) ([]zoekt.DocumentSectio
 	nls := newLinesIndices(content)
 	nls = append(nls, uint32(len(content)))
 	var symOffsets []zoekt.DocumentSection
+	var lastEnd uint32
+	var lastLine int
+	var lastIntraEnd int
 	for _, t := range tags {
 		if t.Line <= 0 {
 			// Observed this with a .JS file.
@@ -217,7 +219,6 @@ func tagsToSections(content []byte, tags []*ctags.Entry) ([]zoekt.DocumentSectio
 		}
 		lineIdx := t.Line - 1
 		if lineIdx >= len(nls) {
-			log.Println("nls", nls)
 			return nil, fmt.Errorf("linenum for entry out of range %v", t)
 		}
 
@@ -228,19 +229,34 @@ func tagsToSections(content []byte, tags []*ctags.Entry) ([]zoekt.DocumentSectio
 
 		end := nls[lineIdx]
 		line := content[lineOff:end]
+		if lastLine == lineIdx {
+			line = line[lastIntraEnd:]
+		} else {
+			lastIntraEnd = 0
+		}
 
-		intraOff := bytes.Index(line, []byte(t.Sym))
+		intraOff := lastIntraEnd + bytes.Index(line, []byte(t.Sym))
 		if intraOff < 0 {
 			// for Go code, this is very common, since
 			// ctags barfs on multi-line declarations
-			// log.Printf("symbol %s not found in line
-			// %q", t.Sym, line)
 			continue
 		}
+		start := lineOff + uint32(intraOff)
+		if start < lastEnd {
+			// This can happen if we have multiple tags on the same line.
+			// Give up.
+			continue
+		}
+
+		endSym := start + uint32(len(t.Sym))
+
 		symOffsets = append(symOffsets, zoekt.DocumentSection{
-			Start: lineOff + uint32(intraOff),
-			End:   lineOff + uint32(intraOff) + uint32(len(t.Sym)),
+			Start: start,
+			End:   endSym,
 		})
+		lastEnd = endSym
+		lastLine = lineIdx
+		lastIntraEnd = intraOff + len(t.Sym)
 	}
 
 	return symOffsets, nil
