@@ -20,11 +20,7 @@ mkdir -p ${out}
 
 for d in cmd/*
 do
-  if echo $d | grep sandbox ; then
-    make -C $d && cp $d/zoekt-sandbox ${out}/
-  else
-    go build -ldflags "-X main.Version=$VERSION"  -o ${out}/$(basename $d) github.com/google/zoekt/$d
-  fi
+  go build -ldflags "-X main.Version=$VERSION"  -o ${out}/$(basename $d) github.com/google/zoekt/$d
 done
 
 cat <<EOF > ${out}/deploy.sh
