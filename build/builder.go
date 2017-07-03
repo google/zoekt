@@ -184,6 +184,10 @@ func NewBuilder(opts Options) (*Builder, error) {
 		finishedShards: map[string]string{},
 	}
 
+	if b.opts.CTags == "" && b.opts.CTagsMustSucceed {
+		return nil, fmt.Errorf("ctags binary not found, but CTagsMustSucceed set.")
+	}
+
 	if strings.Contains(opts.CTags, "universal-ctags") {
 		parser, err := ctags.NewParser(opts.CTags)
 		if err != nil && opts.CTagsMustSucceed {
@@ -331,10 +335,6 @@ func (b *Builder) writeMemProfile(name string) {
 }
 
 func (b *Builder) buildShard(todo []*zoekt.Document, nextShardNum int) (*finishedShard, error) {
-	if b.opts.CTags == "" && b.opts.CTagsMustSucceed {
-		return nil, fmt.Errorf("ctags binary not found, but CTagsMustSucceed set.")
-	}
-
 	if b.opts.CTags != "" {
 		err := ctagsAddSymbols(todo, b.parser, b.opts.CTags)
 		if b.opts.CTagsMustSucceed && err != nil {
