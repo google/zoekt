@@ -48,7 +48,7 @@ func main() {
 	flag.Usage = func() {
 		name := os.Args[0]
 		fmt.Fprintf(os.Stderr, "Usage:\n\n  %s [option] QUERY\n"+
-			`for example\n\n  %s 'byte file:java -file:test'`+"\n\n", name, name)
+			"for example\n\n  %s 'byte file:java -file:test'\n\n", name, name)
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\n")
 	}
