@@ -35,9 +35,6 @@ type ctagsProcess struct {
 	in      io.WriteCloser
 	out     *bufio.Scanner
 	outPipe io.ReadCloser
-
-	procErrMu sync.Mutex
-	procErr   error
 }
 
 func newProcess(bin string) (*ctagsProcess, error) {
@@ -205,9 +202,11 @@ func (lp *lockedParser) Parse(name string, content []byte) ([]*Entry, error) {
 	return lp.p.Parse(name, content)
 }
 
+// NewParser creates a parser that is implemented by the given
+// universal-ctags binary. The parser is safe for concurrent use.
 func NewParser(bin string) (Parser, error) {
 	if strings.Contains(bin, "universal-ctags") {
-		// todo: restart, locking, parallelizatoin.
+		// todo: restart, parallelization.
 		proc, err := newProcess(bin)
 		if err != nil {
 			return nil, err
