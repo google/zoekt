@@ -95,6 +95,10 @@ type Server struct {
 
 	templateMu    sync.Mutex
 	templateCache map[string]*template.Template
+
+	lastStatsMu sync.Mutex
+	lastStats   *zoekt.RepoStats
+	lastStatsTS time.Time
 }
 
 func (s *Server) serveSearchAPI(w http.ResponseWriter, r *http.Request) {
@@ -273,21 +277,39 @@ func (s *Server) servePrint(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+const statsStaleNess = 30 * time.Second
+
 func (s *Server) fetchStats() (*zoekt.RepoStats, error) {
+	s.lastStatsMu.Lock()
+	stats := s.lastStats
+	if time.Now().Sub(s.lastStatsTS) > statsStaleNess {
+		stats = nil
+	}
+	s.lastStatsMu.Unlock()
+
+	if stats != nil {
+		return stats, nil
+	}
+
 	repos, err := s.Searcher.List(context.Background(), &query.Const{true})
 	if err != nil {
 		return nil, err
 	}
 
-	var stats zoekt.RepoStats
+	stats = &zoekt.RepoStats{}
 	names := map[string]struct{}{}
 	for _, r := range repos.Repos {
 		stats.Add(&r.Stats)
 		names[r.Repository.Name] = struct{}{}
 	}
 	stats.Repos = len(names)
-	return &stats, nil
 
+	s.lastStatsMu.Lock()
+	s.lastStatsTS = time.Now()
+	s.lastStats = stats
+	s.lastStatsMu.Unlock()
+
+	return stats, nil
 }
 
 func (s *Server) serveSearchBoxErr(w http.ResponseWriter, r *http.Request) error {
