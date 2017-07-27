@@ -212,6 +212,13 @@ func TestDeleteOldShards(t *testing.T) {
 		t.Fatalf("Glob(%s): got %v, want 4 shards", glob, fs)
 	}
 
+	if fi, err := os.Lstat(fs[0]); err != nil {
+		t.Fatalf("Lstat: %v", err)
+	} else if fi.Mode()&0666 == 0600 {
+		// This fails spuriously if your umask is very restrictive.
+		t.Errorf("got mode %o, should respect umask.", fi.Mode())
+	}
+
 	// Do again, without sharding.
 	opts.ShardMax = 1 << 20
 	b, err = NewBuilder(opts)
