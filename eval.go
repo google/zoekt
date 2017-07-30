@@ -45,8 +45,9 @@ type matchTree interface {
 }
 
 type docMatchTree struct {
-	docs     []uint32
-	matches_ bool
+	// mutable
+	docs    []uint32
+	current []uint32
 }
 
 type bruteForceMatchTree struct {
@@ -117,7 +118,12 @@ func (t *docMatchTree) prepare(doc uint32) {
 	for len(t.docs) > 0 && t.docs[0] < doc {
 		t.docs = t.docs[1:]
 	}
-	t.matches_ = len(t.docs) > 0 && t.docs[0] == doc
+	i := 0
+	for ; i < len(t.docs) && t.docs[i] == doc; i++ {
+	}
+
+	t.current = t.docs[:i]
+	t.docs = t.docs[i:]
 }
 
 func (t *andMatchTree) prepare(doc uint32) {
@@ -355,7 +361,7 @@ func (p *contentProvider) evalRegexpMatches(s *regexpMatchTree) {
 // all matches() methods.
 
 func (t *docMatchTree) matches(known map[matchTree]bool) (bool, bool) {
-	return t.matches_, true
+	return len(t.current) > 0, true
 }
 
 func (t *bruteForceMatchTree) matches(known map[matchTree]bool) (bool, bool) {

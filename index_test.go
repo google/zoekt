@@ -1525,3 +1525,17 @@ func TestLang(t *testing.T) {
 		t.Fatalf("got %v, want 1 match with language cpp", f)
 	}
 }
+
+func TestNoPositiveAtoms(t *testing.T) {
+	content := []byte("bla needle bla")
+	b := testIndexBuilder(t, &Repository{Name: "reponame"},
+		Document{Name: "f1", Content: content},
+		Document{Name: "f2", Language: "java", Content: content},
+		Document{Name: "f3", Language: "cpp", Content: content},
+	)
+	q := query.NewAnd(&query.Language{"java"})
+	res := searchForTest(t, b, q)
+	if len(res.Files) != 1 {
+		t.Fatalf("got %v, want 1 result in f3", res.Files)
+	}
+}
