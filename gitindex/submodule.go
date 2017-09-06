@@ -15,11 +15,9 @@
 package gitindex
 
 import (
-	"io/ioutil"
-	"os"
-	"regexp"
+	"bytes"
 
-	"github.com/libgit2/git2go"
+	"gopkg.in/src-d/go-git.v4/plumbing/format/config"
 )
 
 type SubmoduleEntry struct {
@@ -28,64 +26,36 @@ type SubmoduleEntry struct {
 	Branch string
 }
 
-const submodREStr = "^submodule.([^.]*)\\.(.*)"
-
-var submodRE = regexp.MustCompile(submodREStr)
-
 // ParseGitModules parses the contents of a .gitmodules file.
 func ParseGitModules(content []byte) (map[string]*SubmoduleEntry, error) {
-	base, err := git.NewConfig()
-	if err != nil {
-		return nil, err
-	}
-	defer base.Free()
+	dec := config.NewDecoder(bytes.NewBuffer(content))
+	cfg := &config.Config{}
 
-	// git2go has no API for parsing from contents. Sigh.
-	f, err := ioutil.TempFile("", "")
-	if err != nil {
-		return nil, err
-	}
-	defer os.Remove(f.Name())
-	if _, err := f.Write(content); err != nil {
-		return nil, err
-	}
-	f.Close()
-
-	cfg, err := git.OpenOndisk(base, f.Name())
-	if err != nil {
-		return nil, err
-	}
-	defer cfg.Free()
-	iter, err := cfg.NewIteratorGlob(submodREStr)
-	if err != nil {
+	if err := dec.Decode(cfg); err != nil {
 		return nil, err
 	}
 
 	result := map[string]*SubmoduleEntry{}
-	for {
-		entry, err := iter.Next()
-		if err != nil {
-			if ge, ok := err.(*git.GitError); ok && ge.Code == git.ErrIterOver {
-				break
+	for _, s := range cfg.Sections {
+		if s.Name != "submodule" {
+			continue
+		}
+
+		for _, ss := range s.Subsections {
+			name := ss.Name
+			e := &SubmoduleEntry{}
+			for _, o := range ss.Options {
+				switch o.Key {
+				case "branch":
+					e.Branch = o.Value
+				case "path":
+					e.Path = o.Value
+				case "url":
+					e.URL = o.Value
+				}
 			}
-			return nil, err
-		}
 
-		m := submodRE.FindStringSubmatch(entry.Name)
-
-		name := m[1]
-		if result[name] == nil {
-			result[name] = &SubmoduleEntry{}
-		}
-
-		e := result[name]
-		switch m[2] {
-		case "branch":
-			e.Branch = entry.Value
-		case "path":
-			e.Path = entry.Value
-		case "url":
-			e.URL = entry.Value
+			result[name] = e
 		}
 	}
 

@@ -20,7 +20,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/libgit2/git2go"
+	git "gopkg.in/src-d/go-git.v4"
 )
 
 type RepoCache struct {
@@ -40,9 +40,6 @@ func NewRepoCache(dir string) *RepoCache {
 func (rc *RepoCache) Close() {
 	rc.reposMu.Lock()
 	defer rc.reposMu.Unlock()
-	for _, v := range rc.repos {
-		v.Free()
-	}
 }
 
 func repoKey(u *url.URL) string {
@@ -59,21 +56,26 @@ func Path(baseDir string, u *url.URL) string {
 	return filepath.Join(baseDir, key)
 }
 
+func (rc *RepoCache) Path(u *url.URL) string {
+	key := repoKey(u)
+	return filepath.Join(rc.baseDir, key)
+}
+
 // Open opens a git repository. The cache retains a pointer to the
 // repository, so it cannot be freed.
 func (rc *RepoCache) Open(u *url.URL) (*git.Repository, error) {
-	key := repoKey(u)
-	dir := filepath.Join(rc.baseDir, key)
 
+	dir := rc.Path(u)
 	rc.reposMu.Lock()
 	defer rc.reposMu.Unlock()
 
+	key := repoKey(u)
 	r := rc.repos[key]
 	if r != nil {
 		return r, nil
 	}
 
-	repo, err := git.OpenRepository(dir)
+	repo, err := git.PlainOpen(dir)
 	if err == nil {
 		rc.repos[key] = repo
 	}

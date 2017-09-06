@@ -67,9 +67,6 @@ func main() {
 
 	gitRepos := map[string]string{}
 	for _, repoDir := range flag.Args() {
-		if _, err := os.Lstat(filepath.Join(repoDir, ".git")); err == nil {
-			repoDir = filepath.Join(repoDir, ".git")
-		}
 		repoDir, err := filepath.Abs(repoDir)
 		if err != nil {
 			log.Fatal(err)

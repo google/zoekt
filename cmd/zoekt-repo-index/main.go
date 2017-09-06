@@ -32,6 +32,7 @@ import (
 	"crypto/sha1"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/url"
 	"path"
@@ -44,7 +45,9 @@ import (
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
 	"github.com/google/zoekt/gitindex"
-	git "github.com/libgit2/git2go"
+
+	git "gopkg.in/src-d/go-git.v4"
+	"gopkg.in/src-d/go-git.v4/plumbing"
 )
 
 var _ = log.Println
@@ -67,6 +70,7 @@ func parseBranches(manifestRepoURL, revPrefix string, cache *gitindex.RepoCache,
 		if err != nil {
 			return nil, err
 		}
+
 		for _, f := range args {
 			fs := strings.SplitN(f, ":", 2)
 			if len(fs) != 2 {
@@ -81,7 +85,7 @@ func parseBranches(manifestRepoURL, revPrefix string, cache *gitindex.RepoCache,
 				branch:       fs[0],
 				file:         fs[1],
 				mf:           mf,
-				manifestPath: repo.Path(),
+				manifestPath: cache.Path(u),
 			})
 		}
 	} else {
@@ -169,7 +173,7 @@ func main() {
 	opts.SubRepositories = map[string]*zoekt.Repository{}
 
 	// branch => repo => version
-	versionMap := map[string]map[string]git.Oid{}
+	versionMap := map[string]map[string]plumbing.Hash{}
 	for _, br := range branches {
 		br.mf.Filter()
 		files, versions, err := iterateManifest(br.mf, *baseURL, *revPrefix, repoCache)
@@ -276,24 +280,46 @@ func main() {
 
 // getManifest parses the manifest XML at the given branch/path inside a Git repository.
 func getManifest(repo *git.Repository, branch, path string) (*manifest.Manifest, error) {
-	obj, err := repo.RevparseSingle(branch + ":" + path)
+	ref, err := repo.Reference(plumbing.ReferenceName("refs/heads/"+branch), true)
 	if err != nil {
 		return nil, err
 	}
-	defer obj.Free()
-	blob, err := obj.AsBlob()
+
+	commit, err := repo.CommitObject(ref.Hash())
 	if err != nil {
 		return nil, err
 	}
-	return manifest.Parse(blob.Contents())
+
+	tree, err := repo.TreeObject(commit.TreeHash)
+	if err != nil {
+		return nil, err
+	}
+
+	entry, err := tree.FindEntry(path)
+	if err != nil {
+		return nil, err
+	}
+
+	blob, err := repo.BlobObject(entry.Hash)
+	if err != nil {
+		return nil, err
+	}
+	r, err := blob.Reader()
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+
+	content, err := ioutil.ReadAll(r)
+	return manifest.Parse(content)
 }
 
 // iterateManifest constructs a complete tree from the given Manifest.
 func iterateManifest(mf *manifest.Manifest,
 	baseURL url.URL, revPrefix string,
-	cache *gitindex.RepoCache) (map[gitindex.FileKey]gitindex.BlobLocation, map[string]git.Oid, error) {
+	cache *gitindex.RepoCache) (map[gitindex.FileKey]gitindex.BlobLocation, map[string]plumbing.Hash, error) {
 	allFiles := map[gitindex.FileKey]gitindex.BlobLocation{}
-	allVersions := map[string]git.Oid{}
+	allVersions := map[string]plumbing.Hash{}
 	for _, p := range mf.Project {
 		rev := mf.ProjectRevision(&p)
 
@@ -305,24 +331,25 @@ func iterateManifest(mf *manifest.Manifest,
 			return nil, nil, err
 		}
 
-		obj, err := topRepo.RevparseSingle(revPrefix + rev)
-		if err != nil {
-			return nil, nil, err
-		}
-		defer obj.Free()
-
-		commit, err := obj.AsCommit()
+		ref, err := topRepo.Reference(plumbing.ReferenceName(revPrefix+rev), true)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		allVersions[p.GetPath()] = *commit.Id()
+		commit, err := topRepo.CommitObject(ref.Hash())
+		if err != nil {
+			return nil, nil, err
+		}
+		if err != nil {
+			return nil, nil, err
+		}
+
+		allVersions[p.GetPath()] = commit.Hash
 
 		tree, err := commit.Tree()
 		if err != nil {
 			return nil, nil, err
 		}
-		defer tree.Free()
 
 		files, versions, err := gitindex.TreeToFiles(topRepo, tree, projURL.String(), cache)
 		if err != nil {

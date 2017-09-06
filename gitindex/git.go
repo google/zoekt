@@ -16,6 +16,8 @@ package gitindex
 
 import (
 	"fmt"
+	"io"
+	"io/ioutil"
 	"log"
 	"net/url"
 	"os"
@@ -28,7 +30,11 @@ import (
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
 
-	git "github.com/libgit2/git2go"
+	"gopkg.in/src-d/go-git.v4/config"
+	"gopkg.in/src-d/go-git.v4/plumbing"
+	"gopkg.in/src-d/go-git.v4/plumbing/object"
+
+	git "gopkg.in/src-d/go-git.v4"
 )
 
 // RepoModTime returns the time of last fetch of a git repository.
@@ -129,54 +135,63 @@ func setTemplates(repo *zoekt.Repository, u *url.URL, typ string) error {
 }
 
 // getCommit returns a tree object for the given reference.
-func getCommit(repo *git.Repository, ref string) (*git.Commit, error) {
-	obj, err := repo.RevparseSingle(ref)
+func getCommit(repo *git.Repository, ref string) (*object.Commit, error) {
+	sha1, err := repo.ResolveRevision(plumbing.Revision(ref))
 	if err != nil {
 		return nil, err
 	}
-	defer obj.Free()
 
-	commitObj, err := obj.Peel(git.ObjectCommit)
+	commitObj, err := repo.CommitObject(*sha1)
 	if err != nil {
 		return nil, err
 	}
-	return commitObj.AsCommit()
+	return commitObj, nil
 }
 
-func clearEmptyConfig(err error) error {
-	if git.IsErrorClass(err, git.ErrClassConfig) && git.IsErrorCode(err, git.ErrNotFound) {
-		return nil
+func configLookupRemoteURL(cfg *config.Config, key string) string {
+	rc := cfg.Remotes[key]
+	if rc == nil || len(rc.URLs) == 0 {
+		return ""
 	}
-	return err
+	return rc.URLs[0]
+}
+
+func configLookupString(cfg *config.Config, key string) string {
+	fields := strings.Split(key, ".")
+	for _, s := range cfg.Raw.Sections {
+		if s.Name != fields[0] {
+			continue
+		}
+
+		for _, o := range s.Options {
+			if o.Key != fields[1] {
+				continue
+			}
+			return o.Value
+		}
+	}
+
+	return ""
 }
 
 func isMissingBranchError(err error) bool {
-	return git.IsErrorClass(err, git.ErrClassReference) && git.IsErrorCode(err, git.ErrNotFound)
+	return err != nil && err.Error() == "reference not found"
 }
 
 func setTemplatesFromConfig(desc *zoekt.Repository, repoDir string) error {
-	base, err := git.NewConfig()
-	if err != nil {
-		return err
-	}
-	defer base.Free()
-	cfg, err := git.OpenOndisk(base, filepath.Join(repoDir, "config"))
-	if err != nil {
-		return err
-	}
-	defer cfg.Free()
-
-	webURLStr, err := cfg.LookupString("zoekt.web-url")
-	err = clearEmptyConfig(err)
+	repo, err := git.PlainOpen(repoDir)
 	if err != nil {
 		return err
 	}
 
-	webURLType, err := cfg.LookupString("zoekt.web-url-type")
-	err = clearEmptyConfig(err)
+	cfg, err := repo.Config()
 	if err != nil {
 		return err
 	}
+
+	webURLStr := configLookupString(cfg, "zoekt.web-url")
+
+	webURLType := configLookupString(cfg, "zoekt.web-url-type")
 
 	if webURLType != "" && webURLStr != "" {
 		webURL, err := url.Parse(webURLStr)
@@ -188,19 +203,13 @@ func setTemplatesFromConfig(desc *zoekt.Repository, repoDir string) error {
 		}
 	}
 
-	name, err := cfg.LookupString("zoekt.name")
-	err = clearEmptyConfig(err)
-	if err != nil {
-		return err
-	}
-
+	name := configLookupString(cfg, "zoekt.name")
 	if name != "" {
 		desc.Name = name
 	} else {
-		remoteURL, err := cfg.LookupString("remote.origin.url")
-		err = clearEmptyConfig(err)
-		if err != nil || remoteURL == "" {
-			return err
+		remoteURL := configLookupRemoteURL(cfg, "origin")
+		if remoteURL == "" {
+			return nil
 		}
 		u, err := url.Parse(remoteURL)
 		if err != nil {
@@ -255,36 +264,32 @@ func expandBranches(repo *git.Repository, bs []string, prefix string) ([]string,
 	var result []string
 	for _, b := range bs {
 		if b == "HEAD" {
-			_, ref, err := repo.RevparseExt(b)
+			ref, err := repo.Head()
 			if err != nil {
 				return nil, err
 			}
 
-			result = append(result, strings.TrimPrefix(ref.Name(), prefix))
+			result = append(result, strings.TrimPrefix(ref.Name().String(), prefix))
 			continue
 		}
 
 		if strings.Contains(b, "*") {
-			iter, err := repo.NewBranchIterator(git.BranchAll)
+			iter, err := repo.Branches()
 			if err != nil {
-				log.Println("boem")
 				return nil, err
 			}
 
+			defer iter.Close()
 			for {
-				br, _, err := iter.Next()
-				if git.IsErrorCode(err, git.ErrIterOver) {
+				ref, err := iter.Next()
+				if err == io.EOF {
 					break
 				}
 				if err != nil {
-					log.Printf("bam %#v", err)
 					return nil, err
 				}
 
-				name, err := br.Name()
-				if err != nil {
-					return nil, err
-				}
+				name := ref.Name().Short()
 				if matched, err := filepath.Match(b, name); err != nil {
 					return nil, err
 				} else if !matched {
@@ -300,12 +305,11 @@ func expandBranches(repo *git.Repository, bs []string, prefix string) ([]string,
 	}
 
 	return result, nil
-
 }
 
 // IndexGitRepo indexes the git repository as specified by the options.
 func IndexGitRepo(opts Options) error {
-	repo, err := git.OpenRepository(opts.BuildOptions.RepoDir)
+	repo, err := git.PlainOpen(opts.BuildOptions.RepoDir)
 	if err != nil {
 		return err
 	}
@@ -324,7 +328,7 @@ func IndexGitRepo(opts Options) error {
 	branchMap := map[FileKey][]string{}
 
 	// Branch => Repo => SHA1
-	branchVersions := map[string]map[string]git.Oid{}
+	branchVersions := map[string]map[string]plumbing.Hash{}
 
 	branches, err := expandBranches(repo, opts.Branches, opts.BranchPrefix)
 	if err != nil {
@@ -341,17 +345,15 @@ func IndexGitRepo(opts Options) error {
 		if err != nil {
 			return err
 		}
-		defer commit.Free()
 		opts.BuildOptions.RepositoryDescription.Branches = append(opts.BuildOptions.RepositoryDescription.Branches, zoekt.RepositoryBranch{
 			Name:    b,
-			Version: commit.Id().String(),
+			Version: commit.Hash.String(),
 		})
 
 		tree, err := commit.Tree()
 		if err != nil {
 			return err
 		}
-		defer tree.Free()
 
 		files, subVersions, err := TreeToFiles(repo, tree, opts.BuildOptions.RepositoryDescription.URL, repoCache)
 		if err != nil {
@@ -417,22 +419,40 @@ func IndexGitRepo(opts Options) error {
 		keys := fileKeys[name]
 		for _, key := range keys {
 			brs := branchMap[key]
-			blob, err := repos[key].Repo.LookupBlob(&key.ID)
+			blob, err := repos[key].Repo.BlobObject(key.ID)
 			if err != nil {
 				return err
 			}
 
-			if blob.Size() > int64(opts.BuildOptions.SizeMax) {
+			if blob.Size > int64(opts.BuildOptions.SizeMax) {
 				continue
 			}
 
+			contents, err := blobContents(blob)
+			if err != nil {
+				return err
+			}
 			builder.Add(zoekt.Document{
 				SubRepositoryPath: key.SubRepoPath,
 				Name:              key.FullPath(),
-				Content:           blob.Contents(),
+				Content:           contents,
 				Branches:          brs,
 			})
 		}
 	}
 	return builder.Finish()
+}
+
+func blobContents(blob *object.Blob) ([]byte, error) {
+	r, err := blob.Reader()
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+
+	c, err := ioutil.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
 }

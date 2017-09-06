@@ -31,6 +31,8 @@ import (
 	"github.com/google/zoekt/build"
 	"github.com/google/zoekt/query"
 	"github.com/google/zoekt/shards"
+
+	"gopkg.in/src-d/go-git.v4/plumbing"
 )
 
 func createSubmoduleRepo(dir string) error {
@@ -101,13 +103,16 @@ func TestTreeToFiles(t *testing.T) {
 		t.Fatalf("Open: %v", err)
 	}
 
-	obj, err := repo.RevparseSingle("HEAD:")
+	headRef, err := repo.Head()
 	if err != nil {
 		t.Fatalf("HEAD tree: %v", err)
 	}
+	commit, err := repo.CommitObject(headRef.Hash())
+	if err != nil {
+		t.Fatalf("commit obj HEAD: %v", err)
+	}
 
-	defer obj.Free()
-	tree, err := obj.AsTree()
+	tree, err := repo.TreeObject(commit.TreeHash)
 	if err != nil {
 		t.Fatalf("AsTree: %v", err)
 	}
@@ -116,9 +121,13 @@ func TestTreeToFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TreeToFiles: %v", err)
 	}
+	var bnameHash plumbing.Hash
 
-	if e, v := tree.EntryByName("bname"), versions["bname"]; e == nil || bytes.Compare(e.Id[:], v[:]) != 0 {
-		t.Fatalf("got 'bname' versions %v, want %v", v, e)
+	bnameHash = versions["bname"]
+	if entry, err := tree.FindEntry("bname"); err != nil {
+		t.Fatalf("FindEntry %v", err)
+	} else if bytes.Compare(bnameHash[:], entry.Hash[:]) != 0 {
+		t.Fatalf("got 'bname' versions %v, want %v", bnameHash, entry.Hash)
 	}
 
 	var paths []string
@@ -181,7 +190,7 @@ func TestSubmoduleIndex(t *testing.T) {
 	}
 
 	if len(results.Files) != 1 {
-		t.Fatalf("got %v, want 1 file", results.Files)
+		t.Fatalf("got search result %v, want 1 file", results.Files)
 	}
 
 	file := results.Files[0]
