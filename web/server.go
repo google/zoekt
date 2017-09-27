@@ -231,7 +231,13 @@ func (s *Server) serveSearchErr(w http.ResponseWriter, r *http.Request) error {
 		// 10k docs, 50 num -> max important match = 4
 		sOpts.ShardMaxImportantMatch = num/20 + num/(numdocs/500)
 	} else {
-		sOpts.ShardMaxImportantMatch = 100
+		// Virtually no limits for a small corpus; important
+		// matches are just as expensive as normal matches.
+		n := numdocs + num*100
+		sOpts.ShardMaxImportantMatch = n
+		sOpts.ShardMaxMatchCount = n
+		sOpts.TotalMaxMatchCount = n
+		sOpts.TotalMaxImportantMatch = n
 	}
 
 	result, err := s.Searcher.Search(ctx, q, &sOpts)
