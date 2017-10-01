@@ -35,6 +35,7 @@ import (
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
 
 	git "gopkg.in/src-d/go-git.v4"
+	plumcfg "gopkg.in/src-d/go-git.v4/plumbing/format/config"
 )
 
 // RepoModTime returns the time of last fetch of a git repository.
@@ -156,19 +157,12 @@ func configLookupRemoteURL(cfg *config.Config, key string) string {
 	return rc.URLs[0]
 }
 
-func configLookupString(cfg *config.Config, key string) string {
-	fields := strings.Split(key, ".")
-	for _, s := range cfg.Raw.Sections {
-		if s.Name != fields[0] {
+func configLookupString(sec *plumcfg.Section, key string) string {
+	for _, o := range sec.Options {
+		if o.Key != key {
 			continue
 		}
-
-		for _, o := range s.Options {
-			if o.Key != fields[1] {
-				continue
-			}
-			return o.Value
-		}
+		return o.Value
 	}
 
 	return ""
@@ -189,9 +183,11 @@ func setTemplatesFromConfig(desc *zoekt.Repository, repoDir string) error {
 		return err
 	}
 
-	webURLStr := configLookupString(cfg, "zoekt.web-url")
+	sec := cfg.Raw.Section("zoekt")
 
-	webURLType := configLookupString(cfg, "zoekt.web-url-type")
+	webURLStr := configLookupString(sec, "web-url")
+
+	webURLType := configLookupString(sec, "web-url-type")
 
 	if webURLType != "" && webURLStr != "" {
 		webURL, err := url.Parse(webURLStr)
@@ -203,7 +199,7 @@ func setTemplatesFromConfig(desc *zoekt.Repository, repoDir string) error {
 		}
 	}
 
-	name := configLookupString(cfg, "zoekt.name")
+	name := configLookupString(sec, "name")
 	if name != "" {
 		desc.Name = name
 	} else {
@@ -219,6 +215,14 @@ func setTemplatesFromConfig(desc *zoekt.Repository, repoDir string) error {
 			return err
 		}
 	}
+
+	if desc.RawConfig == nil {
+		desc.RawConfig = map[string]string{}
+	}
+	for _, o := range sec.Options {
+		desc.RawConfig[o.Key] = o.Value
+	}
+
 	return nil
 }
 

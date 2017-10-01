@@ -182,6 +182,9 @@ type Repository struct {
 	// The URL fragment to add to a file URL for line numbers.
 	// has access to {{LineNumber}}.
 	LineFragmentTemplate string
+
+	// All zoekt.* configuration settings.
+	RawConfig map[string]string
 }
 
 // IndexMetadata holds metadata stored in the index file.
