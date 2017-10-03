@@ -103,7 +103,7 @@ func compare(dir, patfile string, caseSensitive bool) error {
 	if err != nil {
 		return err
 	}
-	searcher, err := shards.NewShardedSearcher(indexDir)
+	searcher, err := shards.NewDirectorySearcher(indexDir)
 	if err != nil {
 		return err
 	}

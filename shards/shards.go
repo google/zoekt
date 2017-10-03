@@ -26,9 +26,9 @@ import (
 	"github.com/google/zoekt/query"
 )
 
-// NewShardedSearcher returns a searcher instance that loads all
+// NewDirectorySearcher returns a searcher instance that loads all
 // shards corresponding to a glob into memory.
-func NewShardedSearcher(dir string) (zoekt.Searcher, error) {
+func NewDirectorySearcher(dir string) (zoekt.Searcher, error) {
 	ss := shardWatcher{
 		dir:      dir,
 		shards:   make(map[string]*searchShard),

@@ -60,7 +60,7 @@ func main() {
 	}
 	pat := flag.Arg(0)
 
-	searcher, err := shards.NewShardedSearcher(*index)
+	searcher, err := shards.NewDirectorySearcher(*index)
 	if err != nil {
 		log.Fatal(err)
 	}

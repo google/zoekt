@@ -137,7 +137,7 @@ func main() {
 		go divertLogs(*logDir, *logRefresh)
 	}
 
-	searcher, err := shards.NewShardedSearcher(*index)
+	searcher, err := shards.NewDirectorySearcher(*index)
 	if err != nil {
 		log.Fatal(err)
 	}

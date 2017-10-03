@@ -176,9 +176,9 @@ func TestSubmoduleIndex(t *testing.T) {
 		t.Fatalf("IndexGitRepo: %v", err)
 	}
 
-	searcher, err := shards.NewShardedSearcher(indexDir)
+	searcher, err := shards.NewDirectorySearcher(indexDir)
 	if err != nil {
-		t.Fatal("NewShardedSearcher", err)
+		t.Fatal("NewDirectorySearcher", err)
 	}
 	defer searcher.Close()
 
@@ -319,9 +319,9 @@ func TestBranchWildcard(t *testing.T) {
 		t.Fatalf("IndexGitRepo: %v", err)
 	}
 
-	searcher, err := shards.NewShardedSearcher(indexDir)
+	searcher, err := shards.NewDirectorySearcher(indexDir)
 	if err != nil {
-		t.Fatal("NewShardedSearcher", err)
+		t.Fatal("NewDirectorySearcher", err)
 	}
 	defer searcher.Close()
 
