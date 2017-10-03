@@ -29,27 +29,24 @@ import (
 // NewDirectorySearcher returns a searcher instance that loads all
 // shards corresponding to a glob into memory.
 func NewDirectorySearcher(dir string) (zoekt.Searcher, error) {
-	ss := shardWatcher{
-		dir:      dir,
-		shards:   make(map[string]*searchShard),
-		quit:     make(chan struct{}, 1),
+	ss := &shardedSearcher{
+		shards:   make(map[string]zoekt.Searcher),
 		throttle: make(chan struct{}, runtime.NumCPU()),
 	}
-
-	if err := ss.scan(); err != nil {
+	_, err := NewDirectoryWatcher(dir, ss)
+	if err != nil {
 		return nil, err
 	}
 
-	if err := ss.watch(); err != nil {
-		return nil, err
-	}
+	return ss, nil
+}
 
-	return &shardedSearcher{&ss}, nil
+func (ss *shardedSearcher) String() string {
+	return "shardedSearcher"
 }
 
 // Close closes references to open files. It may be called only once.
-func (ss *shardWatcher) Close() {
-	close(ss.quit)
+func (ss *shardedSearcher) Close() {
 	ss.lock()
 	defer ss.unlock()
 	for _, s := range ss.shards {
@@ -57,16 +54,14 @@ func (ss *shardWatcher) Close() {
 	}
 }
 
-type shardLoader interface {
-	Close()
-	getShards() []zoekt.Searcher
-	rlock()
-	runlock()
-	String() string
-}
-
 type shardedSearcher struct {
-	shardLoader
+	// Limit the number of parallel queries. Since searching is
+	// CPU bound, we can't do better than #CPU queries in
+	// parallel.  If we do so, we just create more memory
+	// pressure.
+	throttle chan struct{}
+
+	shards map[string]zoekt.Searcher
 }
 
 func (ss *shardedSearcher) Search(ctx context.Context, pat query.Q, opts *zoekt.SearchOptions) (*zoekt.SearchResult, error) {
@@ -83,8 +78,8 @@ func (ss *shardedSearcher) Search(ctx context.Context, pat query.Q, opts *zoekt.
 
 	// This critical section is large, but we don't want to deal with
 	// searches on shards that have just been closed.
-	ss.shardLoader.rlock()
-	defer ss.shardLoader.runlock()
+	ss.rlock()
+	defer ss.runlock()
 	aggregate.Wait = time.Now().Sub(start)
 	start = time.Now()
 
@@ -213,4 +208,67 @@ func (ss *shardedSearcher) List(ctx context.Context, r query.Q) (*zoekt.RepoList
 		Repos:   aggregate,
 		Crashes: crashes,
 	}, nil
+}
+
+func (s *shardedSearcher) rlock() {
+	s.throttle <- struct{}{}
+}
+
+// getShards returns the currently loaded shards. The shards must be
+// accessed under a rlock call.
+func (s *shardedSearcher) getShards() []zoekt.Searcher {
+	var res []zoekt.Searcher
+	for _, sh := range s.shards {
+		res = append(res, sh)
+	}
+	return res
+}
+
+func (s *shardedSearcher) runlock() {
+	<-s.throttle
+}
+
+func (s *shardedSearcher) lock() {
+	n := cap(s.throttle)
+	for n > 0 {
+		s.throttle <- struct{}{}
+		n--
+	}
+}
+
+func (s *shardedSearcher) unlock() {
+	n := cap(s.throttle)
+	for n > 0 {
+		<-s.throttle
+		n--
+	}
+}
+
+func (s *shardedSearcher) load(key string) {
+	shard, err := loadShard(key)
+	log.Printf("reloading: %s, err %v ", key, err)
+	if err != nil {
+		return
+	}
+
+	s.replace(key, shard)
+}
+
+func (s *shardedSearcher) drop(key string) {
+	s.replace(key, nil)
+}
+
+func (s *shardedSearcher) replace(key string, shard zoekt.Searcher) {
+	s.lock()
+	defer s.unlock()
+	old := s.shards[key]
+	if old != nil {
+		old.Close()
+	}
+
+	if shard == nil {
+		delete(s.shards, key)
+	} else {
+		s.shards[key] = shard
+	}
 }

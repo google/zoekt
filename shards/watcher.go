@@ -16,6 +16,7 @@ package shards
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -25,32 +26,47 @@ import (
 	"github.com/google/zoekt"
 )
 
-type searchShard struct {
-	zoekt.Searcher
-	mtime time.Time
+type shardLoader interface {
+	load(filename string)
+	drop(filename string)
 }
 
 type shardWatcher struct {
-	dir string
-
-	// Limit the number of parallel queries. Since searching is
-	// CPU bound, we can't do better than #CPU queries in
-	// parallel.  If we do so, we just create more memory
-	// pressure.
-	throttle chan struct{}
-
-	shards map[string]*searchShard
-	quit   chan struct{}
+	dir        string
+	timestamps map[string]time.Time
+	loader     shardLoader
+	quit       chan struct{}
 }
 
-func loadShard(fn string) (*searchShard, error) {
-	f, err := os.Open(fn)
-	if err != nil {
+func (sw *shardWatcher) Close() error {
+	if sw.quit != nil {
+		close(sw.quit)
+		sw.quit = nil
+	}
+	return nil
+}
+
+func NewDirectoryWatcher(dir string, loader shardLoader) (io.Closer, error) {
+	sw := &shardWatcher{
+		dir:        dir,
+		timestamps: map[string]time.Time{},
+		loader:     loader,
+		quit:       make(chan struct{}, 1),
+	}
+	if err := sw.scan(); err != nil {
 		return nil, err
 	}
-	fi, err := f.Stat()
+
+	if err := sw.watch(); err != nil {
+		return nil, err
+	}
+
+	return sw, nil
+}
+
+func loadShard(fn string) (zoekt.Searcher, error) {
+	f, err := os.Open(fn)
 	if err != nil {
-		f.Close()
 		return nil, err
 	}
 
@@ -64,10 +80,7 @@ func loadShard(fn string) (*searchShard, error) {
 		return nil, fmt.Errorf("NewSearcher(%s): %v", fn, err)
 	}
 
-	return &searchShard{
-		mtime:    fi.ModTime(),
-		Searcher: s,
-	}, nil
+	return s, nil
 }
 
 func (s *shardWatcher) String() string {
@@ -86,95 +99,40 @@ func (s *shardWatcher) scan() error {
 
 	ts := map[string]time.Time{}
 	for _, fn := range fs {
-		key := filepath.Base(fn)
 		fi, err := os.Lstat(fn)
 		if err != nil {
 			continue
 		}
 
-		ts[key] = fi.ModTime()
+		ts[fn] = fi.ModTime()
 	}
 
-	s.lock()
 	var toLoad []string
 	for k, mtime := range ts {
-		if s.shards[k] == nil || s.shards[k].mtime != mtime {
+		if t, ok := s.timestamps[k]; !ok || t != mtime {
 			toLoad = append(toLoad, k)
+			s.timestamps[k] = mtime
 		}
 	}
 
 	var toDrop []string
 	// Unload deleted shards.
-	for k := range s.shards {
+	for k := range s.timestamps {
 		if _, ok := ts[k]; !ok {
 			toDrop = append(toDrop, k)
 		}
 	}
-	s.unlock()
 
 	for _, t := range toDrop {
 		log.Printf("unloading: %s", t)
-		s.replace(t, nil)
+		s.loader.drop(t)
 	}
 
 	for _, t := range toLoad {
-		shard, err := loadShard(filepath.Join(s.dir, t))
-		log.Printf("reloading: %s, err %v ", t, err)
-		if err != nil {
-			continue
-		}
-		s.replace(t, shard)
+		s.loader.load(t)
 	}
 
 	return nil
-}
-
-func (s *shardWatcher) rlock() {
-	s.throttle <- struct{}{}
-}
-
-// getShards returns the currently loaded shards. The shards must be
-// accessed under a rlock call.
-func (s *shardWatcher) getShards() []zoekt.Searcher {
-	var res []zoekt.Searcher
-	for _, sh := range s.shards {
-		res = append(res, sh)
-	}
-	return res
-}
-
-func (s *shardWatcher) runlock() {
-	<-s.throttle
-}
-
-func (s *shardWatcher) lock() {
-	n := cap(s.throttle)
-	for n > 0 {
-		s.throttle <- struct{}{}
-		n--
-	}
-}
-
-func (s *shardWatcher) unlock() {
-	n := cap(s.throttle)
-	for n > 0 {
-		<-s.throttle
-		n--
-	}
-}
-
-func (s *shardWatcher) replace(key string, shard *searchShard) {
-	s.lock()
-	defer s.unlock()
-	old := s.shards[key]
-	if old != nil {
-		old.Close()
-	}
-	if shard != nil {
-		s.shards[key] = shard
-	} else {
-		delete(s.shards, key)
-	}
 }
 
 func (s *shardWatcher) watch() error {

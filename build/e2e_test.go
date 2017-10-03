@@ -172,7 +172,11 @@ func TestUpdate(t *testing.T) {
 	if repos, err = ss.List(ctx, &query.Repo{Pattern: "repo"}); err != nil {
 		t.Fatalf("List: %v", err)
 	} else if len(repos.Repos) != 1 {
-		t.Errorf("List(repo): got %v, want 1 repo", repos.Repos)
+		var ss []string
+		for _, r := range repos.Repos {
+			ss = append(ss, r.Repository.Name)
+		}
+		t.Errorf("List(repo): got %v, want 1 repo", ss)
 	}
 }
 
