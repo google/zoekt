@@ -18,6 +18,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -27,8 +28,6 @@ import (
 	"reflect"
 	"sort"
 	"strings"
-
-	"golang.org/x/net/context"
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"

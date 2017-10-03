@@ -16,6 +16,7 @@ package web
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -27,7 +28,6 @@ import (
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/query"
-	"golang.org/x/net/context"
 )
 
 const jsonContentType = "application/json; charset=utf-8"

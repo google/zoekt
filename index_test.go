@@ -16,6 +16,7 @@ package zoekt
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log"
 	"reflect"
@@ -26,7 +27,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/kylelemons/godebug/pretty"
-	"golang.org/x/net/context"
 
 	"github.com/google/zoekt/query"
 )

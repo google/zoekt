@@ -15,14 +15,13 @@
 package zoekt
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"regexp"
 	"sort"
 	"strings"
 	"unicode/utf8"
-
-	"golang.org/x/net/context"
 
 	"github.com/google/zoekt/query"
 )

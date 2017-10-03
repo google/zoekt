@@ -15,14 +15,13 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"runtime/pprof"
-
-	"golang.org/x/net/context"
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/query"

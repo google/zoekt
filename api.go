@@ -15,10 +15,9 @@
 package zoekt
 
 import (
+	"context"
 	"fmt"
 	"time"
-
-	"golang.org/x/net/context"
 
 	"github.com/google/zoekt/query"
 )

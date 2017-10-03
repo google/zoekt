@@ -15,13 +15,12 @@
 package shards
 
 import (
+	"context"
 	"log"
 	"runtime"
 	"runtime/debug"
 	"sort"
 	"time"
-
-	"golang.org/x/net/context"
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/query"

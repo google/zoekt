@@ -16,11 +16,10 @@ package shards
 
 import (
 	"bytes"
+	"context"
 	"log"
 	"os"
 	"testing"
-
-	"golang.org/x/net/context"
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/query"
