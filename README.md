@@ -23,12 +23,12 @@ Searching
     go install github.com/google/zoekt/cmd/zoekt
     $GOPATH/bin/zoekt 'ngram f:READ'
 
-Indexing git repositories (requires libgit2 + git2go):
+Indexing git repositories:
 
     go install github.com/google/zoekt/cmd/zoekt-git-index
     $GOPATH/bin/zoekt-git-index -branches master,stable-1.4 -prefix origin/ .
 
-Indexing repo repositories (requires libgit2 + git2go):
+Indexing repo repositories:
 
     go install github.com/google/zoekt/cmd/zoekt-{repo-index,mirror-gitiles}
     zoekt-mirror-gitiles -dest ~/repos/ https://gfiber.googlesource.com

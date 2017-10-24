@@ -175,7 +175,6 @@ func (r *repoWalker) handleSubmodule(p string, id *plumbing.Hash) error {
 	return nil
 }
 
-// cb is the git2go callback
 func (r *repoWalker) handleEntry(p string, e *object.TreeEntry) error {
 	if e.Mode == filemode.Submodule && r.repoCache != nil {
 		if err := r.tryHandleSubmodule(p, &e.Hash); err != nil {
