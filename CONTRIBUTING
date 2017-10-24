@@ -1,5 +1,5 @@
 
-Before sending a patch or pull request, please fill out a Google CLA,
+Before sending a patch, please fill out a Google CLA,
 using the following form:
 
   https://cla.developers.google.com/clas
@@ -13,6 +13,7 @@ For submitting patches, please use gerrit:
             fetch = +refs/heads/*:refs/remotes/origin/*
 
 * Create an account at https://gerrit-review.googlesource.com/
+  and follow `Settings -> HTTP Credentials -> Obtain password`
 
 * Add a Change ID to the bottom of your commit message: run the following,
   and append its output to your commmit message
