@@ -43,7 +43,6 @@ func TestBasic(t *testing.T) {
 		RepositoryDescription: zoekt.Repository{
 			Name: "repo",
 		},
-		RepoDir:     "/repo",
 		Parallelism: 2,
 		SizeMax:     1 << 20,
 	}
@@ -103,8 +102,6 @@ func TestUpdate(t *testing.T) {
 		},
 		Parallelism: 2,
 		SizeMax:     1 << 20,
-
-		RepoDir: "/a",
 	}
 
 	if b, err := NewBuilder(opts); err != nil {
@@ -138,7 +135,6 @@ func TestUpdate(t *testing.T) {
 		FileURLTemplate: "url2",
 	}
 
-	opts.RepoDir = "/b"
 	if b, err := NewBuilder(opts); err != nil {
 		t.Fatalf("NewBuilder: %v", err)
 	} else {
@@ -193,7 +189,6 @@ func TestDeleteOldShards(t *testing.T) {
 			Name:            "repo",
 			FileURLTemplate: "url",
 		},
-		RepoDir: "/a",
 		SizeMax: 1 << 20,
 	}
 	opts.SetDefaults()
@@ -266,9 +261,9 @@ func TestPartialSuccess(t *testing.T) {
 	opts := Options{
 		IndexDir: dir,
 		ShardMax: 1024,
-		RepoDir:  "/a",
 		SizeMax:  1 << 20,
 	}
+	opts.RepositoryDescription.Name = "repo"
 	opts.SetDefaults()
 
 	b, err := NewBuilder(opts)

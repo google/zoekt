@@ -86,8 +86,6 @@ func main() {
 	exitStatus := 0
 	for dir, name := range gitRepos {
 		opts.RepositoryDescription.Name = name
-		opts.RepoDir = filepath.Clean(dir)
-
 		gitOpts := gitindex.Options{
 			BranchPrefix:       *branchPrefix,
 			Incremental:        *incremental,
@@ -96,6 +94,7 @@ func main() {
 			AllowMissingBranch: *allowMissing,
 			BuildOptions:       opts,
 			Branches:           branches,
+			RepoDir:            dir,
 		}
 
 		if err := gitindex.IndexGitRepo(gitOpts); err != nil {

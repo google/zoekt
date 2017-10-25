@@ -160,11 +160,9 @@ func TestSubmoduleIndex(t *testing.T) {
 
 	buildOpts := build.Options{
 		IndexDir: indexDir,
-		RepoDir:  filepath.Join(dir, "gerrit.googlesource.com", "adir.git"),
 	}
-	buildOpts.SetDefaults()
-
 	opts := Options{
+		RepoDir:      filepath.Join(dir, "gerrit.googlesource.com", "adir.git"),
 		BuildOptions: buildOpts,
 		BranchPrefix: "refs/heads/",
 		Branches:     []string{"master"},
@@ -233,11 +231,10 @@ func TestAllowMissingBranch(t *testing.T) {
 
 	buildOpts := build.Options{
 		IndexDir: indexDir,
-		RepoDir:  filepath.Join(dir, "gerrit.googlesource.com", "adir.git"),
 	}
-	buildOpts.SetDefaults()
 
 	opts := Options{
+		RepoDir:      filepath.Join(dir, "gerrit.googlesource.com", "adir.git"),
 		BuildOptions: buildOpts,
 		BranchPrefix: "refs/heads/",
 		Branches:     []string{"master", "nonexist"},
@@ -304,11 +301,14 @@ func TestBranchWildcard(t *testing.T) {
 
 	buildOpts := build.Options{
 		IndexDir: indexDir,
-		RepoDir:  filepath.Join(dir + "/repo"),
+		RepositoryDescription: zoekt.Repository{
+			Name: "repo",
+		},
 	}
 	buildOpts.SetDefaults()
 
 	opts := Options{
+		RepoDir:      filepath.Join(dir + "/repo"),
 		BuildOptions: buildOpts,
 		BranchPrefix: "refs/heads",
 		Branches:     []string{"branchdir/*"},
@@ -353,16 +353,17 @@ func TestSkipSubmodules(t *testing.T) {
 
 	buildOpts := build.Options{
 		IndexDir: indexDir,
-		RepoDir:  filepath.Join(dir, "gerrit.googlesource.com", "adir.git"),
+		RepositoryDescription: zoekt.Repository{
+			Name: "gerrit.googlesource.com/adir",
+		},
 	}
-	buildOpts.SetDefaults()
-
 	if err := os.Rename(dir+"/gerrit.googlesource.com/bdir.git",
 		dir+"/gerrit.googlesource.com/notexist.git"); err != nil {
 		t.Fatalf("Rename: %v", err)
 	}
 
 	opts := Options{
+		RepoDir:      filepath.Join(dir, "gerrit.googlesource.com", "adir.git"),
 		BuildOptions: buildOpts,
 		BranchPrefix: "refs/heads",
 		Branches:     []string{"master"},

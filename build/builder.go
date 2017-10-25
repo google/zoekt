@@ -62,9 +62,6 @@ type Options struct {
 	// SubRepositories is a path => sub repository map.
 	SubRepositories map[string]*zoekt.Repository
 
-	// RepoDir is the path to the repository on the indexing machine.
-	RepoDir string
-
 	// Path to exuberant ctags binary to run
 	CTags string
 
@@ -124,21 +121,18 @@ func (o *Options) SetDefaults() {
 	if o.ShardMax == 0 {
 		o.ShardMax = 128 << 20
 	}
+
+	if o.RepositoryDescription.Name == "" && o.RepositoryDescription.URL != "" {
+		parsed, _ := url.Parse(o.RepositoryDescription.URL)
+		if parsed != nil {
+			o.RepositoryDescription.Name = filepath.Join(parsed.Host, parsed.Path)
+		}
+	}
 }
 
 // ShardName returns the name the given index shard.
 func (o *Options) shardName(n int) (string, error) {
-	abs, err := filepath.Abs(o.RepoDir)
-	if err != nil {
-		return "", err
-	}
-
-	if u := o.RepositoryDescription.URL; u != "" {
-		parsed, _ := url.Parse(u)
-		if parsed != nil {
-			abs = url.QueryEscape(filepath.Join(parsed.Host, parsed.Path))
-		}
-	}
+	abs := o.RepositoryDescription.Name
 	return filepath.Join(o.IndexDir,
 		fmt.Sprintf("%s_v%d.%05d.zoekt", strings.Replace(abs, "/", "_", -1), zoekt.IndexFormatVersion, n)), nil
 }
@@ -175,8 +169,9 @@ func (o *Options) IndexVersions() []zoekt.RepositoryBranch {
 
 // NewBuilder creates a new Builder instance.
 func NewBuilder(opts Options) (*Builder, error) {
-	if opts.RepoDir == "" {
-		return nil, fmt.Errorf("must set options.RepoDir")
+	opts.SetDefaults()
+	if opts.RepositoryDescription.Name == "" {
+		return nil, fmt.Errorf("builder: must set Name")
 	}
 
 	b := &Builder{

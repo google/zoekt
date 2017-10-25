@@ -259,6 +259,7 @@ type Options struct {
 	AllowMissingBranch bool
 	RepoCacheDir       string
 	BuildOptions       build.Options
+	RepoDir            string
 
 	BranchPrefix string
 	Branches     []string
@@ -313,13 +314,19 @@ func expandBranches(repo *git.Repository, bs []string, prefix string) ([]string,
 
 // IndexGitRepo indexes the git repository as specified by the options.
 func IndexGitRepo(opts Options) error {
-	repo, err := git.PlainOpen(opts.BuildOptions.RepoDir)
+	// Set max thresholds, since we use them in this function.
+	opts.BuildOptions.SetDefaults()
+	if opts.RepoDir == "" {
+		return fmt.Errorf("gitindex: must set RepoDir")
+	}
+	repo, err := git.PlainOpen(opts.RepoDir)
 	if err != nil {
+		log.Println("B")
 		return err
 	}
 
-	if err := setTemplatesFromConfig(&opts.BuildOptions.RepositoryDescription, opts.BuildOptions.RepoDir); err != nil {
-		log.Printf("setTemplatesFromConfig(%s): %s", opts.BuildOptions.RepoDir, err)
+	if err := setTemplatesFromConfig(&opts.BuildOptions.RepositoryDescription, opts.RepoDir); err != nil {
+		log.Printf("setTemplatesFromConfig(%s): %s", opts.RepoDir, err)
 	}
 
 	repoCache := NewRepoCache(opts.RepoCacheDir)

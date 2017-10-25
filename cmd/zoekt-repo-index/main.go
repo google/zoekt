@@ -168,7 +168,6 @@ func main() {
 		}
 	}
 
-	opts.RepoDir = branches[0].manifestPath
 	perBranch := map[string]map[gitindex.FileKey]gitindex.BlobLocation{}
 	opts.SubRepositories = map[string]*zoekt.Repository{}
 
