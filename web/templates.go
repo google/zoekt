@@ -189,9 +189,6 @@ var TemplateText = map[string]string{
       <thead>
         <tr>
           <th>
-            {{if .DuplicateID}}
-            <a class="btn btn-default btn-xs" href="#{{.DuplicateID}}">Duplicate result</a>
-            {{end}}
             {{if .URL}}<a name="{{.ResultID}}" href="{{.URL}}" >{{else}}<a name="{{.ResultID}}">{{end}}
             <small>
               {{.Repo}}:{{.FileName}}</a>:
