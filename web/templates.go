@@ -47,6 +47,12 @@ var TemplateText = map[string]string{
   #navsearchbox { width: 350px !important; }
   #maxhits { width: 100px !important; }
   #results { padding-top: 60px; }
+  .label-dup {
+    border-width: 1px !important;
+    border-style: solid !important;
+    border-color: #777 !important;
+    color: black;
+  }
   .inline-pre { border: unset; background-color: unset; margin: unset; padding: unset; }
   table tbody tr td { border: none !important; padding: 2px !important; }
 </style>
@@ -183,16 +189,15 @@ var TemplateText = map[string]string{
       <thead>
         <tr>
           <th>
+            {{if .DuplicateID}}
+            <a class="btn btn-default btn-xs" href="#{{.DuplicateID}}">Duplicate result</a>
+            {{end}}
             {{if .URL}}<a name="{{.ResultID}}" href="{{.URL}}" >{{else}}<a name="{{.ResultID}}">{{end}}
             <small>
               {{.Repo}}:{{.FileName}}</a>:
-              [{{if .Branches}}
-              {{range .Branches}}<span class="label label-default">{{.}}</span>,
-              {{end}}]
-              {{if .Language}}<i>lang:{{.Language}}</i>{{end}}{{end}}
-              {{if .DuplicateID}}
-              <a href="#{{.DuplicateID}}"><pre>duplicate result</pre></a></div>
-              {{end}}
+              [{{if .Branches}}{{range .Branches}}<span class="label label-default">{{.}}</span>,{{end}}{{end}}]
+              {{if .Language}}<span class="label label-primary">{{.Language}}</span>{{end}}
+              {{if .DuplicateID}}<a class="label label-dup" href="#{{.DuplicateID}}">Duplicate result</a>{{end}}
             </small>
           </th>
         </tr>

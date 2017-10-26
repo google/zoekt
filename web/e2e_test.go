@@ -378,7 +378,7 @@ func TestDupResult(t *testing.T) {
 		t.Fatalf("ReadAll: %v", err)
 	}
 
-	if got, want := string(resultBytes), "duplicate result"; !strings.Contains(got, want) {
+	if got, want := string(resultBytes), "Duplicate result"; !strings.Contains(got, want) {
 		t.Fatalf("got %s, want substring %q", got, want)
 	}
 }
