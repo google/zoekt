@@ -53,6 +53,13 @@ var TemplateText = map[string]string{
     border-color: #777 !important;
     color: black;
   }
+  .result {
+    display: block;
+    content: " ";
+    margin-top: -60px;
+    height: 60px;
+    visibility: hidden;
+  }
   .inline-pre { border: unset; background-color: unset; margin: unset; padding: unset; }
   table tbody tr td { border: none !important; padding: 2px !important; }
 </style>
@@ -189,7 +196,7 @@ var TemplateText = map[string]string{
       <thead>
         <tr>
           <th>
-            {{if .URL}}<a name="{{.ResultID}}" href="{{.URL}}" >{{else}}<a name="{{.ResultID}}">{{end}}
+            {{if .URL}}<a name="{{.ResultID}}" class="result"></a><a href="{{.URL}}" >{{else}}<a name="{{.ResultID}}">{{end}}
             <small>
               {{.Repo}}:{{.FileName}}</a>:
               [{{if .Branches}}{{range .Branches}}<span class="label label-default">{{.}}</span>,{{end}}{{end}}]
