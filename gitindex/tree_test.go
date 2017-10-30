@@ -273,6 +273,8 @@ git commit -am amsg
 git branch branchdir/b
 
 git branch c
+
+git update-ref refs/meta/config HEAD
 `
 	cmd := exec.Command("/bin/sh", "-euxc", script)
 	cmd.Dir = dir
@@ -371,5 +373,58 @@ func TestSkipSubmodules(t *testing.T) {
 	}
 	if err := IndexGitRepo(opts); err != nil {
 		t.Fatalf("IndexGitRepo: %v", err)
+	}
+}
+
+func TestFullAndShortRefNames(t *testing.T) {
+	dir, err := ioutil.TempDir("", "git")
+	if err != nil {
+		t.Fatalf("TempDir: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	if err := createMultibranchRepo(dir); err != nil {
+		t.Fatalf("createMultibranchRepo: %v", err)
+	}
+
+	indexDir, err := ioutil.TempDir("", "index-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.RemoveAll(indexDir)
+
+	buildOpts := build.Options{
+		IndexDir: indexDir,
+		RepositoryDescription: zoekt.Repository{
+			Name: "repo",
+		},
+	}
+	buildOpts.SetDefaults()
+
+	opts := Options{
+		RepoDir:            filepath.Join(dir + "/repo"),
+		BuildOptions:       buildOpts,
+		BranchPrefix:       "refs/heads",
+		Branches:           []string{"refs/heads/master", "branchdir/a", "refs/meta/config"},
+		Submodules:         false,
+		Incremental:        false,
+		AllowMissingBranch: false,
+	}
+	if err := IndexGitRepo(opts); err != nil {
+		t.Fatalf("IndexGitRepo: %v", err)
+	}
+
+	searcher, err := shards.NewDirectorySearcher(indexDir)
+	if err != nil {
+		t.Fatal("NewDirectorySearcher", err)
+	}
+	defer searcher.Close()
+
+	if rlist, err := searcher.List(context.Background(), &query.Repo{Pattern: ""}); err != nil {
+		t.Fatalf("List(): %v", err)
+	} else if len(rlist.Repos) != 1 {
+		t.Errorf("got %v, want 1 result", rlist.Repos)
+	} else if repo := rlist.Repos[0]; len(repo.Repository.Branches) != 3 {
+		t.Errorf("got branches %v, want 3", repo.Repository.Branches)
 	}
 }
