@@ -17,7 +17,9 @@
 package build
 
 import (
+	"crypto/sha1"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/url"
@@ -130,11 +132,20 @@ func (o *Options) SetDefaults() {
 	}
 }
 
+func hashString(s string) string {
+	h := sha1.New()
+	io.WriteString(h, s)
+	return fmt.Sprintf("%x", h.Sum(nil))
+}
+
 // ShardName returns the name the given index shard.
 func (o *Options) shardName(n int) (string, error) {
-	abs := o.RepositoryDescription.Name
+	abs := url.QueryEscape(o.RepositoryDescription.Name)
+	if len(abs) > 200 {
+		abs = abs[:200] + hashString(abs)[:8]
+	}
 	return filepath.Join(o.IndexDir,
-		fmt.Sprintf("%s_v%d.%05d.zoekt", strings.Replace(abs, "/", "_", -1), zoekt.IndexFormatVersion, n)), nil
+		fmt.Sprintf("%s_v%d.%05d.zoekt", abs, zoekt.IndexFormatVersion, n)), nil
 }
 
 // IndexVersions returns the versions as present in the index, for
