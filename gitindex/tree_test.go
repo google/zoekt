@@ -64,6 +64,10 @@ mkdir gerrit.googlesource.com
 git clone --bare adir gerrit.googlesource.com/adir.git
 git clone --bare bdir gerrit.googlesource.com/bdir.git
 
+mkdir gerrit.googlesource.com/bogus.git
+mkdir gerrit.googlesource.com/sub
+git clone --bare bdir gerrit.googlesource.com/sub/bdir.git
+
 cat << EOF  > gerrit.googlesource.com/adir.git/config
 [core]
 	repositoryformatversion = 0
