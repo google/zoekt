@@ -21,8 +21,10 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -41,6 +43,7 @@ func main() {
 		filepath.Join(os.Getenv("HOME"), ".github-token"),
 		"file holding API token.")
 	forks := flag.Bool("forks", false, "also mirror forks.")
+	deleteRepos := flag.Bool("delete", false, "delete missing repos")
 	namePattern := flag.String("name", "", "only clone repos whose name matches the given regexp.")
 	excludePattern := flag.String("exclude", "", "don't mirror repos whose names match this regexp.")
 	flag.Parse()
@@ -48,9 +51,10 @@ func main() {
 	if *dest == "" {
 		log.Fatal("must set --dest")
 	}
-	if *org == "" && *user == "" {
-		log.Fatal("must set --org or --user")
+	if (*org == "") == (*user == "") {
+		log.Fatal("must set either --org or --user")
 	}
+
 	destDir := filepath.Join(*dest, "github.com")
 	if err := os.MkdirAll(destDir, 0755); err != nil {
 		log.Fatal(err)
@@ -78,6 +82,7 @@ func main() {
 	} else if *user != "" {
 		repos, err = getUserRepos(client, *user)
 	}
+
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -110,6 +115,56 @@ func main() {
 	if err := cloneRepos(destDir, repos); err != nil {
 		log.Fatal(err)
 	}
+
+	if *deleteRepos {
+		if err := deleteStaleRepos(*dest, filter, repos, *org+*user); err != nil {
+			log.Fatalf("deleteStaleRepos: %v", err)
+		}
+	}
+}
+
+func deleteStaleRepos(destDir string, filter *gitindex.Filter, repos []*github.Repository, user string) error {
+	u, err := url.Parse("https://github.com/" + user)
+	if err != nil {
+		return err
+	}
+
+	paths, err := gitindex.ListRepos(destDir, u)
+	if err != nil {
+		return err
+	}
+
+	names := map[string]bool{}
+	for _, r := range repos {
+		u, err := url.Parse(*r.HTMLURL)
+		if err != nil {
+			return err
+		}
+
+		names[filepath.Join(u.Host, u.Path+".git")] = true
+	}
+
+	var toDelete []string
+	for _, p := range paths {
+		if filter.Include(p) && !names[p] {
+			toDelete = append(toDelete, p)
+		}
+	}
+
+	if len(toDelete) > 0 {
+		log.Println("deleting repos %v", toDelete)
+	}
+
+	var errs []string
+	for _, d := range toDelete {
+		if err := os.RemoveAll(filepath.Join(destDir, d)); err != nil {
+			errs = append(errs, err.Error())
+		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("errors: %v", errs)
+	}
+	return nil
 }
 
 func getOrgRepos(client *github.Client, org string) ([]*github.Repository, error) {
