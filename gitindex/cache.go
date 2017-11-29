@@ -84,12 +84,16 @@ func (rc *RepoCache) Open(u *url.URL) (*git.Repository, error) {
 }
 
 // ListRepos returns paths to repos on disk that start with the given
-// URL prefix. The paths are relative to baseDir.
+// URL prefix. The paths are relative to baseDir, and typically
+// include a ".git" suffix.
 func ListRepos(baseDir string, u *url.URL) ([]string, error) {
 	key := filepath.Join(u.Host, u.Path)
 
 	var paths []string
 	walk := func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 		if !info.IsDir() {
 			return nil
 		}

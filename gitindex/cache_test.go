@@ -23,6 +23,18 @@ import (
 	"testing"
 )
 
+func TestListReposNonExistent(t *testing.T) {
+	u, err := url.Parse("https://gerrit.googlesource.com/")
+	if err != nil {
+		t.Fatalf("url.Parse: %v", err)
+	}
+
+	rs, err := ListRepos("/doesnotexist", u)
+	if err == nil {
+		t.Fatalf("ListRepos(/doesnotexist): %v", rs)
+	}
+}
+
 func TestListRepos(t *testing.T) {
 	tmp, err := ioutil.TempDir("", "")
 	if err != nil {
