@@ -93,10 +93,6 @@ func (s *shardWatcher) scan() error {
 		return err
 	}
 
-	if len(fs) == 0 {
-		return fmt.Errorf("directory %s is empty", s.dir)
-	}
-
 	ts := map[string]time.Time{}
 	for _, fn := range fs {
 		fi, err := os.Lstat(fn)

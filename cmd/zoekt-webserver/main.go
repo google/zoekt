@@ -137,6 +137,10 @@ func main() {
 		go divertLogs(*logDir, *logRefresh)
 	}
 
+	if err := os.MkdirAll(*index, 0755); err != nil {
+		log.Fatal(err)
+	}
+
 	searcher, err := shards.NewDirectorySearcher(*index)
 	if err != nil {
 		log.Fatal(err)
