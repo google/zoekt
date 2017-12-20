@@ -136,7 +136,7 @@ func runIndexCommand(indexDir, repoDir, indexConfigFile string) {
 		}
 
 		cmd := exec.Command("zoekt-git-index",
-			"-require_ctags",
+			//"-require_ctags",
 			"-parallelism=1",
 			"-repo_cache", repoDir,
 			"-index", indexDir, "-incremental", dir)
