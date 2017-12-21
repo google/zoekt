@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 
 	"github.com/google/zoekt"
@@ -36,6 +37,15 @@ func (e *httpError) Error() string { return fmt.Sprintf("%d: %s", e.status, e.ms
 
 func Search(s zoekt.Searcher, w http.ResponseWriter, r *http.Request) {
 	if err := serveSearchAPIErr(s, w, r); err != nil {
+		if e, ok := err.(*httpError); ok {
+			http.Error(w, e.msg, e.status)
+		}
+		http.Error(w, err.Error(), http.StatusTeapot)
+	}
+}
+
+func List(s zoekt.Searcher, w http.ResponseWriter, r *http.Request) {
+	if err := serveListAPIErr(s, w, r); err != nil {
 		if e, ok := err.(*httpError); ok {
 			http.Error(w, e.msg, e.status)
 		}
@@ -80,6 +90,25 @@ func serveSearchAPIErr(s zoekt.Searcher, w http.ResponseWriter, r *http.Request)
 	return dumpAPIOutput(w, rep)
 }
 
+func serveListAPIErr(s zoekt.Searcher, w http.ResponseWriter, r *http.Request) error {
+	content, err := verifyAPIInput(w, r)
+	if err != nil {
+		return err
+	}
+
+	var req ListRequest
+	if err := json.Unmarshal(content, &req); err != nil {
+		return &httpError{err.Error(), http.StatusBadRequest}
+	}
+
+	rep, err := serveListAPIStructured(s, &req)
+	if err != nil {
+		return err
+	}
+
+	return dumpAPIOutput(w, rep)
+}
+
 func dumpAPIOutput(w http.ResponseWriter, rep interface{}) error {
 	content, err := json.Marshal(rep)
 	if err != nil {
@@ -94,6 +123,8 @@ func dumpAPIOutput(w http.ResponseWriter, rep interface{}) error {
 }
 
 func serveSearchAPIStructured(searcher zoekt.Searcher, req *SearchRequest) (*SearchResponse, error) {
+	log.Printf("api/search query=%q restrictions=%d", req.Query, len(req.Restrict))
+
 	q, err := query.Parse(req.Query)
 	if err != nil {
 		msg := "parse error: " + err.Error()
@@ -160,6 +191,39 @@ func serveSearchAPIStructured(searcher zoekt.Searcher, req *SearchRequest) (*Sea
 			srf.Lines = append(srf.Lines, srl)
 		}
 		resp.Files = append(resp.Files, &srf)
+	}
+
+	return &resp, nil
+}
+
+func serveListAPIStructured(searcher zoekt.Searcher, req *ListRequest) (*ListResponse, error) {
+	log.Printf("api/list restrictions=%d", len(req.Restrict))
+
+	restrictions := make([]query.Q, len(req.Restrict))
+	for i, r := range req.Restrict {
+		restrictions[i] = &query.Repo{r.Repo}
+	}
+
+	finalQ := query.NewOr(restrictions...)
+
+	ctx := context.Background()
+	result, err := searcher.List(ctx, finalQ)
+	if err != nil {
+		return nil, &httpError{err.Error(), http.StatusInternalServerError}
+	}
+
+	var resp ListResponse
+	for _, r := range result.Repos {
+		lrr := ListResponseRepo{
+			Name: r.Repository.Name,
+		}
+		for _, b := range r.Repository.Branches {
+			lrr.Branches = append(lrr.Branches, ListResponseBranch{
+				Name:    b.Name,
+				Version: b.Version,
+			})
+		}
+		resp.Repos = append(resp.Repos, &lrr)
 	}
 
 	return &resp, nil

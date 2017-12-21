@@ -61,3 +61,35 @@ type SearchResponseMatch struct {
 	// End of match, in (unicode) characters.
 	End int
 }
+
+// ListRequest is the entry point for the /api/list POST endpoint.
+type ListRequest struct {
+	// A list of OR'd restrictions.
+	Restrict []ListRequestRestriction
+}
+
+type ListRequestRestriction struct {
+	Repo string
+}
+
+// ListResponse is the return type for /api/search endpoint
+type ListResponse struct {
+	Repos []*ListResponseRepo
+	Error *string
+}
+
+// ListResponseRepo holds repository metadata.
+type ListResponseRepo struct {
+	// Name is the repository name.
+	Name string
+
+	// Branches is the branches indexed in this repo.
+	Branches []ListResponseBranch
+}
+
+// ListResponseBranch describes an indexed branch, which is a name combined
+// with a version.
+type ListResponseBranch struct {
+	Name    string
+	Version string
+}

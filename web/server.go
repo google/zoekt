@@ -105,6 +105,10 @@ func (s *Server) serveSearchAPI(w http.ResponseWriter, r *http.Request) {
 	rest.Search(s.Searcher, w, r)
 }
 
+func (s *Server) serveListAPI(w http.ResponseWriter, r *http.Request) {
+	rest.List(s.Searcher, w, r)
+}
+
 func (s *Server) getTemplate(str string) *template.Template {
 	s.templateMu.Lock()
 	defer s.templateMu.Unlock()
@@ -154,6 +158,7 @@ func NewMux(s *Server) (*http.ServeMux, error) {
 	}
 	if s.RESTAPI {
 		mux.HandleFunc("/api/search", s.serveSearchAPI)
+		mux.HandleFunc("/api/list", s.serveListAPI)
 	}
 	if s.Print {
 		mux.HandleFunc("/print", s.servePrint)
