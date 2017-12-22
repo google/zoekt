@@ -201,6 +201,8 @@ func setTemplatesFromConfig(desc *zoekt.Repository, repoDir string) error {
 		if err := setTemplates(desc, webURL, webURLType); err != nil {
 			return err
 		}
+	} else if webURLStr != "" {
+		desc.URL = webURLStr
 	}
 
 	name := configLookupString(sec, "name")

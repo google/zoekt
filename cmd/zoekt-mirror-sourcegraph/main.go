@@ -90,6 +90,14 @@ func cloneRepos(destDir string, root *url.URL, repos []string) error {
 	for _, r := range repos {
 		config := map[string]string{
 			"zoekt.name": r,
+			// A lie, but we need to set this since zoekt currently has a
+			// false assumption. It clones into the repo_cache based on the
+			// name we pass to CloneRepo. However, in the indexserver (and
+			// some other places) it maps an index to something in the
+			// repo_cache based on the web-url. The underlying bug should be
+			// fixed, but I am not familiar enough with internals to do
+			// that. - keegan
+			"zoekt.web-url": "https://" + r,
 		}
 		cloneURL := root.ResolveReference(&url.URL{Path: "/.internal/git/" + r})
 		if err := gitindex.CloneRepo(destDir, r, cloneURL.String(), config); err != nil {
