@@ -150,7 +150,7 @@ func deleteLogs(logDir string, maxAge time.Duration) {
 	for {
 		fs, err := filepath.Glob(filepath.Join(logDir, "*"))
 		if err != nil {
-			log.Fatal("filepath.Glob(%s): %v", logDir, err)
+			log.Fatalf("filepath.Glob(%s): %v", logDir, err)
 		}
 
 		threshold := time.Now().Add(-maxAge)
@@ -204,12 +204,12 @@ func deleteStaleIndexes(indexDir, repoDir string, watchInterval time.Duration) {
 	for {
 		fs, err := filepath.Glob(expr)
 		if err != nil {
-			log.Println("Glob(%q): %v", expr, err)
+			log.Printf("Glob(%q): %v", expr, err)
 		}
 
 		for _, f := range fs {
 			if err := deleteIfStale(repoDir, f); err != nil {
-				log.Println("deleteIfStale(%q): %v", f, err)
+				log.Printf("deleteIfStale(%q): %v", f, err)
 			}
 		}
 		<-t.C
