@@ -189,8 +189,10 @@ func deleteIfStale(repoDir string, fn string) error {
 		return err
 	}
 
-	_, err = os.Stat(gitindex.Path(repoDir, u))
+	repoPath := gitindex.Path(repoDir, u)
+	_, err = os.Stat(repoPath)
 	if os.IsNotExist(err) {
+		log.Printf("%s no longer exists, deleting %s", repoPath, fn)
 		return os.Remove(fn)
 	}
 
