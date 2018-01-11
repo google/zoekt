@@ -228,13 +228,13 @@ var TemplateText = map[string]string{
     {{end}}
     <hr>
     <p class="text-right">
+      Took {{.Stats.Duration}}{{if .Stats.Wait}}(queued: {{.Stats.Wait}}){{end}} for
       {{HumanUnit .Stats.IndexBytesLoaded}}B index data,
       {{.Stats.NgramMatches}} ngram matches,
       {{.Stats.FilesConsidered}} docs considered,
       {{.Stats.FilesLoaded}} docs ({{HumanUnit .Stats.ContentBytesLoaded}}B) loaded,
       {{.Stats.FilesSkipped}} docs skipped
     </p>
-    <!--samp>{{.Query}} with options {{.SearchOptions}} in {{.Stats.Duration}} (queued: {{.Stats.Wait}})</samp-->
   </div>
   {{ template "jsdep"}}
 </body>

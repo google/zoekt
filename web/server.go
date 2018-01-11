@@ -269,6 +269,10 @@ func (s *Server) serveSearchErr(w http.ResponseWriter, r *http.Request) error {
 		SearchOptions: sOpts.String(),
 		FileMatches:   fileMatches,
 	}
+	if res.Stats.Wait < res.Stats.Duration/10 {
+		// Suppress queueing stats if they are neglible.
+		res.Stats.Wait = 0
+	}
 
 	var buf bytes.Buffer
 	if err := s.result.Execute(&buf, &res); err != nil {
