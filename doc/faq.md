@@ -148,7 +148,7 @@ distance apart.
 
 Some further background documentation
 
- * [Designdoc](design.md)
+ * [Designdoc](design.md) for technical details
  * [Godoc](https://godoc.org/github.com/google/zoekt)
  * Gerrit 2016 user summit: [slides](https://storage.googleapis.com/gerrit-talks/summit/2016/zoekt.pdf)
  * Gerrit 2017 user summit: [transcript](https://gitenterprise.me/2017/11/01/gerrit-user-summit-zoekt-code-search-engine/),  [slides]((https://storage.googleapis.com/gerrit-talks/summit/2017/Zoekt%20-%20improved%20codesearch.pdf), [video](https://www.youtube.com/watch?v=_-KTAvgJYdI)
