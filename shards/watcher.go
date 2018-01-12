@@ -35,7 +35,7 @@ type shardWatcher struct {
 	dir        string
 	timestamps map[string]time.Time
 	loader     shardLoader
-	quit       chan struct{}
+	quit       chan<- struct{}
 }
 
 func (sw *shardWatcher) Close() error {
@@ -47,17 +47,18 @@ func (sw *shardWatcher) Close() error {
 }
 
 func NewDirectoryWatcher(dir string, loader shardLoader) (io.Closer, error) {
+	quitter := make(chan struct{}, 1)
 	sw := &shardWatcher{
 		dir:        dir,
 		timestamps: map[string]time.Time{},
 		loader:     loader,
-		quit:       make(chan struct{}, 1),
+		quit:       quitter,
 	}
 	if err := sw.scan(); err != nil {
 		return nil, err
 	}
 
-	if err := sw.watch(); err != nil {
+	if err := sw.watch(quitter); err != nil {
 		return nil, err
 	}
 
@@ -93,7 +94,7 @@ func (s *shardWatcher) scan() error {
 		return err
 	}
 
-	if len(fs) == 0 {
+	if len(s.timestamps) == 0 && len(fs) == 0 {
 		return fmt.Errorf("directory %s is empty", s.dir)
 	}
 
@@ -120,6 +121,7 @@ func (s *shardWatcher) scan() error {
 	for k := range s.timestamps {
 		if _, ok := ts[k]; !ok {
 			toDrop = append(toDrop, k)
+			delete(s.timestamps, k)
 		}
 	}
 
@@ -135,7 +137,7 @@ func (s *shardWatcher) scan() error {
 	return nil
 }
 
-func (s *shardWatcher) watch() error {
+func (s *shardWatcher) watch(quitter <-chan struct{}) error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return err
@@ -153,7 +155,7 @@ func (s *shardWatcher) watch() error {
 				if err != nil {
 					log.Println("watcher error:", err)
 				}
-			case <-s.quit:
+			case <-quitter:
 				watcher.Close()
 				return
 			}
