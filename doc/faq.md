@@ -144,8 +144,6 @@ characters), and stores the offset of each occurrence. Substrings are
 found by searching different trigrams from the query at the correct
 distance apart.
 
-For more details, see the [design doc](design.md).
-
 ## I want to know more
 
 Some further background documentation
