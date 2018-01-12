@@ -655,6 +655,7 @@ func (d *indexData) Search(ctx context.Context, q query.Q, opts *SearchOptions) 
 	docCount := uint32(len(d.fileBranchMasks))
 	canceled := false
 	lastDoc := int(-1)
+
 nextFileMatch:
 	for {
 		if !canceled {
@@ -666,11 +667,11 @@ nextFileMatch:
 		}
 
 		nextDoc := mt.nextDoc()
+		if int(nextDoc) <= lastDoc {
+			nextDoc = uint32(lastDoc + 1)
+		}
 		if nextDoc >= docCount {
 			break
-		}
-		if int(nextDoc) <= lastDoc {
-			log.Panicf("lastDoc %d, nextDoc %d", lastDoc, nextDoc)
 		}
 		lastDoc = int(nextDoc)
 

@@ -36,6 +36,9 @@ var Funcmap = template.FuncMap{
 	"Inc": func(orig int) int {
 		return orig + 1
 	},
+	"More": func(orig int) int {
+		return orig * 3
+	},
 	"HumanUnit": func(orig int64) string {
 		b := orig
 		suffix := ""

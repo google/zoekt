@@ -1526,7 +1526,7 @@ func TestLang(t *testing.T) {
 	}
 }
 
-func TestNoPositiveAtoms(t *testing.T) {
+func TestNoTextMatchAtoms(t *testing.T) {
 	content := []byte("bla needle bla")
 	b := testIndexBuilder(t, &Repository{Name: "reponame"},
 		Document{Name: "f1", Content: content},
@@ -1537,5 +1537,21 @@ func TestNoPositiveAtoms(t *testing.T) {
 	res := searchForTest(t, b, q)
 	if len(res.Files) != 1 {
 		t.Fatalf("got %v, want 1 result in f3", res.Files)
+	}
+}
+
+func TestNoPositiveAtoms(t *testing.T) {
+	content := []byte("bla needle bla")
+	b := testIndexBuilder(t, &Repository{Name: "reponame"},
+		Document{Name: "f1", Content: content},
+		Document{Name: "f2", Content: content},
+	)
+
+	q := query.NewAnd(
+		&query.Not{&query.Substring{Pattern: "xyz"}},
+		&query.Repo{"reponame"})
+	res := searchForTest(t, b, q)
+	if len(res.Files) != 2 {
+		t.Fatalf("got %v, want 2 results in f3", res.Files)
 	}
 }

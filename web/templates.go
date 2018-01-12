@@ -193,7 +193,10 @@ var TemplateText = map[string]string{
   <div class="container-fluid">
     <h5>
       {{if .Stats.Crashes}}<br><b>{{.Stats.Crashes}} shards crashed</b><br>{{end}}
-      Found {{.Stats.MatchCount}} results in {{.Stats.FileCount}} files
+      {{ $fileCount := len .FileMatches }}
+      Found {{.Stats.MatchCount}} results in {{.Stats.FileCount}} files{{if lt $fileCount .Stats.FileCount}},
+        showing top {{ $fileCount }} files (<a href="search?q={{.Last.Query}}&num={{More .Last.Num}}">show more</a>).
+      {{else}}.{{end}}
     </h5>
     {{range .FileMatches}}
     <table class="table table-hover table-condensed">
