@@ -157,7 +157,7 @@ func deleteLogs(logDir string, maxAge time.Duration) {
 		for _, fn := range fs {
 
 			if fi, err := os.Lstat(fn); err == nil && fi.ModTime().Before(threshold) {
-
+				log.Printf("deleteLogs %s", fn)
 				os.Remove(fn)
 			}
 		}

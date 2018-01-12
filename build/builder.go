@@ -238,6 +238,7 @@ func (b *Builder) Finish() error {
 
 	if b.buildError != nil {
 		for tmp := range b.finishedShards {
+			log.Printf("Builder.Finish %s", tmp)
 			os.Remove(tmp)
 		}
 		return b.buildError
@@ -264,6 +265,7 @@ func (b *Builder) deleteRemainingShards() {
 			break
 		}
 
+		log.Printf("Builder.deleteRemainingShards %s", name)
 		if err := os.Remove(name); os.IsNotExist(err) {
 			break
 		}
