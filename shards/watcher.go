@@ -20,14 +20,13 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/google/zoekt"
 )
 
 type shardLoader interface {
-	// Load a new file. Should be safe for concurrent calls.
 	load(filename string)
 	drop(filename string)
 }
@@ -64,6 +63,25 @@ func NewDirectoryWatcher(dir string, loader shardLoader) (io.Closer, error) {
 	}
 
 	return sw, nil
+}
+
+func loadShard(fn string) (zoekt.Searcher, error) {
+	f, err := os.Open(fn)
+	if err != nil {
+		return nil, err
+	}
+
+	iFile, err := zoekt.NewIndexFile(f)
+	if err != nil {
+		return nil, err
+	}
+	s, err := zoekt.NewSearcher(iFile)
+	if err != nil {
+		iFile.Close()
+		return nil, fmt.Errorf("NewSearcher(%s): %v", fn, err)
+	}
+
+	return s, nil
 }
 
 func (s *shardWatcher) String() string {
@@ -112,15 +130,9 @@ func (s *shardWatcher) scan() error {
 		s.loader.drop(t)
 	}
 
-	var wg sync.WaitGroup
 	for _, t := range toLoad {
-		wg.Add(1)
-		go func(k string) {
-			s.loader.load(k)
-			wg.Done()
-		}(t)
+		s.loader.load(t)
 	}
-	wg.Wait()
 
 	return nil
 }
