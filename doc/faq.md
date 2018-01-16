@@ -110,7 +110,14 @@ rudimentary support for filtering, and there is no symbol ranking.
 ## How much resources does `zoekt` require?
 
 The search server should have local SSD to store the index file (which
-is 3.5x the corpus size), and have 20% more RAM than the corpus size.
+is 3.5x the corpus size), and have at least 20% more RAM than the
+corpus size.
+
+## Can I index multiple branches?
+
+Yes. You can index 64 branches (see also
+https://github.com/google/zoekt/issues/32). Files that are identical
+across branches take up space just once in the index.
 
 ## How fast is the search?
 
