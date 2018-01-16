@@ -16,7 +16,9 @@ package shards
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"os"
 	"runtime"
 	"runtime/debug"
 	"sort"
@@ -52,12 +54,38 @@ func newShardedSearcher(n int64) *shardedSearcher {
 // shards corresponding to a glob into memory.
 func NewDirectorySearcher(dir string) (zoekt.Searcher, error) {
 	ss := newShardedSearcher(int64(runtime.NumCPU()))
-	_, err := NewDirectoryWatcher(dir, ss)
+	tl := &throttledLoader{
+		ss:       ss,
+		throttle: make(chan struct{}, runtime.NumCPU()),
+	}
+	_, err := NewDirectoryWatcher(dir, tl)
 	if err != nil {
 		return nil, err
 	}
 
 	return ss, nil
+}
+
+// throttledLoader tries to load up to throttle shards in parallel.
+type throttledLoader struct {
+	ss       *shardedSearcher
+	throttle chan struct{}
+}
+
+func (tl *throttledLoader) load(key string) {
+	tl.throttle <- struct{}{}
+	shard, err := loadShard(key)
+	<-tl.throttle
+	log.Printf("reloading: %s, err %v ", key, err)
+	if err != nil {
+		return
+	}
+
+	tl.ss.replace(key, shard)
+}
+
+func (tl *throttledLoader) drop(key string) {
+	tl.ss.replace(key, nil)
 }
 
 func (ss *shardedSearcher) String() string {
@@ -249,20 +277,6 @@ func (s *shardedSearcher) unlock() {
 	s.throttle.Release(s.capacity)
 }
 
-func (s *shardedSearcher) load(key string) {
-	shard, err := loadShard(key)
-	log.Printf("reloading: %s, err %v ", key, err)
-	if err != nil {
-		return
-	}
-
-	s.replace(key, shard)
-}
-
-func (s *shardedSearcher) drop(key string) {
-	s.replace(key, nil)
-}
-
 func (s *shardedSearcher) replace(key string, shard zoekt.Searcher) {
 	s.lock(context.Background())
 	defer s.unlock()
@@ -276,4 +290,23 @@ func (s *shardedSearcher) replace(key string, shard zoekt.Searcher) {
 	} else {
 		s.shards[key] = shard
 	}
+}
+
+func loadShard(fn string) (zoekt.Searcher, error) {
+	f, err := os.Open(fn)
+	if err != nil {
+		return nil, err
+	}
+
+	iFile, err := zoekt.NewIndexFile(f)
+	if err != nil {
+		return nil, err
+	}
+	s, err := zoekt.NewSearcher(iFile)
+	if err != nil {
+		iFile.Close()
+		return nil, fmt.Errorf("NewSearcher(%s): %v", fn, err)
+	}
+
+	return s, nil
 }
