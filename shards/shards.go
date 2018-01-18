@@ -22,6 +22,8 @@ import (
 	"sort"
 	"time"
 
+	"golang.org/x/net/trace"
+
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/query"
 )
@@ -64,7 +66,21 @@ type shardedSearcher struct {
 	shards map[string]zoekt.Searcher
 }
 
-func (ss *shardedSearcher) Search(ctx context.Context, pat query.Q, opts *zoekt.SearchOptions) (*zoekt.SearchResult, error) {
+func (ss *shardedSearcher) Search(ctx context.Context, pat query.Q, opts *zoekt.SearchOptions) (sr *zoekt.SearchResult, err error) {
+	tr := trace.New("shardedSearcher.Search", pat.String())
+	tr.LazyPrintf("opts: %+v", opts)
+	defer func() {
+		if sr != nil {
+			tr.LazyPrintf("num files: %d", len(sr.Files))
+			tr.LazyPrintf("stats: %+v", sr.Stats)
+		}
+		if err != nil {
+			tr.LazyPrintf("error: %v", err)
+			tr.SetError()
+		}
+		tr.Finish()
+	}()
+
 	start := time.Now()
 	type res struct {
 		sr  *zoekt.SearchResult
@@ -80,6 +96,7 @@ func (ss *shardedSearcher) Search(ctx context.Context, pat query.Q, opts *zoekt.
 	// searches on shards that have just been closed.
 	ss.rlock()
 	defer ss.runlock()
+	tr.LazyPrintf("acquired lock")
 	aggregate.Wait = time.Now().Sub(start)
 	start = time.Now()
 
@@ -150,7 +167,20 @@ func (ss *shardedSearcher) Search(ctx context.Context, pat query.Q, opts *zoekt.
 	return &aggregate, nil
 }
 
-func (ss *shardedSearcher) List(ctx context.Context, r query.Q) (*zoekt.RepoList, error) {
+func (ss *shardedSearcher) List(ctx context.Context, r query.Q) (rl *zoekt.RepoList, err error) {
+	tr := trace.New("shardedSearcher.List", r.String())
+	defer func() {
+		if rl != nil {
+			tr.LazyPrintf("repos size: %d", len(rl.Repos))
+			tr.LazyPrintf("crashes: %d", rl.Crashes)
+		}
+		if err != nil {
+			tr.LazyPrintf("error: %v", err)
+			tr.SetError()
+		}
+		tr.Finish()
+	}()
+
 	type res struct {
 		rl  *zoekt.RepoList
 		err error
@@ -158,10 +188,12 @@ func (ss *shardedSearcher) List(ctx context.Context, r query.Q) (*zoekt.RepoList
 
 	ss.rlock()
 	defer ss.runlock()
+	tr.LazyPrintf("acquired lock")
 
 	shards := ss.getShards()
 	shardCount := len(shards)
 	all := make(chan res, shardCount)
+	tr.LazyPrintf("shardCount: %d", len(shards))
 
 	for _, s := range shards {
 		go func(s zoekt.Searcher) {
