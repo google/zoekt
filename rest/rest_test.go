@@ -16,6 +16,7 @@ package rest
 
 import (
 	"bytes"
+	"context"
 	"testing"
 
 	"github.com/google/zoekt"
@@ -64,7 +65,7 @@ func TestUnicodeOffset(t *testing.T) {
 		t.Fatalf("NewSearcher: %v", err)
 	}
 
-	rep, err := serveSearchAPIStructured(searcher, &SearchRequest{
+	rep, err := serveSearchAPIStructured(context.Background(), searcher, &SearchRequest{
 		Query: "orange.*apple",
 		Restrict: []SearchRequestRestriction{
 			{

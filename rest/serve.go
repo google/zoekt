@@ -82,7 +82,7 @@ func serveSearchAPIErr(s zoekt.Searcher, w http.ResponseWriter, r *http.Request)
 		return &httpError{err.Error(), http.StatusBadRequest}
 	}
 
-	rep, err := serveSearchAPIStructured(s, &req)
+	rep, err := serveSearchAPIStructured(r.Context(), s, &req)
 	if err != nil {
 		return err
 	}
@@ -101,7 +101,7 @@ func serveListAPIErr(s zoekt.Searcher, w http.ResponseWriter, r *http.Request) e
 		return &httpError{err.Error(), http.StatusBadRequest}
 	}
 
-	rep, err := serveListAPIStructured(s, &req)
+	rep, err := serveListAPIStructured(r.Context(), s, &req)
 	if err != nil {
 		return err
 	}
@@ -122,7 +122,7 @@ func dumpAPIOutput(w http.ResponseWriter, rep interface{}) error {
 	return nil
 }
 
-func serveSearchAPIStructured(searcher zoekt.Searcher, req *SearchRequest) (*SearchResponse, error) {
+func serveSearchAPIStructured(ctx context.Context, searcher zoekt.Searcher, req *SearchRequest) (*SearchResponse, error) {
 	log.Printf("api/search query=%q restrictions=%d", req.Query, len(req.Restrict))
 
 	q, err := query.Parse(req.Query)
@@ -146,7 +146,6 @@ func serveSearchAPIStructured(searcher zoekt.Searcher, req *SearchRequest) (*Sea
 	var options zoekt.SearchOptions
 	options.SetDefaults()
 
-	ctx := context.Background()
 	result, err := searcher.Search(ctx, finalQ, &options)
 	if err != nil {
 		return nil, &httpError{err.Error(), http.StatusInternalServerError}
@@ -196,7 +195,7 @@ func serveSearchAPIStructured(searcher zoekt.Searcher, req *SearchRequest) (*Sea
 	return &resp, nil
 }
 
-func serveListAPIStructured(searcher zoekt.Searcher, req *ListRequest) (*ListResponse, error) {
+func serveListAPIStructured(ctx context.Context, searcher zoekt.Searcher, req *ListRequest) (*ListResponse, error) {
 	log.Printf("api/list restrictions=%d", len(req.Restrict))
 
 	restrictions := make([]query.Q, len(req.Restrict))
@@ -206,7 +205,6 @@ func serveListAPIStructured(searcher zoekt.Searcher, req *ListRequest) (*ListRes
 
 	finalQ := query.NewOr(restrictions...)
 
-	ctx := context.Background()
 	result, err := searcher.List(ctx, finalQ)
 	if err != nil {
 		return nil, &httpError{err.Error(), http.StatusInternalServerError}
