@@ -20,13 +20,14 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/google/zoekt"
 )
 
 type shardLoader interface {
+	// Load a new file. Should be safe for concurrent calls.
 	load(filename string)
 	drop(filename string)
 }
@@ -35,7 +36,7 @@ type shardWatcher struct {
 	dir        string
 	timestamps map[string]time.Time
 	loader     shardLoader
-	quit       chan struct{}
+	quit       chan<- struct{}
 }
 
 func (sw *shardWatcher) Close() error {
@@ -47,40 +48,22 @@ func (sw *shardWatcher) Close() error {
 }
 
 func NewDirectoryWatcher(dir string, loader shardLoader) (io.Closer, error) {
+	quitter := make(chan struct{}, 1)
 	sw := &shardWatcher{
 		dir:        dir,
 		timestamps: map[string]time.Time{},
 		loader:     loader,
-		quit:       make(chan struct{}, 1),
+		quit:       quitter,
 	}
 	if err := sw.scan(); err != nil {
 		return nil, err
 	}
 
-	if err := sw.watch(); err != nil {
+	if err := sw.watch(quitter); err != nil {
 		return nil, err
 	}
 
 	return sw, nil
-}
-
-func loadShard(fn string) (zoekt.Searcher, error) {
-	f, err := os.Open(fn)
-	if err != nil {
-		return nil, err
-	}
-
-	iFile, err := zoekt.NewIndexFile(f)
-	if err != nil {
-		return nil, err
-	}
-	s, err := zoekt.NewSearcher(iFile)
-	if err != nil {
-		iFile.Close()
-		return nil, fmt.Errorf("NewSearcher(%s): %v", fn, err)
-	}
-
-	return s, nil
 }
 
 func (s *shardWatcher) String() string {
@@ -116,6 +99,7 @@ func (s *shardWatcher) scan() error {
 	for k := range s.timestamps {
 		if _, ok := ts[k]; !ok {
 			toDrop = append(toDrop, k)
+			delete(s.timestamps, k)
 		}
 	}
 
@@ -124,14 +108,20 @@ func (s *shardWatcher) scan() error {
 		s.loader.drop(t)
 	}
 
+	var wg sync.WaitGroup
 	for _, t := range toLoad {
-		s.loader.load(t)
+		wg.Add(1)
+		go func(k string) {
+			s.loader.load(k)
+			wg.Done()
+		}(t)
 	}
+	wg.Wait()
 
 	return nil
 }
 
-func (s *shardWatcher) watch() error {
+func (s *shardWatcher) watch(quitter <-chan struct{}) error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return err
@@ -149,7 +139,7 @@ func (s *shardWatcher) watch() error {
 				if err != nil {
 					log.Println("watcher error:", err)
 				}
-			case <-s.quit:
+			case <-quitter:
 				watcher.Close()
 				return
 			}

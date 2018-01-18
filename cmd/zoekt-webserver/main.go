@@ -244,7 +244,7 @@ func watchdog(dt time.Duration, addr string) {
 	for _ = range tick.C {
 		err := watchdogOnce(context.Background(), client, addr)
 		if err != nil {
-			log.Fatalf("watchdog: %v", err)
+			log.Panicf("watchdog: %v", err)
 		}
 	}
 }

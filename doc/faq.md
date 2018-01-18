@@ -110,7 +110,14 @@ rudimentary support for filtering, and there is no symbol ranking.
 ## How much resources does `zoekt` require?
 
 The search server should have local SSD to store the index file (which
-is 3.5x the corpus size), and have 20% more RAM than the corpus size.
+is 3.5x the corpus size), and have at least 20% more RAM than the
+corpus size.
+
+## Can I index multiple branches?
+
+Yes. You can index 64 branches (see also
+https://github.com/google/zoekt/issues/32). Files that are identical
+across branches take up space just once in the index.
 
 ## How fast is the search?
 
@@ -148,7 +155,7 @@ distance apart.
 
 Some further background documentation
 
- * [Designdoc](design.md)
+ * [Designdoc](design.md) for technical details
  * [Godoc](https://godoc.org/github.com/google/zoekt)
  * Gerrit 2016 user summit: [slides](https://storage.googleapis.com/gerrit-talks/summit/2016/zoekt.pdf)
  * Gerrit 2017 user summit: [transcript](https://gitenterprise.me/2017/11/01/gerrit-user-summit-zoekt-code-search-engine/),  [slides]((https://storage.googleapis.com/gerrit-talks/summit/2017/Zoekt%20-%20improved%20codesearch.pdf), [video](https://www.youtube.com/watch?v=_-KTAvgJYdI)
