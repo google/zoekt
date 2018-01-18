@@ -29,6 +29,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/net/trace"
+
 	"github.com/google/zoekt/build"
 	"github.com/google/zoekt/shards"
 	"github.com/google/zoekt/web"
@@ -184,6 +186,8 @@ func main() {
 		handler.HandleFunc("/debug/pprof/profile", pprof.Profile)
 		handler.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 		handler.HandleFunc("/debug/pprof/trace", pprof.Trace)
+		handler.HandleFunc("/debug/requests/", trace.Traces)
+		handler.HandleFunc("/debug/events/", trace.Events)
 	}
 
 	watchdogAddr := "http://" + *listen

@@ -23,6 +23,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"golang.org/x/net/trace"
+
 	"github.com/google/zoekt/query"
 )
 
@@ -599,7 +601,7 @@ func (o *SearchOptions) SetDefaults() {
 	}
 }
 
-func (d *indexData) Search(ctx context.Context, q query.Q, opts *SearchOptions) (*SearchResult, error) {
+func (d *indexData) Search(ctx context.Context, q query.Q, opts *SearchOptions) (sr *SearchResult, err error) {
 	copyOpts := *opts
 	opts = &copyOpts
 	opts.SetDefaults()
@@ -610,7 +612,22 @@ func (d *indexData) Search(ctx context.Context, q query.Q, opts *SearchOptions) 
 		return &res, nil
 	}
 
+	tr := trace.New("indexData.Search", d.file.Name())
+	tr.LazyPrintf("opts: %+v", opts)
+	defer func() {
+		if sr != nil {
+			tr.LazyPrintf("num files: %d", len(sr.Files))
+			tr.LazyPrintf("stats: %+v", sr.Stats)
+		}
+		if err != nil {
+			tr.LazyPrintf("error: %v", err)
+			tr.SetError()
+		}
+		tr.Finish()
+	}()
+
 	q = d.simplify(q)
+	tr.LazyLog(q, true)
 	if c, ok := q.(*query.Const); ok && !c.Value {
 		return &res, nil
 	}
@@ -945,8 +962,22 @@ func (d *indexData) gatherBranches(docID uint32, mt matchTree, known map[matchTr
 	return branches
 }
 
-func (d *indexData) List(ctx context.Context, q query.Q) (*RepoList, error) {
+func (d *indexData) List(ctx context.Context, q query.Q) (rl *RepoList, err error) {
+	tr := trace.New("indexData.List", d.file.Name())
+	defer func() {
+		if rl != nil {
+			tr.LazyPrintf("repos size: %d", len(rl.Repos))
+			tr.LazyPrintf("crashes: %d", rl.Crashes)
+		}
+		if err != nil {
+			tr.LazyPrintf("error: %v", err)
+			tr.SetError()
+		}
+		tr.Finish()
+	}()
+
 	q = d.simplify(q)
+	tr.LazyLog(q, true)
 	c, ok := q.(*query.Const)
 
 	if !ok {
