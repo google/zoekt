@@ -217,7 +217,7 @@ func (s *Server) serveSearchErr(w http.ResponseWriter, r *http.Request) error {
 
 	sOpts.SetDefaults()
 
-	ctx := context.Background()
+	ctx := r.Context()
 	if result, err := s.Searcher.Search(ctx, q, &zoekt.SearchOptions{EstimateDocCount: true}); err != nil {
 		return err
 	} else if numdocs := result.ShardFilesConsidered; numdocs > 10000 {
@@ -292,7 +292,7 @@ func (s *Server) servePrint(w http.ResponseWriter, r *http.Request) {
 
 const statsStaleNess = 30 * time.Second
 
-func (s *Server) fetchStats() (*zoekt.RepoStats, error) {
+func (s *Server) fetchStats(ctx context.Context) (*zoekt.RepoStats, error) {
 	s.lastStatsMu.Lock()
 	stats := s.lastStats
 	if time.Now().Sub(s.lastStatsTS) > statsStaleNess {
@@ -304,7 +304,7 @@ func (s *Server) fetchStats() (*zoekt.RepoStats, error) {
 		return stats, nil
 	}
 
-	repos, err := s.Searcher.List(context.Background(), &query.Const{Value: true})
+	repos, err := s.Searcher.List(ctx, &query.Const{Value: true})
 	if err != nil {
 		return nil, err
 	}
@@ -326,7 +326,7 @@ func (s *Server) fetchStats() (*zoekt.RepoStats, error) {
 }
 
 func (s *Server) serveSearchBoxErr(w http.ResponseWriter, r *http.Request) error {
-	stats, err := s.fetchStats()
+	stats, err := s.fetchStats(r.Context())
 	if err != nil {
 		return err
 	}
@@ -368,7 +368,7 @@ func (s *Server) serveSearchBox(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) serveAboutErr(w http.ResponseWriter, r *http.Request) error {
-	stats, err := s.fetchStats()
+	stats, err := s.fetchStats(r.Context())
 	if err != nil {
 		return err
 	}
@@ -394,7 +394,7 @@ func (s *Server) serveAbout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) serveListReposErr(q query.Q, qStr string, w http.ResponseWriter, r *http.Request) error {
-	ctx := context.Background()
+	ctx := r.Context()
 	repos, err := s.Searcher.List(ctx, q)
 	if err != nil {
 		return err
@@ -478,7 +478,7 @@ func (s *Server) servePrintErr(w http.ResponseWriter, r *http.Request) error {
 		Whole: true,
 	}
 
-	ctx := context.Background()
+	ctx := r.Context()
 	result, err := s.Searcher.Search(ctx, q, &sOpts)
 	if err != nil {
 		return err

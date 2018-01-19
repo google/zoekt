@@ -72,7 +72,7 @@ func serveSearchAPIErr(s zoekt.Searcher, w http.ResponseWriter, r *http.Request)
 		return &httpError{err.Error(), http.StatusBadRequest}
 	}
 
-	rep, err := serveSearchAPIStructured(s, &req)
+	rep, err := serveSearchAPIStructured(r.Context(), s, &req)
 	if err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ func dumpAPIOutput(w http.ResponseWriter, rep interface{}) error {
 	return nil
 }
 
-func serveSearchAPIStructured(searcher zoekt.Searcher, req *SearchRequest) (*SearchResponse, error) {
+func serveSearchAPIStructured(ctx context.Context, searcher zoekt.Searcher, req *SearchRequest) (*SearchResponse, error) {
 	q, err := query.Parse(req.Query)
 	if err != nil {
 		msg := "parse error: " + err.Error()
@@ -115,7 +115,6 @@ func serveSearchAPIStructured(searcher zoekt.Searcher, req *SearchRequest) (*Sea
 	var options zoekt.SearchOptions
 	options.SetDefaults()
 
-	ctx := context.Background()
 	result, err := searcher.Search(ctx, finalQ, &options)
 	if err != nil {
 		return nil, &httpError{err.Error(), http.StatusInternalServerError}
