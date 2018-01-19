@@ -203,7 +203,7 @@ func serveListAPIStructured(ctx context.Context, searcher zoekt.Searcher, req *L
 		restrictions[i] = &query.Repo{Pattern: r.Repo}
 	}
 
-	finalQ := query.NewOr(restrictions...)
+	finalQ := query.Simplify(query.NewOr(restrictions...))
 
 	result, err := searcher.List(ctx, finalQ)
 	if err != nil {
