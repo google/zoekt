@@ -135,11 +135,11 @@ func serveSearchAPIStructured(ctx context.Context, searcher zoekt.Searcher, req 
 	for _, r := range req.Restrict {
 		var branchQs []query.Q
 		for _, b := range r.Branches {
-			branchQs = append(branchQs, &query.Branch{b})
+			branchQs = append(branchQs, &query.Branch{Pattern: b})
 		}
 
 		restrictions = append(restrictions,
-			query.NewAnd(&query.Repo{r.Repo}, query.NewOr(branchQs...)))
+			query.NewAnd(&query.Repo{Pattern: r.Repo}, query.NewOr(branchQs...)))
 	}
 
 	finalQ := query.NewAnd(q, query.NewOr(restrictions...))

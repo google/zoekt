@@ -309,7 +309,7 @@ func (s *Server) fetchStats() (*zoekt.RepoStats, error) {
 		return stats, nil
 	}
 
-	repos, err := s.Searcher.List(context.Background(), &query.Const{true})
+	repos, err := s.Searcher.List(context.Background(), &query.Const{Value: true})
 	if err != nil {
 		return nil, err
 	}
@@ -477,7 +477,7 @@ func (s *Server) servePrintErr(w http.ResponseWriter, r *http.Request) error {
 		qs = append(qs, &query.Branch{Pattern: branchStr})
 	}
 
-	q := &query.And{qs}
+	q := &query.And{Children: qs}
 
 	sOpts := zoekt.SearchOptions{
 		Whole: true,

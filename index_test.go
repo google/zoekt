@@ -282,7 +282,7 @@ func TestAndNegateSearch(t *testing.T) {
 		&query.Substring{
 			Pattern: "banana",
 		},
-		&query.Not{&query.Substring{
+		&query.Not{Child: &query.Substring{
 			Pattern: "apple",
 		}}))
 
@@ -314,7 +314,7 @@ func TestNegativeMatchesOnlyShortcut(t *testing.T) {
 		&query.Substring{
 			Pattern: "banana",
 		},
-		&query.Not{&query.Substring{
+		&query.Not{Child: &query.Substring{
 			Pattern: "appel",
 		}}))
 
@@ -463,7 +463,7 @@ func TestSearchMatchAll(t *testing.T) {
 	b.AddFile("banzana", []byte("x orange y"))
 	// --------------------------0123456879
 	b.AddFile("banana", []byte("x apple y"))
-	sres := searchForTest(t, b, &query.Const{true})
+	sres := searchForTest(t, b, &query.Const{Value: true})
 
 	matches := sres.Files
 	if len(matches) != 2 {
@@ -683,7 +683,7 @@ func TestCoversContent(t *testing.T) {
 			&query.Substring{
 				Pattern: "needle",
 			},
-			&query.Not{&query.Substring{
+			&query.Not{Child: &query.Substring{
 				Pattern: "the",
 			}}))
 
@@ -901,7 +901,7 @@ func TestNegativeRegexp(t *testing.T) {
 				Pattern: "needle",
 			},
 			&query.Not{
-				&query.Regexp{
+				Child: &query.Regexp{
 					Regexp: mustParseRE(".cs"),
 				},
 			}))
@@ -983,7 +983,7 @@ func TestNegativeRepo(t *testing.T) {
 	sres := searchForTest(t, b,
 		query.NewAnd(
 			&query.Substring{Pattern: "needle"},
-			&query.Not{&query.Repo{Pattern: "bla"}},
+			&query.Not{Child: &query.Repo{Pattern: "bla"}},
 		))
 
 	if len(sres.Files) != 0 {
@@ -1441,8 +1441,8 @@ func TestAndOrUnicode(t *testing.T) {
 		t.Errorf("parse: %v", err)
 	}
 	finalQ := query.NewAnd(q,
-		query.NewOr(query.NewAnd(&query.Repo{"name"},
-			query.NewOr(&query.Branch{"master"}))))
+		query.NewOr(query.NewAnd(&query.Repo{Pattern: "name"},
+			query.NewOr(&query.Branch{Pattern: "master"}))))
 
 	b := testIndexBuilder(t, &Repository{
 		Name:     "name",
@@ -1514,7 +1514,7 @@ func TestLang(t *testing.T) {
 	)
 
 	q := query.NewAnd(&query.Substring{Pattern: "needle"},
-		&query.Language{"cpp"})
+		&query.Language{Language: "cpp"})
 
 	res := searchForTest(t, b, q)
 	if len(res.Files) != 1 {
@@ -1533,7 +1533,7 @@ func TestNoTextMatchAtoms(t *testing.T) {
 		Document{Name: "f2", Language: "java", Content: content},
 		Document{Name: "f3", Language: "cpp", Content: content},
 	)
-	q := query.NewAnd(&query.Language{"java"})
+	q := query.NewAnd(&query.Language{Language: "java"})
 	res := searchForTest(t, b, q)
 	if len(res.Files) != 1 {
 		t.Fatalf("got %v, want 1 result in f3", res.Files)
@@ -1548,8 +1548,8 @@ func TestNoPositiveAtoms(t *testing.T) {
 	)
 
 	q := query.NewAnd(
-		&query.Not{&query.Substring{Pattern: "xyz"}},
-		&query.Repo{"reponame"})
+		&query.Not{Child: &query.Substring{Pattern: "xyz"}},
+		&query.Repo{Pattern: "reponame"})
 	res := searchForTest(t, b, q)
 	if len(res.Files) != 2 {
 		t.Fatalf("got %v, want 2 results in f3", res.Files)
