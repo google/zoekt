@@ -761,7 +761,7 @@ func TestRegexpFile(t *testing.T) {
 	}
 
 	if sres.Files[0].FileName != name {
-		t.Errorf("got match %#v, want name %q", sres.Files[0])
+		t.Errorf("got match %#v, want name %q", sres.Files[0], name)
 	}
 }
 

@@ -47,7 +47,7 @@ func (s *Server) formatResults(result *zoekt.SearchResult, query string, localPr
 			if err := tpl.Execute(&buf, map[string]string{
 				"LineNumber": strconv.Itoa(linenum),
 			}); err != nil {
-				log.Println("fragment template: %v", err)
+				log.Printf("fragment template: %v", err)
 				return ""
 			}
 			return buf.String()
@@ -78,7 +78,7 @@ func (s *Server) formatResults(result *zoekt.SearchResult, query string, localPr
 				"Path":    filename,
 			})
 			if err != nil {
-				log.Println("url template: %v", err)
+				log.Printf("url template: %v", err)
 				return ""
 			}
 			return buf.String()

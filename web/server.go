@@ -122,7 +122,7 @@ func (s *Server) getTemplate(str string) *template.Template {
 
 	t, err := template.New("cache").Parse(str)
 	if err != nil {
-		log.Println("template parse error: %v", err)
+		log.Printf("template parse error: %v", err)
 		t = template.Must(template.New("empty").Parse(""))
 	}
 	s.templateCache[str] = t

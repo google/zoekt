@@ -131,7 +131,7 @@ func main() {
 
 	if *logDir != "" {
 		if fi, err := os.Lstat(*logDir); err != nil || !fi.IsDir() {
-			log.Fatal("%s is not a directory", *logDir)
+			log.Fatalf("%s is not a directory", *logDir)
 		}
 		// We could do fdup acrobatics to also redirect
 		// stderr, but it is simpler and more portable for the
@@ -156,7 +156,7 @@ func main() {
 
 	if *templateDir != "" {
 		if err := loadTemplates(s.Top, *templateDir); err != nil {
-			log.Fatal("loadTemplates: %v", err)
+			log.Fatalf("loadTemplates: %v", err)
 		}
 	}
 
@@ -172,7 +172,7 @@ func main() {
 			}
 			fields := strings.SplitN(h, "=", 2)
 			if len(fields) < 2 {
-				log.Fatal("invalid host_customization %q", h)
+				log.Fatalf("invalid host_customization %q", h)
 			}
 
 			s.HostCustomQueries[fields[0]] = fields[1]

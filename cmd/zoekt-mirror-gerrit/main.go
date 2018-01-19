@@ -82,7 +82,7 @@ func main() {
 
 	rootURL, err := url.Parse(flag.Arg(0))
 	if err != nil {
-		log.Fatal("url.Parse(): %v", err)
+		log.Fatalf("url.Parse(): %v", err)
 	}
 
 	if *dest == "" {
@@ -95,7 +95,7 @@ func main() {
 	}
 	client, err := gerrit.NewClient(rootURL.String(), newLoggingClient())
 	if err != nil {
-		log.Fatalf("NewClient(%s)", rootURL, err)
+		log.Fatalf("NewClient(%s): %v", rootURL, err)
 	}
 
 	info, _, err := client.Config.GetServerInfo()
