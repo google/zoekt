@@ -25,7 +25,7 @@ func main() {
 
 	root, err := url.Parse(flag.Arg(0))
 	if err != nil {
-		log.Fatal("url.Parse(): %v", err)
+		log.Fatalf("url.Parse(): %v", err)
 	}
 
 	if *dest == "" {

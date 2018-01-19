@@ -200,7 +200,7 @@ func serveListAPIStructured(ctx context.Context, searcher zoekt.Searcher, req *L
 
 	restrictions := make([]query.Q, len(req.Restrict))
 	for i, r := range req.Restrict {
-		restrictions[i] = &query.Repo{r.Repo}
+		restrictions[i] = &query.Repo{Pattern: r.Repo}
 	}
 
 	finalQ := query.NewOr(restrictions...)
