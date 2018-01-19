@@ -607,7 +607,12 @@ func (d *indexData) Search(ctx context.Context, q query.Q, opts *SearchOptions) 
 	opts.SetDefaults()
 	importantMatchCount := 0
 
-	tr := trace.New("indexData.Search", fmt.Sprintf("%s %s", d.file.Name(), q.String()))
+	var res SearchResult
+	if len(d.fileNameIndex) == 0 {
+		return &res, nil
+	}
+
+	tr := trace.New("indexData.Search", d.file.Name())
 	tr.LazyPrintf("opts: %+v", opts)
 	defer func() {
 		if sr != nil {
@@ -621,13 +626,8 @@ func (d *indexData) Search(ctx context.Context, q query.Q, opts *SearchOptions) 
 		tr.Finish()
 	}()
 
-	var res SearchResult
-	if len(d.fileNameIndex) == 0 {
-		return &res, nil
-	}
-
 	q = d.simplify(q)
-	tr.LazyLog(q, false)
+	tr.LazyLog(q, true)
 	if c, ok := q.(*query.Const); ok && !c.Value {
 		return &res, nil
 	}
@@ -963,7 +963,7 @@ func (d *indexData) gatherBranches(docID uint32, mt matchTree, known map[matchTr
 }
 
 func (d *indexData) List(ctx context.Context, q query.Q) (rl *RepoList, err error) {
-	tr := trace.New("indexData.List", fmt.Sprintf("%s %s", d.file.Name(), q.String()))
+	tr := trace.New("indexData.List", d.file.Name())
 	defer func() {
 		if rl != nil {
 			tr.LazyPrintf("repos size: %d", len(rl.Repos))
@@ -977,7 +977,7 @@ func (d *indexData) List(ctx context.Context, q query.Q) (rl *RepoList, err erro
 	}()
 
 	q = d.simplify(q)
-	tr.LazyLog(q, false)
+	tr.LazyLog(q, true)
 	c, ok := q.(*query.Const)
 
 	if !ok {

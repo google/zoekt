@@ -103,7 +103,8 @@ func (ss *shardedSearcher) Close() {
 }
 
 func (ss *shardedSearcher) Search(ctx context.Context, pat query.Q, opts *zoekt.SearchOptions) (sr *zoekt.SearchResult, err error) {
-	tr := trace.New("shardedSearcher.Search", pat.String())
+	tr := trace.New("shardedSearcher.Search", "")
+	tr.LazyLog(pat, true)
 	tr.LazyPrintf("opts: %+v", opts)
 	defer func() {
 		if sr != nil {
@@ -206,7 +207,8 @@ func (ss *shardedSearcher) Search(ctx context.Context, pat query.Q, opts *zoekt.
 }
 
 func (ss *shardedSearcher) List(ctx context.Context, r query.Q) (rl *zoekt.RepoList, err error) {
-	tr := trace.New("shardedSearcher.List", r.String())
+	tr := trace.New("shardedSearcher.List", "")
+	tr.LazyLog(r, true)
 	defer func() {
 		if rl != nil {
 			tr.LazyPrintf("repos size: %d", len(rl.Repos))
