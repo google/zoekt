@@ -152,7 +152,7 @@ func deleteStaleRepos(destDir string, filter *gitindex.Filter, repos []*github.R
 	}
 
 	if len(toDelete) > 0 {
-		log.Println("deleting repos %v", toDelete)
+		log.Printf("deleting repos %v", toDelete)
 	}
 
 	var errs []string

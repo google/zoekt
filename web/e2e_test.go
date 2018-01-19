@@ -320,7 +320,7 @@ func TestHostCustomization(t *testing.T) {
 	req.Host = "myproject.io"
 	res, err := (&http.Client{}).Do(req)
 	if err != nil {
-		t.Fatal("Do(%v): %v", req, err)
+		t.Fatalf("Do(%v): %v", req, err)
 	}
 	resultBytes, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
@@ -370,7 +370,7 @@ func TestDupResult(t *testing.T) {
 	}
 	res, err := (&http.Client{}).Do(req)
 	if err != nil {
-		t.Fatal("Do(%v): %v", req, err)
+		t.Fatalf("Do(%v): %v", req, err)
 	}
 	resultBytes, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
