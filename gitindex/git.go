@@ -95,10 +95,6 @@ func FindGitRepos(arg string) ([]string, error) {
 	return dirs, nil
 }
 
-func templatesForOrigin(u *url.URL) (*zoekt.Repository, error) {
-	return nil, fmt.Errorf("unknown URL %s", u)
-}
-
 // setTemplates fills in URL templates for known git hosting
 // sites.
 func setTemplates(repo *zoekt.Repository, u *url.URL, typ string) error {
@@ -244,19 +240,6 @@ func SetTemplatesFromOrigin(desc *zoekt.Repository, u *url.URL) error {
 	} else {
 		return fmt.Errorf("unknown git hosting site %q", u)
 	}
-
-	found, err := templatesForOrigin(u)
-
-	if err != nil {
-		return err
-
-	}
-
-	desc.URL = found.URL
-	desc.CommitURLTemplate = found.CommitURLTemplate
-	desc.FileURLTemplate = found.FileURLTemplate
-	desc.LineFragmentTemplate = found.LineFragmentTemplate
-	return nil
 }
 
 type Options struct {
