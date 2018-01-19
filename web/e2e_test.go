@@ -70,7 +70,7 @@ func TestJSON(t *testing.T) {
 		CommitURLTemplate:    "{{.Version}}",
 		FileURLTemplate:      "url",
 		LineFragmentTemplate: "line",
-		Branches:             []zoekt.RepositoryBranch{{"master", "1234"}},
+		Branches:             []zoekt.RepositoryBranch{{Name: "master", Version: "1234"}},
 	})
 	if err != nil {
 		t.Fatalf("NewIndexBuilder: %v", err)
@@ -159,7 +159,7 @@ func TestBasic(t *testing.T) {
 		CommitURLTemplate:    "{{.Version}}",
 		FileURLTemplate:      "file-url",
 		LineFragmentTemplate: "line",
-		Branches:             []zoekt.RepositoryBranch{{"master", "1234"}},
+		Branches:             []zoekt.RepositoryBranch{{Name: "master", Version: "1234"}},
 	})
 	if err != nil {
 		t.Fatalf("NewIndexBuilder: %v", err)

@@ -40,7 +40,7 @@ func (s *memSeeker) Name() string {
 func TestUnicodeOffset(t *testing.T) {
 	repo := zoekt.Repository{
 		Name:     "name",
-		Branches: []zoekt.RepositoryBranch{{"master", "master-version"}},
+		Branches: []zoekt.RepositoryBranch{{Name: "master", Version: "master-version"}},
 	}
 	b, err := zoekt.NewIndexBuilder(&repo)
 	if err != nil {

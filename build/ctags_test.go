@@ -63,8 +63,8 @@ func TestTagsToSectionsMultiple(t *testing.T) {
 	}
 
 	want := []zoekt.DocumentSection{
-		{17, 18},
-		{24, 25},
+		{Start: 17, End: 18},
+		{Start: 24, End: 25},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %v, want %v", got, want)
