@@ -142,7 +142,7 @@ func serveSearchAPIStructured(ctx context.Context, searcher zoekt.Searcher, req 
 			query.NewAnd(&query.Repo{Pattern: r.Repo}, query.NewOr(branchQs...)))
 	}
 
-	finalQ := query.NewAnd(q, query.NewOr(restrictions...))
+	finalQ := query.Simplify(query.NewAnd(q, query.NewOr(restrictions...)))
 	var options zoekt.SearchOptions
 	options.SetDefaults()
 
