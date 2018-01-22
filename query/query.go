@@ -285,10 +285,6 @@ func evalConstants(q Q) Q {
 		if s.Pattern == "" {
 			return &Const{true}
 		}
-	case *Repo:
-		if s.Pattern == "" {
-			return &Const{true}
-		}
 	}
 	return q
 }
