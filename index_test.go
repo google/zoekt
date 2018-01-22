@@ -1150,7 +1150,7 @@ func TestFrequency(t *testing.T) {
 func TestMatchNewline(t *testing.T) {
 	re, err := syntax.Parse("[^a]a", syntax.ClassNL)
 	if err != nil {
-		panic(err)
+		t.Fatalf("syntax.Parse: %v", err)
 	}
 
 	content := []byte("pqr\nalex")
