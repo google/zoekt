@@ -231,7 +231,7 @@ func TestBasic(t *testing.T) {
 		result := string(resultBytes)
 		for _, want := range needles {
 			if !strings.Contains(result, want) {
-				t.Errorf("result did not have %q: %s", want, result)
+				t.Errorf("query %q: result did not have %q: %s", req, want, result)
 			}
 		}
 	}
