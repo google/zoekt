@@ -324,7 +324,7 @@ func (d *indexData) readNewlines(i uint32, buf []uint32) ([]uint32, uint32, erro
 	return fromSizedDeltas(blob, buf), sec.sz, nil
 }
 
-func (d *indexData) readDocSections(i uint32) ([]DocumentSection, uint32, error) {
+func (d *indexData) readDocSections(i uint32, buf []DocumentSection) ([]DocumentSection, uint32, error) {
 	sec := simpleSection{
 		off: d.docSectionsStart + d.docSectionsIndex[i],
 		sz:  d.docSectionsIndex[i+1] - d.docSectionsIndex[i],
@@ -334,7 +334,7 @@ func (d *indexData) readDocSections(i uint32) ([]DocumentSection, uint32, error)
 		return nil, 0, err
 	}
 
-	return unmarshalDocSections(blob), sec.sz, nil
+	return unmarshalDocSections(blob, buf), sec.sz, nil
 }
 
 // NewSearcher creates a Searcher for a single index file.
