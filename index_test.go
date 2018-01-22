@@ -910,7 +910,6 @@ func TestNegativeRegexp(t *testing.T) {
 }
 
 func TestSymbolRank(t *testing.T) {
-
 	content := []byte("func bla() blub")
 	// ----------------012345678901234
 	b := testIndexBuilder(t, nil,
@@ -929,6 +928,37 @@ func TestSymbolRank(t *testing.T) {
 	res := searchForTest(t, b,
 		&query.Substring{
 			Pattern: "bla",
+		})
+
+	if len(res.Files) != 3 {
+		t.Fatalf("got %#v, want 3 files", res.Files)
+	}
+	if res.Files[0].FileName != "f2" {
+		t.Errorf("got %#v, want 'f2' as top match", res.Files[0])
+	}
+}
+
+func TestSymbolRankRegexpUTF8(t *testing.T) {
+	prefix := strings.Repeat(string([]rune{kelvinCodePoint}), 100) + "\n"
+	content := []byte(prefix +
+		"func bla() blub")
+	// ------012345678901234
+	b := testIndexBuilder(t, nil,
+		Document{
+			Name:    "f1",
+			Content: content,
+		}, Document{
+			Name:    "f2",
+			Content: content,
+			Symbols: []DocumentSection{{uint32(len(prefix) + 5), uint32(len(prefix) + 8)}},
+		}, Document{
+			Name:    "f3",
+			Content: content,
+		})
+
+	res := searchForTest(t, b,
+		&query.Regexp{
+			Regexp: mustParseRE("b.a"),
 		})
 
 	if len(res.Files) != 3 {
