@@ -62,24 +62,22 @@ func main() {
 
 func listRepos(root *url.URL) ([]string, error) {
 	u := root.ResolveReference(&url.URL{Path: "/.internal/repos/list"})
-	resp, err := http.Post(u.String(), "application/json; charset=utf8", bytes.NewReader([]byte(`{"PerPage": 10000}`)))
+	resp, err := http.Post(u.String(), "application/json; charset=utf8", bytes.NewReader([]byte(`{"PerPage": 10000, "Enabled": true}`)))
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
-	var data struct {
-		Repos []struct {
-			URI string
-		}
+	var data []struct {
+		URI string
 	}
 	err = json.NewDecoder(resp.Body).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
 
-	repos := make([]string, len(data.Repos))
-	for i, r := range data.Repos {
+	repos := make([]string, len(data))
+	for i, r := range data {
 		repos[i] = r.URI
 	}
 	return repos, nil
