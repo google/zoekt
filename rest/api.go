@@ -24,8 +24,7 @@ type SearchRequest struct {
 
 // A REST search query must provide a restriction.
 type SearchRequestRestriction struct {
-	Repo     string
-	Branches []string
+	Repo string
 
 	// TODO - provide way to set number of search results.
 }

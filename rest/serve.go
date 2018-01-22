@@ -131,18 +131,14 @@ func serveSearchAPIStructured(ctx context.Context, searcher zoekt.Searcher, req 
 		return &SearchResponse{Error: &msg}, nil
 	}
 
-	var restrictions []query.Q
+	repoSet := &query.RepoSet{
+		Set: make(map[string]bool),
+	}
 	for _, r := range req.Restrict {
-		var branchQs []query.Q
-		for _, b := range r.Branches {
-			branchQs = append(branchQs, &query.Branch{Pattern: b})
-		}
-
-		restrictions = append(restrictions,
-			query.NewAnd(&query.Repo{Pattern: r.Repo}, query.NewOr(branchQs...)))
+		repoSet.Set[r.Repo] = true
 	}
 
-	finalQ := query.Simplify(query.NewAnd(q, query.NewOr(restrictions...)))
+	finalQ := query.Simplify(query.NewAnd(q, repoSet))
 	var options zoekt.SearchOptions
 	options.SetDefaults()
 

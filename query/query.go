@@ -19,6 +19,7 @@ import (
 	"log"
 	"reflect"
 	"regexp/syntax"
+	"sort"
 	"strings"
 )
 
@@ -81,6 +82,23 @@ type Repo struct {
 
 func (q *Repo) String() string {
 	return fmt.Sprintf("repo:%s", q.Pattern)
+}
+
+// RepoSet is a list of repos to match. It is a Sourcegraph addition and only
+// used in the Rest interface for efficient checking of large repo lists.
+type RepoSet struct {
+	Set map[string]bool
+}
+
+func (q *RepoSet) String() string {
+	repos := make([]string, len(q.Set))
+	i := 0
+	for repo := range q.Set {
+		repos[i] = repo
+		i++
+	}
+	sort.Strings(repos)
+	return fmt.Sprintf("(reposet %s)", strings.Join(repos, " "))
 }
 
 // Substring is the most basic query: a query for a substring.
@@ -283,6 +301,10 @@ func evalConstants(q Q) Q {
 		}
 	case *Branch:
 		if s.Pattern == "" {
+			return &Const{true}
+		}
+	case *RepoSet:
+		if len(s.Set) == 0 {
 			return &Const{true}
 		}
 	}

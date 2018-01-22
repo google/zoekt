@@ -576,10 +576,14 @@ func (d *indexData) newSubstringMatchTree(s *query.Substring, stats *Stats) (mat
 
 func (d *indexData) simplify(in query.Q) query.Q {
 	eval := query.Map(in, func(q query.Q) query.Q {
-		if r, ok := q.(*query.Repo); ok {
+		switch r := q.(type) {
+		case *query.Repo:
 			return &query.Const{Value: strings.Contains(d.repoMetaData.Name, r.Pattern)}
+		case *query.RepoSet:
+			return &query.Const{Value: r.Set[d.repoMetaData.Name]}
+		default:
+			return q
 		}
-		return q
 	})
 	return query.Simplify(eval)
 }
