@@ -215,6 +215,7 @@ type Document struct {
 	SubRepositoryPath string
 	Language          string
 
+	// Document sections for symbols. Offsets should use bytes.
 	Symbols []DocumentSection
 }
 

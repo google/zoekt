@@ -23,8 +23,6 @@ import (
 	"regexp/syntax"
 	"strings"
 	"testing"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/kylelemons/godebug/pretty"
 
@@ -912,7 +910,6 @@ func TestNegativeRegexp(t *testing.T) {
 }
 
 func TestSymbolRank(t *testing.T) {
-
 	content := []byte("func bla() blub")
 	// ----------------012345678901234
 	b := testIndexBuilder(t, nil,
@@ -931,6 +928,37 @@ func TestSymbolRank(t *testing.T) {
 	res := searchForTest(t, b,
 		&query.Substring{
 			Pattern: "bla",
+		})
+
+	if len(res.Files) != 3 {
+		t.Fatalf("got %#v, want 3 files", res.Files)
+	}
+	if res.Files[0].FileName != "f2" {
+		t.Errorf("got %#v, want 'f2' as top match", res.Files[0])
+	}
+}
+
+func TestSymbolRankRegexpUTF8(t *testing.T) {
+	prefix := strings.Repeat(string([]rune{kelvinCodePoint}), 100) + "\n"
+	content := []byte(prefix +
+		"func bla() blub")
+	// ------012345678901234
+	b := testIndexBuilder(t, nil,
+		Document{
+			Name:    "f1",
+			Content: content,
+		}, Document{
+			Name:    "f2",
+			Content: content,
+			Symbols: []DocumentSection{{uint32(len(prefix) + 5), uint32(len(prefix) + 8)}},
+		}, Document{
+			Name:    "f3",
+			Content: content,
+		})
+
+	res := searchForTest(t, b,
+		&query.Regexp{
+			Regexp: mustParseRE("b.a"),
 		})
 
 	if len(res.Files) != 3 {
@@ -1122,7 +1150,7 @@ func TestFrequency(t *testing.T) {
 func TestMatchNewline(t *testing.T) {
 	re, err := syntax.Parse("[^a]a", syntax.ClassNL)
 	if err != nil {
-		panic(err)
+		t.Fatalf("syntax.Parse: %v", err)
 	}
 
 	content := []byte("pqr\nalex")
@@ -1244,26 +1272,13 @@ func TestUnicodeNonCoverContent(t *testing.T) {
 	}
 }
 
+const kelvinCodePoint = 8490
+const kelvinUTFSize = 3
+
 func TestUnicodeVariableLength(t *testing.T) {
-	var lower, upper rune
-	var buf [4]byte
-	for l := rune(0); l < (1 << 21); l++ {
-		u := unicode.SimpleFold(l)
+	lower := 'k'
+	upper := rune(kelvinCodePoint)
 
-		lSz := utf8.EncodeRune(buf[:], l)
-		uSz := utf8.EncodeRune(buf[:], u)
-
-		if lSz != uSz {
-			lower = l
-			upper = u
-			t.Logf("char %c (%d sz %d) %c (%d sz %d)", l, l, lSz, u, u, uSz)
-			break
-		}
-	}
-
-	if lower == 0 {
-		t.Fatal("rune not found")
-	}
 	needle := "nee" + string([]rune{lower}) + "eed"
 	corpus := []byte("nee" + string([]rune{upper}) + "eed" +
 		" ee" + string([]rune{lower}) + "ee" +

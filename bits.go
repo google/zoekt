@@ -213,14 +213,20 @@ func marshalDocSections(secs []DocumentSection) []byte {
 	return toSizedDeltas(ints)
 }
 
-func unmarshalDocSections(in []byte) (secs []DocumentSection) {
+func unmarshalDocSections(in []byte, buf []DocumentSection) (secs []DocumentSection) {
+	// TODO - ints is unnecessary garbage here.
 	ints := fromSizedDeltas(in, nil)
-	res := make([]DocumentSection, 0, len(ints)/2)
+	if cap(buf) >= len(ints)/2 {
+		buf = buf[:0]
+	} else {
+		buf = make([]DocumentSection, 0, len(ints)/2)
+	}
+
 	for len(ints) > 0 {
-		res = append(res, DocumentSection{ints[0], ints[1]})
+		buf = append(buf, DocumentSection{ints[0], ints[1]})
 		ints = ints[2:]
 	}
-	return res
+	return buf
 }
 
 type ngramSlice []ngram

@@ -37,6 +37,7 @@ type contentProvider struct {
 	_nlBuf       []uint32
 	_runeOffsets []uint32
 	_sects       []DocumentSection
+	_sectBuf     []DocumentSection
 	fileSize     uint32
 	bytesRead    uint32
 }
@@ -55,8 +56,9 @@ func (p *contentProvider) setDocument(docID uint32) {
 func (p *contentProvider) docSections() []DocumentSection {
 	if p._sects == nil {
 		var sz uint32
-		p._sects, sz, p.err = p.id.readDocSections(p.idx)
+		p._sects, sz, p.err = p.id.readDocSections(p.idx, p._sectBuf)
 		p.stats.ContentBytesLoaded += int64(sz)
+		p._sectBuf = p._sects
 	}
 	return p._sects
 }

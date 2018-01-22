@@ -33,7 +33,7 @@ func TestNgram(t *testing.T) {
 func TestDocSection(t *testing.T) {
 	in := []DocumentSection{{1, 2}, {3, 4}}
 	serialized := marshalDocSections(in)
-	roundtrip := unmarshalDocSections(serialized)
+	roundtrip := unmarshalDocSections(serialized, nil)
 	if !reflect.DeepEqual(in, roundtrip) {
 		t.Errorf("got %v, want %v", roundtrip, in)
 	}
