@@ -281,6 +281,10 @@ func evalConstants(q Q) Q {
 		if s.Regexp.Op == syntax.OpEmptyMatch {
 			return &Const{true}
 		}
+	case *Branch:
+		if s.Pattern == "" {
+			return &Const{true}
+		}
 	}
 	return q
 }
