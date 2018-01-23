@@ -213,7 +213,7 @@ func main() {
 }
 
 func watchdogOnce(ctx context.Context, client *http.Client, addr string) error {
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(5*time.Second))
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(30*time.Second))
 	defer cancel()
 
 	req, err := http.NewRequest("GET", addr, nil)
