@@ -21,6 +21,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	gorpc "net/rpc"
 	"strconv"
 	"sync"
 	"time"
@@ -30,6 +31,7 @@ import (
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/query"
 	"github.com/google/zoekt/rest"
+	"github.com/google/zoekt/rpc"
 )
 
 var Funcmap = template.FuncMap{
@@ -66,6 +68,9 @@ type Server struct {
 
 	// Serve REST API
 	RESTAPI bool
+
+	// Serve go/net RPC
+	RPC bool
 
 	// If set, show files from the index.
 	Print bool
@@ -162,6 +167,11 @@ func NewMux(s *Server) (*http.ServeMux, error) {
 	if s.RESTAPI {
 		mux.HandleFunc("/api/search", s.serveSearchAPI)
 		mux.HandleFunc("/api/list", s.serveListAPI)
+	}
+	if s.RPC {
+		rpcServer := gorpc.NewServer()
+		rpc.Register(rpcServer, s.Searcher)
+		mux.Handle(gorpc.DefaultRPCPath, rpcServer)
 	}
 	if s.Print {
 		mux.HandleFunc("/print", s.servePrint)

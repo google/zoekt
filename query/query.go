@@ -108,6 +108,14 @@ func (q *RepoSet) String() string {
 	return fmt.Sprintf("(reposet %s)", detail)
 }
 
+func NewRepoSet(repo ...string) *RepoSet {
+	s := &RepoSet{Set: make(map[string]bool)}
+	for _, r := range repo {
+		s.Set[r] = true
+	}
+	return s
+}
+
 // Substring is the most basic query: a query for a substring.
 type Substring struct {
 	Pattern       string
