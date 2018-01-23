@@ -62,7 +62,7 @@ func main() {
 
 func listRepos(root *url.URL) ([]string, error) {
 	u := root.ResolveReference(&url.URL{Path: "/.internal/repos/list"})
-	resp, err := http.Post(u.String(), "application/json; charset=utf8", bytes.NewReader([]byte(`{"PerPage": 10000, "Enabled": true}`)))
+	resp, err := http.Post(u.String(), "application/json; charset=utf8", bytes.NewReader([]byte(`{"Enabled": true}`)))
 	if err != nil {
 		return nil, err
 	}
