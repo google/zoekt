@@ -21,7 +21,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	gorpc "net/rpc"
 	"strconv"
 	"sync"
 	"time"
@@ -169,9 +168,7 @@ func NewMux(s *Server) (*http.ServeMux, error) {
 		mux.HandleFunc("/api/list", s.serveListAPI)
 	}
 	if s.RPC {
-		rpcServer := gorpc.NewServer()
-		rpc.Register(rpcServer, s.Searcher)
-		mux.Handle(gorpc.DefaultRPCPath, rpcServer)
+		mux.Handle(rpc.DefaultRPCPath, rpc.Server(s.Searcher)) // /rpc
 	}
 	if s.Print {
 		mux.HandleFunc("/print", s.servePrint)

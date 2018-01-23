@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http/httptest"
-	gorpc "net/rpc"
 	"net/url"
 	"reflect"
 	"testing"
@@ -35,19 +34,14 @@ func TestClientServer(t *testing.T) {
 		},
 	}
 
-	rpcServer := gorpc.NewServer()
-	rpc.Register(rpcServer, mock)
-	ts := httptest.NewServer(rpcServer)
+	ts := httptest.NewServer(rpc.Server(mock))
 	defer ts.Close()
 
 	u, err := url.Parse(ts.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
-	client, err := rpc.DialHTTP(u.Host)
-	if err != nil {
-		t.Fatal(err)
-	}
+	client := rpc.Client(u.Host)
 
 	r, err := client.Search(context.Background(), mock.wantSearch, &zoekt.SearchOptions{})
 	if err != nil {
