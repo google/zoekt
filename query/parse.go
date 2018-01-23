@@ -225,12 +225,14 @@ func parseExpr(in []byte) (Q, int, error) {
 	return expr, len(in) - len(b), nil
 }
 
+const regexpFlags syntax.Flags = syntax.ClassNL | syntax.PerlX | syntax.UnicodeGroups
+
 // regexpQuery parses an atom into either a regular expression, or a
 // simple substring atom.
 func regexpQuery(text string, content, file bool) (Q, error) {
 	var expr Q
 
-	r, err := syntax.Parse(text, syntax.ClassNL|syntax.PerlX|syntax.UnicodeGroups)
+	r, err := syntax.Parse(text, regexpFlags)
 	if err != nil {
 		return nil, err
 	}

@@ -15,7 +15,7 @@ import (
 
 func TestClientServer(t *testing.T) {
 	mock := &mockSearcher{
-		wantSearch: query.NewAnd(mustParse("hello world"), query.NewRepoSet("foo/bar", "baz/bam")),
+		wantSearch: query.NewAnd(mustParse("hello world|universe"), query.NewRepoSet("foo/bar", "baz/bam")),
 		searchResult: &zoekt.SearchResult{
 			Files: []zoekt.FileMatch{
 				{FileName: "bin.go"},

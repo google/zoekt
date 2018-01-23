@@ -15,6 +15,7 @@
 package query
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"reflect"
@@ -47,6 +48,36 @@ func (q *Regexp) String() string {
 		pref = "case_" + pref
 	}
 	return fmt.Sprintf("%sregex:%q", pref, q.Regexp.String())
+}
+
+// gobRegexp wraps Regexp to make it gob-encodable/decodable. Regexp contains syntax.Regexp, which
+// contains slices/arrays with possibly nil elements, which gob doesn't support
+// (https://github.com/golang/go/issues/1501).
+type gobRegexp struct {
+	Regexp       // Regexp.Regexp (*syntax.Regexp) is set to nil and its string is set in RegexpString
+	RegexpString string
+}
+
+// GobEncode implements gob.Encoder.
+func (q Regexp) GobEncode() ([]byte, error) {
+	gobq := gobRegexp{Regexp: q, RegexpString: q.Regexp.String()}
+	gobq.Regexp.Regexp = nil // can't be gob-encoded/decoded
+	return json.Marshal(gobq)
+}
+
+// GobDecode implements gob.Decoder.
+func (q *Regexp) GobDecode(data []byte) error {
+	var gobq gobRegexp
+	err := json.Unmarshal(data, &gobq)
+	if err != nil {
+		return err
+	}
+	gobq.Regexp.Regexp, err = syntax.Parse(gobq.RegexpString, regexpFlags)
+	if err != nil {
+		return err
+	}
+	*q = gobq.Regexp
+	return nil
 }
 
 type caseQ struct {
