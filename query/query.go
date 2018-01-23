@@ -91,14 +91,21 @@ type RepoSet struct {
 }
 
 func (q *RepoSet) String() string {
-	repos := make([]string, len(q.Set))
-	i := 0
-	for repo := range q.Set {
-		repos[i] = repo
-		i++
+	var detail string
+	if len(q.Set) > 5 {
+		// Large sets being output are not useful
+		detail = fmt.Sprintf("size=%d", len(q.Set))
+	} else {
+		repos := make([]string, len(q.Set))
+		i := 0
+		for repo := range q.Set {
+			repos[i] = repo
+			i++
+		}
+		sort.Strings(repos)
+		detail = strings.Join(repos, " ")
 	}
-	sort.Strings(repos)
-	return fmt.Sprintf("(reposet %s)", strings.Join(repos, " "))
+	return fmt.Sprintf("(reposet %s)", detail)
 }
 
 // Substring is the most basic query: a query for a substring.
