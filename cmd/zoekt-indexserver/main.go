@@ -26,6 +26,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -122,6 +123,8 @@ func runIndexCommand(indexDir, repoDir, indexConfigFile string) {
 		return
 	}
 
+	// Parallelize zoekt-git-index, one per CPU (which makes sense as long as its -parallelism=1).
+	sem := make(chan struct{}, runtime.NumCPU())
 	for _, dir := range repos {
 		if indexConfig != nil {
 			// Don't want to index the subrepos of a repo
@@ -135,12 +138,19 @@ func runIndexCommand(indexDir, repoDir, indexConfigFile string) {
 			// submodule separately too.
 		}
 
-		cmd := exec.Command("zoekt-git-index",
-			//"-require_ctags",
-			"-parallelism=1",
-			"-repo_cache", repoDir,
-			"-index", indexDir, "-incremental", dir)
-		loggedRun(cmd)
+		sem <- struct{}{}
+		go func(dir string) {
+			defer func() { <-sem }()
+			cmd := exec.Command("zoekt-git-index",
+				//"-require_ctags",
+				"-parallelism=1",
+				"-repo_cache", repoDir,
+				"-index", indexDir, "-incremental", dir)
+			loggedRun(cmd)
+		}(dir)
+	}
+	for i := 0; i < cap(sem); i++ {
+		sem <- struct{}{}
 	}
 }
 
