@@ -26,7 +26,7 @@ type ListReply struct {
 }
 
 type Searcher struct {
-	zoekt.Searcher
+	Searcher zoekt.Searcher
 }
 
 func (s *Searcher) Search(args *SearchArgs, reply *SearchReply) error {
