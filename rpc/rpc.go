@@ -68,7 +68,7 @@ func (c *client) call(ctx context.Context, serviceMethod string, args interface{
 	// again after 100ms. Unrolled to make logic clear
 	cl, gen, err := c.getRPCClient(0)
 	if err == nil {
-		call := cl.Go(serviceMethod, args, reply, callDone)
+		call := cl.Go(ctx, serviceMethod, args, reply, callDone)
 		select {
 		case <-ctxDone:
 			return ctx.Err()
@@ -90,7 +90,7 @@ func (c *client) call(ctx context.Context, serviceMethod string, args interface{
 	if err != nil {
 		return err
 	}
-	call := cl.Go(serviceMethod, args, reply, callDone)
+	call := cl.Go(ctx, serviceMethod, args, reply, callDone)
 	select {
 	case <-ctxDone:
 		return ctx.Err()

@@ -5,6 +5,7 @@
 package rpc
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -46,7 +47,7 @@ type R struct {
 
 type S struct{}
 
-func (s *S) Recv(nul *struct{}, reply *R) error {
+func (s *S) Recv(ctx context.Context, nul *struct{}, reply *R) error {
 	*reply = R{[]byte("foo")}
 	return nil
 }
@@ -75,7 +76,7 @@ func TestGobError(t *testing.T) {
 	}
 
 	var reply Reply
-	err = client.Call("S.Recv", &struct{}{}, &reply)
+	err = client.Call(context.Background(), "S.Recv", &struct{}{}, &reply)
 	if err != nil {
 		panic(err)
 	}

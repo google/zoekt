@@ -15,20 +15,22 @@
 
 		- the method's type is exported.
 		- the method is exported.
-		- the method has two arguments, both exported (or builtin) types.
-		- the method's second argument is a pointer.
+		- the method has three arguments.
+        - the method's first argument has type context.Context.
+        - the method's last two arguments are exported (or builtin) types.
+		- the method's third argument is a pointer.
 		- the method has return type error.
 
 	In effect, the method must look schematically like
 
-		func (t *T) MethodName(argType T1, replyType *T2) error
+		func (t *T) MethodName(ctx context.Context, argType T1, replyType *T2) error
 
 	where T1 and T2 can be marshaled by encoding/gob.
 	These requirements apply even if a different codec is used.
 	(In the future, these requirements may soften for custom codecs.)
 
-	The method's first argument represents the arguments provided by the caller; the
-	second argument represents the result parameters to be returned to the caller.
+	The method's second argument represents the arguments provided by the caller; the
+	third argument represents the result parameters to be returned to the caller.
 	The method's return value, if non-nil, is passed back as a string that the client
 	sees as if created by errors.New.  If an error is returned, the reply parameter
 	will not be sent back to the client.
@@ -67,12 +69,12 @@
 
 		type Arith int
 
-		func (t *Arith) Multiply(args *Args, reply *int) error {
+		func (t *Arith) Multiply(ctx context.Context, args *Args, reply *int) error {
 			*reply = args.A * args.B
 			return nil
 		}
 
-		func (t *Arith) Divide(args *Args, quo *Quotient) error {
+		func (t *Arith) Divide(ctx context.Context, args *Args, quo *Quotient) error {
 			if args.B == 0 {
 				return errors.New("divide by zero")
 			}
@@ -105,7 +107,7 @@
 		// Synchronous call
 		args := &server.Args{7,8}
 		var reply int
-		err = client.Call("Arith.Multiply", args, &reply)
+		err = client.Call(context.Background(), "Arith.Multiply", args, &reply)
 		if err != nil {
 			log.Fatal("arith error:", err)
 		}
@@ -115,7 +117,7 @@
 
 		// Asynchronous call
 		quotient := new(Quotient)
-		divCall := client.Go("Arith.Divide", args, quotient, nil)
+		divCall := client.Go(context.Background(), "Arith.Divide", args, quotient, nil)
 		replyCall := <-divCall.Done	// will be equal to divCall
 		// check errors, print, etc.
 
@@ -128,6 +130,7 @@ package rpc
 
 import (
 	"bufio"
+	"context"
 	"encoding/gob"
 	"errors"
 	"io"
@@ -150,6 +153,7 @@ const (
 // Precompute the reflect type for error. Can't use error directly
 // because Typeof takes an empty interface value. This is annoying.
 var typeOfError = reflect.TypeOf((*error)(nil)).Elem()
+var typeOfCtx = reflect.TypeOf((*context.Context)(nil)).Elem()
 
 type methodType struct {
 	sync.Mutex // protects counters
@@ -293,23 +297,30 @@ func suitableMethods(typ reflect.Type, reportErr bool) map[string]*methodType {
 		if method.PkgPath != "" {
 			continue
 		}
-		// Method needs three ins: receiver, *args, *reply.
-		if mtype.NumIn() != 3 {
+		// Method needs four ins: receiver, ctx, *args, *reply.
+		if mtype.NumIn() != 4 {
 			if reportErr {
 				log.Println("method", mname, "has wrong number of ins:", mtype.NumIn())
 			}
 			continue
 		}
-		// First arg need not be a pointer.
-		argType := mtype.In(1)
+		// First arg must be context.Context
+		if ctxType := mtype.In(1); ctxType != typeOfCtx {
+			if reportErr {
+				log.Println("method", mname, "first argument is", ctxType.String(), "not context.Context")
+			}
+			continue
+		}
+		// Second arg need not be a pointer.
+		argType := mtype.In(2)
 		if !isExportedOrBuiltinType(argType) {
 			if reportErr {
 				log.Println(mname, "argument type not exported:", argType)
 			}
 			continue
 		}
-		// Second arg must be a pointer.
-		replyType := mtype.In(2)
+		// Third arg must be a pointer.
+		replyType := mtype.In(3)
 		if replyType.Kind() != reflect.Ptr {
 			if reportErr {
 				log.Println("method", mname, "reply type not a pointer:", replyType)
@@ -376,9 +387,11 @@ func (s *service) call(server *Server, sending *sync.Mutex, mtype *methodType, r
 	mtype.Lock()
 	mtype.numCalls++
 	mtype.Unlock()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	function := mtype.method.Func
 	// Invoke the method, providing a new value for the reply.
-	returnValues := function.Call([]reflect.Value{s.rcvr, argv, replyv})
+	returnValues := function.Call([]reflect.Value{s.rcvr, reflect.ValueOf(ctx), argv, replyv})
 	// The return value for the method is an error.
 	errInter := returnValues[0].Interface()
 	errmsg := ""
