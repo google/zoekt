@@ -6,12 +6,12 @@ import (
 	"encoding/gob"
 	"fmt"
 	"net/http"
-	"net/rpc"
 	"sync"
 	"time"
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/query"
+	"github.com/google/zoekt/rpc/internal/rpc"
 	"github.com/google/zoekt/rpc/internal/srv"
 )
 
