@@ -117,7 +117,7 @@
 
 		// Asynchronous call
 		quotient := new(Quotient)
-		divCall := client.Go(context.Background(), "Arith.Divide", args, quotient, nil)
+		divCall := client.Go("Arith.Divide", args, quotient, nil)
 		replyCall := <-divCall.Done	// will be equal to divCall
 		// check errors, print, etc.
 

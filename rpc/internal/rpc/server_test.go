@@ -213,9 +213,9 @@ func testRPC(t *testing.T, addr string) {
 	// Out of order.
 	args = &Args{7, 8}
 	mulReply := new(Reply)
-	mulCall := client.Go(ctx, "Arith.Mul", args, mulReply, nil)
+	mulCall := client.Go("Arith.Mul", args, mulReply, nil)
 	addReply := new(Reply)
-	addCall := client.Go(ctx, "Arith.Add", args, addReply, nil)
+	addCall := client.Go("Arith.Add", args, addReply, nil)
 
 	addCall = <-addCall.Done
 	if addCall.Error != nil {
@@ -757,7 +757,6 @@ func benchmarkEndToEndAsync(dial func() (*Client, error), b *testing.B) {
 	defer client.Close()
 
 	// Asynchronous calls
-	ctx := context.Background()
 	args := &Args{7, 8}
 	procs := 4 * runtime.GOMAXPROCS(-1)
 	send := int32(b.N)
@@ -773,7 +772,7 @@ func benchmarkEndToEndAsync(dial func() (*Client, error), b *testing.B) {
 			for atomic.AddInt32(&send, -1) >= 0 {
 				gate <- true
 				reply := new(Reply)
-				client.Go(ctx, "Arith.Add", args, reply, res)
+				client.Go("Arith.Add", args, reply, res)
 			}
 		}()
 		go func() {
