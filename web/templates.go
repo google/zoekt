@@ -195,7 +195,7 @@ var TemplateText = map[string]string{
     <h5>
       {{if .Stats.Crashes}}<br><b>{{.Stats.Crashes}} shards crashed</b><br>{{end}}
       {{ $fileCount := len .FileMatches }}
-      Found {{.Stats.MatchCount}} results in {{.Stats.FileCount}} files{{if lt $fileCount .Stats.FileCount}},
+      Found {{.Stats.MatchCount}} results in {{.Stats.FileCount}} files{{if or (lt $fileCount .Stats.FileCount) (gt .Stats.FilesSkipped 0) }},
         showing top {{ $fileCount }} files (<a href="search?q={{.Last.Query}}&num={{More .Last.Num}}">show more</a>).
       {{else}}.{{end}}
     </h5>
