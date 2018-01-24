@@ -37,6 +37,11 @@ type Regexp struct {
 	CaseSensitive bool
 }
 
+// SymbolSubstring finds a substring that is a symbol.
+type SymbolSubstring struct {
+	Atom Substring
+}
+
 func (q *Regexp) String() string {
 	pref := ""
 	if q.FileName {
