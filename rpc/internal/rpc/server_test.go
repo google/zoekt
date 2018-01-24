@@ -12,6 +12,7 @@ import (
 	"log"
 	"net"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"runtime"
 	"strings"
@@ -395,6 +396,63 @@ func TestBuiltinTypes(t *testing.T) {
 	}
 	if e := [2]int{args.A, args.B}; !reflect.DeepEqual(replyArray, e) {
 		t.Errorf("Array: expected %v got %v", e, replyArray)
+	}
+}
+
+type Context struct {
+	started chan struct{}
+	done    chan struct{}
+}
+
+func (t *Context) Wait(ctx context.Context, s string, reply *int) error {
+	close(t.started)
+	<-ctx.Done()
+	close(t.done)
+	return nil
+}
+
+func TestContext(t *testing.T) {
+	svc := &Context{
+		started: make(chan struct{}),
+		done:    make(chan struct{}),
+	}
+
+	handler := NewServer()
+	handler.Register(svc)
+	ts := httptest.NewServer(handler)
+	defer ts.Close()
+	u, err := url.Parse(ts.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cl, err := DialHTTP("tcp", u.Host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cl.Close()
+
+	wait := func(desc string, c chan struct{}) {
+		select {
+		case <-c:
+			return
+		case <-time.After(5 * time.Second):
+			t.Fatal("Failed to wait for", desc)
+		}
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		args := ""
+		err = cl.Call(ctx, "Context.Wait", &args, new(int))
+		close(done)
+	}()
+	wait("server side to be called", svc.started)
+	cancel()
+	wait("client side to be done after cancel", done)
+	wait("server side to be done after cancel", svc.done)
+	if err != context.Canceled {
+		t.Fatalf("expected to fail due to context cancellation: %v", err)
 	}
 }
 

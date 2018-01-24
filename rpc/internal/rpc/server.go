@@ -146,8 +146,9 @@ import (
 
 const (
 	// Defaults used by HandleHTTP
-	DefaultRPCPath   = "/_goRPC_"
-	DefaultDebugPath = "/debug/rpc"
+	DefaultRPCPath      = "/_goRPC_"
+	DefaultDebugPath    = "/debug/rpc"
+	cancelServiceMethod = "_goRPC_.cancel"
 )
 
 // Precompute the reflect type for error. Can't use error directly
@@ -163,12 +164,40 @@ type methodType struct {
 	numCalls   uint
 }
 
+type pending struct {
+	mu sync.Mutex
+	m  map[uint64]context.CancelFunc // seq -> cancel
+}
+
+func (s *pending) Start(seq uint64) context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+	s.mu.Lock()
+	// we assume seq is not already in map. If not, the client is broken.
+	s.m[seq] = cancel
+	s.mu.Unlock()
+	return ctx
+}
+
+func (s *pending) Cancel(seq uint64) {
+	s.mu.Lock()
+	cancel, ok := s.m[seq]
+	if ok {
+		delete(s.m, seq)
+	}
+	s.mu.Unlock()
+	if ok {
+		cancel()
+	}
+}
+
 type service struct {
 	name   string                 // name of service
 	rcvr   reflect.Value          // receiver of methods for the service
 	typ    reflect.Type           // type of the receiver
 	method map[string]*methodType // registered methods
 }
+
+var cancelService = &service{}
 
 // Request is a header written before every RPC call. It is used internally
 // but documented here as an aid to debugging, such as when analyzing
@@ -383,12 +412,17 @@ func (m *methodType) NumCalls() (n uint) {
 	return n
 }
 
-func (s *service) call(server *Server, sending *sync.Mutex, mtype *methodType, req *Request, argv, replyv reflect.Value, codec ServerCodec) {
+func (s *service) call(server *Server, sending *sync.Mutex, pending *pending, mtype *methodType, req *Request, argv, replyv reflect.Value, codec ServerCodec) {
+	if s == cancelService {
+		pending.Cancel(argv.Interface().(uint64))
+		server.freeRequest(req)
+		return
+	}
 	mtype.Lock()
 	mtype.numCalls++
 	mtype.Unlock()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := pending.Start(req.Seq)
+	defer pending.Cancel(req.Seq)
 	function := mtype.method.Func
 	// Invoke the method, providing a new value for the reply.
 	returnValues := function.Call([]reflect.Value{s.rcvr, reflect.ValueOf(ctx), argv, replyv})
@@ -469,6 +503,7 @@ func (server *Server) ServeConn(conn io.ReadWriteCloser) {
 // decode requests and encode responses.
 func (server *Server) ServeCodec(codec ServerCodec) {
 	sending := new(sync.Mutex)
+	pending := &pending{m: make(map[uint64]context.CancelFunc)}
 	for {
 		service, mtype, req, argv, replyv, keepReading, err := server.readRequest(codec)
 		if err != nil {
@@ -485,7 +520,7 @@ func (server *Server) ServeCodec(codec ServerCodec) {
 			}
 			continue
 		}
-		go service.call(server, sending, mtype, req, argv, replyv, codec)
+		go service.call(server, sending, pending, mtype, req, argv, replyv, codec)
 	}
 	codec.Close()
 }
@@ -494,6 +529,7 @@ func (server *Server) ServeCodec(codec ServerCodec) {
 // It does not close the codec upon completion.
 func (server *Server) ServeRequest(codec ServerCodec) error {
 	sending := new(sync.Mutex)
+	pending := &pending{m: make(map[uint64]context.CancelFunc)}
 	service, mtype, req, argv, replyv, keepReading, err := server.readRequest(codec)
 	if err != nil {
 		if !keepReading {
@@ -506,7 +542,7 @@ func (server *Server) ServeRequest(codec ServerCodec) error {
 		}
 		return err
 	}
-	service.call(server, sending, mtype, req, argv, replyv, codec)
+	service.call(server, sending, pending, mtype, req, argv, replyv, codec)
 	return nil
 }
 
@@ -561,6 +597,15 @@ func (server *Server) readRequest(codec ServerCodec) (service *service, mtype *m
 		return
 	}
 
+	if service == cancelService {
+		var seq uint64
+		if err = codec.ReadRequestBody(&seq); err != nil {
+			return
+		}
+		argv = reflect.ValueOf(seq)
+		return
+	}
+
 	// Decode the argument value.
 	argIsValue := false // if true, need to indirect before calling.
 	if mtype.ArgType.Kind() == reflect.Ptr {
@@ -604,6 +649,11 @@ func (server *Server) readRequestHeader(codec ServerCodec) (svc *service, mtype 
 	// We read the header successfully. If we see an error now,
 	// we can still recover and move on to the next request.
 	keepReading = true
+
+	if req.ServiceMethod == cancelServiceMethod {
+		svc = cancelService
+		return
+	}
 
 	dot := strings.LastIndex(req.ServiceMethod, ".")
 	if dot < 0 {
