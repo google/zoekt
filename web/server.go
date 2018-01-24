@@ -29,7 +29,6 @@ import (
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/query"
-	"github.com/google/zoekt/rest"
 )
 
 var Funcmap = template.FuncMap{
@@ -63,9 +62,6 @@ type Server struct {
 
 	// Serve HTML interface
 	HTML bool
-
-	// Serve REST API
-	RESTAPI bool
 
 	// If set, show files from the index.
 	Print bool
@@ -102,10 +98,6 @@ type Server struct {
 	lastStatsMu sync.Mutex
 	lastStats   *zoekt.RepoStats
 	lastStatsTS time.Time
-}
-
-func (s *Server) serveSearchAPI(w http.ResponseWriter, r *http.Request) {
-	rest.Search(s.Searcher, w, r)
 }
 
 func (s *Server) getTemplate(str string) *template.Template {
@@ -154,9 +146,6 @@ func NewMux(s *Server) (*http.ServeMux, error) {
 		mux.HandleFunc("/search", s.serveSearch)
 		mux.HandleFunc("/", s.serveSearchBox)
 		mux.HandleFunc("/about", s.serveAbout)
-	}
-	if s.RESTAPI {
-		mux.HandleFunc("/api/search", s.serveSearchAPI)
 	}
 	if s.Print {
 		mux.HandleFunc("/print", s.servePrint)
