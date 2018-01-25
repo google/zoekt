@@ -77,8 +77,8 @@ func (tl *throttledLoader) load(key string) {
 	tl.throttle <- struct{}{}
 	shard, err := loadShard(key)
 	<-tl.throttle
-	log.Printf("reloading: %s, err %v ", key, err)
 	if err != nil {
+		log.Printf("reloading: %s, err %v ", key, err)
 		return
 	}
 
