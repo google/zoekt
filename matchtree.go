@@ -532,6 +532,23 @@ func (d *indexData) newMatchTree(q query.Q, stats *Stats) (matchTree, error) {
 		return &docMatchTree{
 			docs: docs,
 		}, nil
+
+	case *query.Symbol:
+		mt, err := d.newSubstringMatchTree(s.Atom, stats)
+		if err != nil {
+			return nil, err
+		}
+
+		if _, ok := mt.(*regexpMatchTree); ok {
+			return nil, fmt.Errorf("regexps and short queries not implemented for symbol search")
+		}
+		subMT, ok := mt.(*substrMatchTree)
+		if !ok {
+			return nil, fmt.Errorf("found %T inside query.Symbol", mt)
+		}
+
+		subMT.cands = d.trimByDocSection(s.Atom, subMT.cands, d.runeDocSections)
+		return subMT, nil
 	}
 	log.Panicf("type %T", q)
 	return nil, nil
@@ -564,4 +581,37 @@ func (d *indexData) newSubstringMatchTree(s *query.Substring, stats *Stats) (mat
 	st.cands = result.cands
 	stats.IndexBytesLoaded += int64(result.bytesRead)
 	return st, nil
+}
+
+func (d *indexData) trimByDocSection(q *query.Substring, ms []*candidateMatch, secs []DocumentSection) []*candidateMatch {
+	trimmed := ms[:0]
+
+	patSize := utf8.RuneCount([]byte(q.Pattern))
+	for len(secs) > 0 && len(ms) > 0 {
+		var fileStart uint32
+		if ms[0].file > 0 {
+			fileStart = d.fileEndRunes[ms[0].file-1]
+		}
+
+		start := fileStart + ms[0].runeOffset
+		end := start + uint32(patSize)
+		if start >= secs[0].End {
+			secs = secs[1:]
+			continue
+		}
+
+		if start < secs[0].Start {
+			ms = ms[1:]
+			continue
+		}
+
+		// here we have: sec.Start <= start < sec.End
+		if end <= secs[0].End {
+			// complete match falls inside section.
+			trimmed = append(trimmed, ms[0])
+		}
+
+		ms = ms[1:]
+	}
+	return trimmed
 }

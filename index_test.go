@@ -1541,6 +1541,25 @@ func TestLang(t *testing.T) {
 	}
 }
 
+func TestLangShortcut(t *testing.T) {
+	content := []byte("bla needle bla")
+	b := testIndexBuilder(t, &Repository{Name: "reponame"},
+		Document{Name: "f2", Language: "java", Content: content},
+		Document{Name: "f3", Language: "cpp", Content: content},
+	)
+
+	q := query.NewAnd(&query.Substring{Pattern: "needle"},
+		&query.Language{Language: "fortran"})
+
+	res := searchForTest(t, b, q)
+	if len(res.Files) != 0 {
+		t.Fatalf("got %v, want 0 results", res.Files)
+	}
+	if res.Stats.IndexBytesLoaded > 0 {
+		t.Errorf("got IndexBytesLoaded %d, want 0", res.Stats.IndexBytesLoaded)
+	}
+}
+
 func TestNoTextMatchAtoms(t *testing.T) {
 	content := []byte("bla needle bla")
 	b := testIndexBuilder(t, &Repository{Name: "reponame"},
@@ -1568,5 +1587,49 @@ func TestNoPositiveAtoms(t *testing.T) {
 	res := searchForTest(t, b, q)
 	if len(res.Files) != 2 {
 		t.Fatalf("got %v, want 2 results in f3", res.Files)
+	}
+}
+
+func TestSymbolAtom(t *testing.T) {
+	content := []byte("bla\nsymblabla\nbla")
+	// ----------------0123 456789012
+
+	b := testIndexBuilder(t, &Repository{Name: "reponame"},
+		Document{
+			Name:    "f1",
+			Content: content,
+			Symbols: []DocumentSection{{4, 12}},
+		},
+	)
+	q := &query.Symbol{&query.Substring{Pattern: "bla"}}
+	res := searchForTest(t, b, q)
+	if len(res.Files) != 1 && len(res.Files[0].LineMatches) != 1 {
+		t.Fatalf("got %v, want 1 line in 1 file", res.Files)
+	}
+	m := res.Files[0].LineMatches[0].LineFragments[0]
+	if m.Offset != 7 || m.MatchLength != 3 {
+		t.Fatalf("got offset %d, size %d want 7 size 3", m.Offset, m.MatchLength)
+	}
+}
+
+func TestSymbolAtomExact(t *testing.T) {
+	content := []byte("bla\nsym\nbla\nsym\nasymb")
+	// ----------------0123 4567 89012
+
+	b := testIndexBuilder(t, &Repository{Name: "reponame"},
+		Document{
+			Name:    "f1",
+			Content: content,
+			Symbols: []DocumentSection{{4, 7}},
+		},
+	)
+	q := &query.Symbol{&query.Substring{Pattern: "sym"}}
+	res := searchForTest(t, b, q)
+	if len(res.Files) != 1 && len(res.Files[0].LineMatches) != 1 {
+		t.Fatalf("got %v, want 1 line in 1 file", res.Files)
+	}
+	m := res.Files[0].LineMatches[0].LineFragments[0]
+	if m.Offset != 4 {
+		t.Fatalf("got offset %d, want 7", m.Offset)
 	}
 }

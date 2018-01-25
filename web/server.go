@@ -29,7 +29,6 @@ import (
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/query"
-	"github.com/google/zoekt/rest"
 	"github.com/google/zoekt/rpc"
 )
 
@@ -65,10 +64,7 @@ type Server struct {
 	// Serve HTML interface
 	HTML bool
 
-	// Serve REST API
-	RESTAPI bool
-
-	// Serve go/net RPC
+	// Serve RPC
 	RPC bool
 
 	// If set, show files from the index.
@@ -106,14 +102,6 @@ type Server struct {
 	lastStatsMu sync.Mutex
 	lastStats   *zoekt.RepoStats
 	lastStatsTS time.Time
-}
-
-func (s *Server) serveSearchAPI(w http.ResponseWriter, r *http.Request) {
-	rest.Search(s.Searcher, w, r)
-}
-
-func (s *Server) serveListAPI(w http.ResponseWriter, r *http.Request) {
-	rest.List(s.Searcher, w, r)
 }
 
 func (s *Server) getTemplate(str string) *template.Template {
@@ -162,10 +150,6 @@ func NewMux(s *Server) (*http.ServeMux, error) {
 		mux.HandleFunc("/search", s.serveSearch)
 		mux.HandleFunc("/", s.serveSearchBox)
 		mux.HandleFunc("/about", s.serveAbout)
-	}
-	if s.RESTAPI {
-		mux.HandleFunc("/api/search", s.serveSearchAPI)
-		mux.HandleFunc("/api/list", s.serveListAPI)
 	}
 	if s.RPC {
 		mux.Handle(rpc.DefaultRPCPath, rpc.Server(s.Searcher)) // /rpc

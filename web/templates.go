@@ -156,6 +156,7 @@ var TemplateText = map[string]string{
           <dt><a href="search?q=foo.*bar">foo.*bar</a></dt><dd>search for the regular expression "foo.*bar"</dd>
           <dt><a href="search?q=-%28Path File%29 Stream">-(Path File) Stream</a></dt><dd>search "Stream", but exclude files containing both "Path" and "File"</dd>
           <dt><a href="search?q=-Path%5c+file+Stream">-Path\ file Stream</a></dt><dd>search "Stream", but exclude files containing "Path File"</dd>
+          <dt><a href="search?q=sym:data">sym:data</a></span></dt><dd>search for symbol definitions containing "data"</dd>
           <dt><a href="search?q=phone+r:droid">phone r:droid</a></dt><dd>search for "phone" in repositories whose name contains "droid"</dd>
           <dt><a href="search?q=phone+b:master">phone b:master</a></dt><dd>for Git repos, find "phone" in files in branches whose name contains "master".</dd>
           <dt><a href="search?q=phone+b:HEAD">phone b:HEAD</a></dt><dd>for Git repos, find "phone" in the default ('HEAD') branch.</dd>
@@ -194,7 +195,7 @@ var TemplateText = map[string]string{
     <h5>
       {{if .Stats.Crashes}}<br><b>{{.Stats.Crashes}} shards crashed</b><br>{{end}}
       {{ $fileCount := len .FileMatches }}
-      Found {{.Stats.MatchCount}} results in {{.Stats.FileCount}} files{{if lt $fileCount .Stats.FileCount}},
+      Found {{.Stats.MatchCount}} results in {{.Stats.FileCount}} files{{if or (lt $fileCount .Stats.FileCount) (gt .Stats.FilesSkipped 0) }},
         showing top {{ $fileCount }} files (<a href="search?q={{.Last.Query}}&num={{More .Last.Num}}">show more</a>).
       {{else}}.{{end}}
     </h5>

@@ -83,7 +83,9 @@ func main() {
 			log.Fatal(err)
 		}
 		defer f.Close()
-		log.Println("Displaying matches...")
+		if *verbose {
+			log.Println("Displaying matches...")
+		}
 		pprof.StartCPUProfile(f)
 		for i := 0; i < 10; i++ {
 			sres, err = searcher.Search(context.Background(), query, &sOpts)

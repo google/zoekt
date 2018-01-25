@@ -84,6 +84,8 @@ func TestParseQuery(t *testing.T) {
 		{"content:abc", &Substring{Pattern: "abc", Content: true}},
 
 		{"lang:c++", &Language{"c++"}},
+		{"sym:pqr", &Symbol{&Substring{Pattern: "pqr"}}},
+		{"sym:Pqr", &Symbol{&Substring{Pattern: "Pqr", CaseSensitive: true}}},
 
 		// case
 		{"abc case:yes", &Substring{Pattern: "abc", CaseSensitive: true}},
@@ -95,6 +97,7 @@ func TestParseQuery(t *testing.T) {
 		{"\"a\\", nil},
 		{"case:foo", nil},
 
+		{"sym:", nil},
 		{"abc or", nil},
 		{"or abc", nil},
 		{"def or or abc", nil},
