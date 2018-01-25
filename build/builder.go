@@ -30,7 +30,6 @@ import (
 	"runtime/pprof"
 	"strings"
 	"sync"
-	"syscall"
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/ctags"
@@ -392,8 +391,10 @@ func (b *Builder) writeShard(fn string, ib *zoekt.IndexBuilder) (*finishedShard,
 	if err != nil {
 		return nil, err
 	}
-	if err := f.Chmod(0666 &^ umask); err != nil {
-		return nil, err
+	if runtime.GOOS != "windows" {
+		if err := f.Chmod(0666 &^ umask); err != nil {
+			return nil, err
+		}
 	}
 
 	defer f.Close()
@@ -415,8 +416,3 @@ func (b *Builder) writeShard(fn string, ib *zoekt.IndexBuilder) (*finishedShard,
 }
 
 var umask os.FileMode
-
-func init() {
-	umask = os.FileMode(syscall.Umask(0))
-	syscall.Umask(int(umask))
-}
