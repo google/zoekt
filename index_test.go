@@ -1541,6 +1541,25 @@ func TestLang(t *testing.T) {
 	}
 }
 
+func TestLangShortcut(t *testing.T) {
+	content := []byte("bla needle bla")
+	b := testIndexBuilder(t, &Repository{Name: "reponame"},
+		Document{Name: "f2", Language: "java", Content: content},
+		Document{Name: "f3", Language: "cpp", Content: content},
+	)
+
+	q := query.NewAnd(&query.Substring{Pattern: "needle"},
+		&query.Language{Language: "fortran"})
+
+	res := searchForTest(t, b, q)
+	if len(res.Files) != 0 {
+		t.Fatalf("got %v, want 0 results", res.Files)
+	}
+	if res.Stats.IndexBytesLoaded > 0 {
+		t.Errorf("got IndexBytesLoaded %d, want 0", res.Stats.IndexBytesLoaded)
+	}
+}
+
 func TestNoTextMatchAtoms(t *testing.T) {
 	content := []byte("bla needle bla")
 	b := testIndexBuilder(t, &Repository{Name: "reponame"},

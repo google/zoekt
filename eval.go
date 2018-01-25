@@ -62,6 +62,12 @@ func (d *indexData) simplify(in query.Q) query.Q {
 		if r, ok := q.(*query.Repo); ok {
 			return &query.Const{Value: strings.Contains(d.repoMetaData.Name, r.Pattern)}
 		}
+		if l, ok := q.(*query.Language); ok {
+			_, has := d.metaData.LanguageMap[l.Language]
+			if !has {
+				return &query.Const{Value: false}
+			}
+		}
 		return q
 	})
 	return query.Simplify(eval)
