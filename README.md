@@ -87,9 +87,8 @@ SYMBOL SEARCH
 =============
 
 It is recommended to install [Universal
-ctags](https://github.com/universal-ctags/ctags) to improve ranking,
-in particular, version `db3d9a6` or newer, which supports seccomp
-sandboxing.
+ctags](https://github.com/universal-ctags/ctags) to improve
+ranking. See [here](doc/ctags.md) for more information.
 
 
 ACKNOWLEDGEMENTS
