@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
 	"reflect"
 	"regexp/syntax"
 	"strings"
@@ -63,7 +62,31 @@ func TestBoundary(t *testing.T) {
 	}
 }
 
-var _ = log.Println
+func TestDocSectionInvalid(t *testing.T) {
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
+	doc := Document{
+		Name:    "f1",
+		Content: []byte("01234567890123"),
+		Symbols: []DocumentSection{{5, 8}, {7, 9}},
+	}
+
+	if err := b.Add(doc); err == nil {
+		t.Errorf("overlapping doc sections should fail")
+	}
+
+	doc = Document{
+		Name:    "f1",
+		Content: []byte("01234567890123"),
+		Symbols: []DocumentSection{{0, 20}},
+	}
+
+	if err := b.Add(doc); err == nil {
+		t.Errorf("doc sections beyond EOF should fail")
+	}
+}
 
 func TestBasic(t *testing.T) {
 	b := testIndexBuilder(t, nil,

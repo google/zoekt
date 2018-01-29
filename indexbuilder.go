@@ -114,11 +114,18 @@ func (s *postingsBuilder) newSearchableString(data []byte, byteSections []Docume
 		s.lastOffsets[ng] = newOff
 	}
 
+	// Handle symbol definition that ends at file end. This can
+	// happen for labels at the end of .bat files.
+	for len(byteSectionBoundaries) > 0 && byteSectionBoundaries[0] == uint32(byteCount) {
+		runeSectionBoundaries = append(runeSectionBoundaries,
+			endRune+uint32(runeIndex))
+		byteSectionBoundaries = byteSectionBoundaries[1:]
+	}
 	runeSecs := make([]DocumentSection, 0, len(byteSections))
-	for i := 0; i < len(byteSections); i++ {
+	for i := 0; i < len(runeSectionBoundaries); i += 2 {
 		runeSecs = append(runeSecs, DocumentSection{
-			Start: runeSectionBoundaries[2*i],
-			End:   runeSectionBoundaries[2*i+1],
+			Start: runeSectionBoundaries[i],
+			End:   runeSectionBoundaries[i+1],
 		})
 	}
 
@@ -327,6 +334,9 @@ func (b *IndexBuilder) Add(doc Document) error {
 			}
 		}
 		last = s
+	}
+	if last.End > uint32(len(doc.Content)) {
+		return fmt.Errorf("section goes past end of content")
 	}
 
 	if doc.SubRepositoryPath != "" {
