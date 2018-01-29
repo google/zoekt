@@ -1613,6 +1613,50 @@ func TestNoPositiveAtoms(t *testing.T) {
 	}
 }
 
+func TestSymbolBoundaryStart(t *testing.T) {
+	content := []byte("start\nbla bla\nend")
+	// ----------------012345 67890123 456
+
+	b := testIndexBuilder(t, &Repository{Name: "reponame"},
+		Document{
+			Name:    "f1",
+			Content: content,
+			Symbols: []DocumentSection{{0, 5}, {14, 17}},
+		},
+	)
+	q := &query.Symbol{&query.Substring{Pattern: "start"}}
+	res := searchForTest(t, b, q)
+	if len(res.Files) != 1 || len(res.Files[0].LineMatches) != 1 {
+		t.Fatalf("got %v, want 1 line in 1 file", res.Files)
+	}
+	m := res.Files[0].LineMatches[0].LineFragments[0]
+	if m.Offset != 0 {
+		t.Fatalf("got offset %d want 0", m.Offset)
+	}
+}
+
+func TestSymbolBoundaryEnd(t *testing.T) {
+	content := []byte("start\nbla bla\nend")
+	// ----------------012345 67890123 456
+
+	b := testIndexBuilder(t, &Repository{Name: "reponame"},
+		Document{
+			Name:    "f1",
+			Content: content,
+			Symbols: []DocumentSection{{14, 17}},
+		},
+	)
+	q := &query.Symbol{&query.Substring{Pattern: "end"}}
+	res := searchForTest(t, b, q)
+	if len(res.Files) != 1 || len(res.Files[0].LineMatches) != 1 {
+		t.Fatalf("got %v, want 1 line in 1 file", res.Files)
+	}
+	m := res.Files[0].LineMatches[0].LineFragments[0]
+	if m.Offset != 14 {
+		t.Fatalf("got offset %d want 0", m.Offset)
+	}
+}
+
 func TestSymbolAtom(t *testing.T) {
 	content := []byte("bla\nsymblabla\nbla")
 	// ----------------0123 456789012
@@ -1626,7 +1670,7 @@ func TestSymbolAtom(t *testing.T) {
 	)
 	q := &query.Symbol{&query.Substring{Pattern: "bla"}}
 	res := searchForTest(t, b, q)
-	if len(res.Files) != 1 && len(res.Files[0].LineMatches) != 1 {
+	if len(res.Files) != 1 || len(res.Files[0].LineMatches) != 1 {
 		t.Fatalf("got %v, want 1 line in 1 file", res.Files)
 	}
 	m := res.Files[0].LineMatches[0].LineFragments[0]
@@ -1648,7 +1692,7 @@ func TestSymbolAtomExact(t *testing.T) {
 	)
 	q := &query.Symbol{&query.Substring{Pattern: "sym"}}
 	res := searchForTest(t, b, q)
-	if len(res.Files) != 1 && len(res.Files[0].LineMatches) != 1 {
+	if len(res.Files) != 1 || len(res.Files[0].LineMatches) != 1 {
 		t.Fatalf("got %v, want 1 line in 1 file", res.Files)
 	}
 	m := res.Files[0].LineMatches[0].LineFragments[0]
