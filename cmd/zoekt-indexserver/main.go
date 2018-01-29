@@ -21,11 +21,14 @@ package main
 import (
 	"bytes"
 	"flag"
+	"fmt"
 	"log"
+	"math"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -49,9 +52,9 @@ func loggedRun(cmd *exec.Cmd) {
 	}
 }
 
-func refresh(repoDir, indexDir, indexConfigFile string, fetchInterval time.Duration) {
+func refresh(repoDir, indexDir, indexConfigFile string, fetchInterval time.Duration, cpuFraction float64) {
 	// Start with indexing something, so we can start the webserver.
-	runIndexCommand(indexDir, repoDir, indexConfigFile)
+	runIndexCommand(indexDir, repoDir, indexConfigFile, cpuFraction)
 
 	t := time.NewTicker(fetchInterval)
 	for {
@@ -70,7 +73,7 @@ func refresh(repoDir, indexDir, indexConfigFile string, fetchInterval time.Durat
 			loggedRun(cmd)
 		}
 
-		runIndexCommand(indexDir, repoDir, indexConfigFile)
+		runIndexCommand(indexDir, repoDir, indexConfigFile, cpuFraction)
 		<-t.C
 	}
 }
@@ -104,7 +107,7 @@ func repositoryOnRepoHost(repoBaseDir, dir string, repoHosts []RepoHostConfig) b
 	return false
 }
 
-func runIndexCommand(indexDir, repoDir, indexConfigFile string) {
+func runIndexCommand(indexDir, repoDir, indexConfigFile string, cpuFraction float64) {
 	var indexConfig *IndexConfig
 	if indexConfigFile != "" {
 		var err error
@@ -122,6 +125,10 @@ func runIndexCommand(indexDir, repoDir, indexConfigFile string) {
 		return
 	}
 
+	cpuCount := int(math.Round(float64(runtime.NumCPU()) * cpuFraction))
+	if cpuCount < 1 {
+		cpuCount = 1
+	}
 	for _, dir := range repos {
 		if indexConfig != nil {
 			// Don't want to index the subrepos of a repo
@@ -137,7 +144,7 @@ func runIndexCommand(indexDir, repoDir, indexConfigFile string) {
 
 		cmd := exec.Command("zoekt-git-index",
 			"-require_ctags",
-			"-parallelism=1",
+			fmt.Sprintf("-parallelism=%d", cpuCount),
 			"-repo_cache", repoDir,
 			"-index", indexDir, "-incremental", dir)
 		loggedRun(cmd)
@@ -226,8 +233,13 @@ func main() {
 	indexConfig := flag.String("index_config",
 		"", "JSON file holding index configuration.")
 	mirrorInterval := flag.Duration("mirror_duration", 24*time.Hour, "clone new repos at this frequency.")
+	cpuFraction := flag.Float64("cpu_fraction", 0.25,
+		"use this fractoin of the cores for indexing.")
 	flag.Parse()
 
+	if *cpuFraction <= 0.0 || *cpuFraction > 1.0 {
+		log.Fatal("cpu_fraction must be between 0.0 and 1.0")
+	}
 	if *dataDir == "" {
 		log.Fatal("must set --data_dir")
 	}
@@ -260,5 +272,5 @@ func main() {
 	go deleteLogs(logDir, *maxLogAge)
 	go deleteStaleIndexes(indexDir, repoDir, *fetchInterval)
 
-	refresh(repoDir, indexDir, *indexConfig, *fetchInterval)
+	refresh(repoDir, indexDir, *indexConfig, *fetchInterval, *cpuFraction)
 }
