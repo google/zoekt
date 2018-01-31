@@ -168,15 +168,15 @@ type ngramIterationResults struct {
 	bytesRead uint32
 }
 
-func (data *indexData) iterateNgrams(query *query.Substring) (*ngramIterationResults, error) {
+func (d *indexData) iterateNgrams(query *query.Substring) (*ngramIterationResults, error) {
 	iter := &ngramDocIterator{
 		query: query,
 	}
 
 	if query.FileName {
-		iter.ends = data.fileNameEndRunes
+		iter.ends = d.fileNameEndRunes
 	} else {
-		iter.ends = data.fileEndRunes
+		iter.ends = d.fileEndRunes
 	}
 
 	str := query.Pattern
@@ -187,10 +187,10 @@ func (data *indexData) iterateNgrams(query *query.Substring) (*ngramIterationRes
 	for _, o := range ngramOffs {
 		var freq uint32
 		if query.CaseSensitive {
-			freq = data.ngramFrequency(o.ngram, query.FileName)
+			freq = d.ngramFrequency(o.ngram, query.FileName)
 		} else {
 			for _, v := range generateCaseNgrams(o.ngram) {
-				freq += data.ngramFrequency(v, query.FileName)
+				freq += d.ngramFrequency(v, query.FileName)
 			}
 		}
 
@@ -214,16 +214,15 @@ func (data *indexData) iterateNgrams(query *query.Substring) (*ngramIterationRes
 	iter.leftPad = firstI
 	iter.rightPad = uint32(utf8.RuneCountInString(str)-ngramSize) - lastI
 
-	postings, bytesRead, err := data.readPostings(firstNG, query.CaseSensitive, query.FileName)
+	docIter, err := d.trigramHitIterator(firstNG, query.CaseSensitive, query.FileName)
 	if err != nil {
 		return nil, err
 	}
 
-	iter.first = postings
+	iter.first = docIter
 
 	if firstI != lastI {
-		postings, sz, err := data.readPostings(lastNG, query.CaseSensitive, query.FileName)
-		bytesRead += sz
+		postings, err := d.trigramHitIterator(lastNG, query.CaseSensitive, query.FileName)
 		if err != nil {
 			return nil, err
 		}
@@ -234,77 +233,13 @@ func (data *indexData) iterateNgrams(query *query.Substring) (*ngramIterationRes
 		iter.last = iter.first
 	}
 
+	cands := iter.next()
 	result := ngramIterationResults{
-		bytesRead:     bytesRead,
-		cands:         iter.candidates(),
+		cands:         cands,
+		bytesRead:     iter.bytesRead(),
 		coversContent: lastI-firstI <= ngramSize && iter.leftPad == 0 && iter.rightPad == 0,
 	}
 	return &result, nil
-}
-
-func (d *indexData) readPostings(ng ngram, caseSensitive, fileName bool) ([]uint32, uint32, error) {
-	variants := []ngram{ng}
-	if !caseSensitive {
-		variants = generateCaseNgrams(ng)
-	}
-
-	// TODO - generate less garbage.
-	var sz uint32
-	postings := make([][]uint32, 0, len(variants))
-	for _, v := range variants {
-		if fileName {
-			postings = append(postings, d.fileNameNgrams[v])
-			continue
-		}
-
-		sec := d.ngrams[v]
-		blob, err := d.readSectionBlob(sec)
-		if err != nil {
-			return nil, 0, err
-		}
-		sz += sec.sz
-		ps := fromDeltas(blob, nil)
-		if len(ps) > 0 {
-			postings = append(postings, ps)
-		}
-	}
-
-	result := mergeUint32(postings)
-	return result, sz, nil
-}
-
-func mergeUint32(in [][]uint32) []uint32 {
-	sz := 0
-	for _, i := range in {
-		sz += len(i)
-	}
-	out := make([]uint32, 0, sz)
-	for len(in) > 0 {
-		minVal := uint32(maxUInt32)
-		for _, n := range in {
-			if len(n) > 0 && n[0] < minVal {
-				minVal = n[0]
-			}
-		}
-
-		next := in[:0]
-		for _, n := range in {
-			if len(n) == 0 {
-				continue
-			}
-			if n[0] == minVal {
-				out = append(out, minVal)
-				n = n[1:]
-			}
-			if len(n) > 0 {
-				next = append(next, n)
-			}
-		}
-
-		in = next
-	}
-
-	return out
 }
 
 func (d *indexData) fileName(i uint32) []byte {

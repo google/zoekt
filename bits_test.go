@@ -59,16 +59,3 @@ func TestGenerateCaseNgrams(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 }
-
-func TestMergeUInt32(t *testing.T) {
-	in := [][]uint32{
-		{1, 7, 9},
-		{5, 7},
-	}
-	got := mergeUint32(in)
-	want := []uint32{1, 5, 7, 7, 9}
-
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("DeepEqual: got %v want %v", got, want)
-	}
-}

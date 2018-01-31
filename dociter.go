@@ -16,14 +16,12 @@ package zoekt
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
-	"log"
 	"sort"
 
 	"github.com/google/zoekt/query"
 )
-
-var _ = log.Println
 
 // candidateMatch is a candidate match for a substring.
 type candidateMatch struct {
@@ -90,35 +88,48 @@ type ngramDocIterator struct {
 	leftPad  uint32
 	rightPad uint32
 	distance uint32
-	first    []uint32
-	last     []uint32
-	ends     []uint32
+
+	first hitIterator
+	last  hitIterator
+
+	ends []uint32
 }
 
-func (s *ngramDocIterator) candidates() []*candidateMatch {
+func (s *ngramDocIterator) bytesRead() uint32 {
+	b := s.first.bytesRead()
+
+	if s.first != s.last {
+		b += s.last.bytesRead()
+	}
+	return b
+}
+
+func (s *ngramDocIterator) next() []*candidateMatch {
 	patBytes := []byte(s.query.Pattern)
 	lowerPatBytes := toLower(patBytes)
 
 	fileIdx := 0
 	var candidates []*candidateMatch
 	for {
-		if len(s.first) == 0 || len(s.last) == 0 {
+		var p1, p2 uint32
+		p1 = s.first.first()
+		p2 = s.last.first()
+		if p1 == maxUInt32 || p2 == maxUInt32 {
 			break
 		}
-		p1 := s.first[0]
-		p2 := s.last[0]
 
 		for fileIdx < len(s.ends) && s.ends[fileIdx] <= p1 {
 			fileIdx++
 		}
-
 		if p1+s.distance < p2 {
-			s.first = s.first[1:]
+			// TODO: can skip based on p2 - distance?
+			s.first.next(p1)
 		} else if p1+s.distance > p2 {
-			s.last = s.last[1:]
+			// TODO: can skip based on p1 + distance?
+			s.last.next(p2)
 		} else {
-			s.first = s.first[1:]
-			s.last = s.last[1:]
+			s.first.next(p1)
+			s.last.next(p2)
 
 			var fileStart uint32
 			if fileIdx > 0 {
@@ -128,7 +139,7 @@ func (s *ngramDocIterator) candidates() []*candidateMatch {
 				continue
 			}
 
-			cand := &candidateMatch{
+			candidates = append(candidates, &candidateMatch{
 				caseSensitive: s.query.CaseSensitive,
 				fileName:      s.query.FileName,
 				substrBytes:   patBytes,
@@ -137,9 +148,152 @@ func (s *ngramDocIterator) candidates() []*candidateMatch {
 				byteMatchSz: uint32(len(lowerPatBytes)),
 				file:        uint32(fileIdx),
 				runeOffset:  p1 - fileStart - s.leftPad,
-			}
-			candidates = append(candidates, cand)
+			})
 		}
 	}
 	return candidates
+}
+
+func (d *indexData) trigramHitIterator(ng ngram, caseSensitive, fileName bool) (hitIterator, error) {
+	variants := []ngram{ng}
+	if !caseSensitive {
+		variants = generateCaseNgrams(ng)
+	}
+
+	iters := make([]hitIterator, 0, len(variants))
+	for _, v := range variants {
+		if fileName {
+			blob := d.fileNameNgrams[v]
+			if len(blob) > 0 {
+				iters = append(iters, &inMemoryIterator{
+					d.fileNameNgrams[v],
+					v,
+				})
+			}
+			continue
+		}
+
+		sec := d.ngrams[v]
+		blob, err := d.readSectionBlob(sec)
+		if err != nil {
+			return nil, err
+		}
+		if len(blob) > 0 {
+			iters = append(iters, newCompressedPostingIterator(blob, v))
+		}
+	}
+
+	if len(iters) == 1 {
+		return iters[0], nil
+	}
+	return &mergingIterator{
+		iters: iters,
+	}, nil
+}
+
+type hitIterator interface {
+	first() uint32
+	next(limit uint32)
+	bytesRead() uint32
+}
+
+type inMemoryIterator struct {
+	postings []uint32
+	what     ngram
+}
+
+func (i *inMemoryIterator) String() string {
+	return fmt.Sprintf("mem(%s):%v", i.what, i.postings)
+}
+
+func (i *inMemoryIterator) first() uint32 {
+	if len(i.postings) > 0 {
+		return i.postings[0]
+	}
+	return maxUInt32
+}
+
+func (i *inMemoryIterator) bytesRead() uint32 {
+	return 0
+}
+
+func (i *inMemoryIterator) next(limit uint32) {
+	for len(i.postings) > 0 && i.postings[0] <= limit {
+		i.postings = i.postings[1:]
+	}
+}
+
+type compressedPostingIterator struct {
+	blob, orig []byte
+	_first     uint32
+	what       ngram
+}
+
+func newCompressedPostingIterator(b []byte, w ngram) *compressedPostingIterator {
+	d, sz := binary.Uvarint(b)
+	return &compressedPostingIterator{
+		_first: uint32(d),
+		blob:   b[sz:],
+		orig:   b,
+		what:   w,
+	}
+}
+
+func (i *compressedPostingIterator) String() string {
+	return fmt.Sprintf("compressed(%s, %d, [%d bytes])", i.what, i._first, len(i.blob))
+}
+
+func (i *compressedPostingIterator) first() uint32 {
+	return i._first
+}
+
+func (i *compressedPostingIterator) next(limit uint32) {
+	if i._first <= limit && len(i.blob) == 0 {
+		i._first = maxUInt32
+		return
+	}
+
+	for i._first <= limit {
+		delta, sz := binary.Uvarint(i.blob)
+		i._first += uint32(delta)
+		i.blob = i.blob[sz:]
+	}
+}
+
+func (i *compressedPostingIterator) bytesRead() uint32 {
+	return uint32(len(i.orig) - len(i.blob))
+}
+
+type mergingIterator struct {
+	iters []hitIterator
+}
+
+func (i *mergingIterator) String() string {
+	return fmt.Sprintf("merge:%v", i.iters)
+}
+
+func (i *mergingIterator) bytesRead() uint32 {
+	var r uint32
+	for _, j := range i.iters {
+		r += j.bytesRead()
+	}
+	return r
+}
+
+func (i *mergingIterator) first() uint32 {
+	r := uint32(maxUInt32)
+	for _, j := range i.iters {
+		f := j.first()
+		if f < r {
+			r = f
+		}
+	}
+
+	return r
+}
+
+func (i *mergingIterator) next(limit uint32) {
+	for _, j := range i.iters {
+		j.next(limit)
+	}
 }

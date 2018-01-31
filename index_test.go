@@ -96,7 +96,10 @@ func TestBasic(t *testing.T) {
 			// ------------- 0123456789012345678901234567890123456789
 		})
 
-	res := searchForTest(t, b, &query.Substring{Pattern: "water"})
+	res := searchForTest(t, b, &query.Substring{
+		Pattern:       "water",
+		CaseSensitive: true,
+	})
 	fmatches := res.Files
 	if len(fmatches) != 1 || len(fmatches[0].LineMatches) != 1 {
 		t.Fatalf("got %v, want 1 matches", fmatches)
@@ -208,7 +211,10 @@ func TestFileBasedSearch(t *testing.T) {
 		Document{Name: "f1", Content: c1},
 		Document{Name: "f2", Content: c2},
 	)
-	sres := searchForTest(t, b, &query.Substring{Pattern: "ananas"})
+	sres := searchForTest(t, b, &query.Substring{
+		CaseSensitive: false,
+		Pattern:       "ananas",
+	})
 
 	matches := sres.Files
 	if len(matches) != 2 {
@@ -351,8 +357,9 @@ func TestFileSearch(t *testing.T) {
 	}
 
 	b.AddFile("banzana", []byte("x orange y"))
-	// --------------------------0123456879
+	// --------0123456
 	b.AddFile("banana", []byte("x apple y"))
+	// --------789012
 	sres := searchForTest(t, b, &query.Substring{
 		Pattern:  "anan",
 		FileName: true,
@@ -933,8 +940,8 @@ func TestNegativeRegexp(t *testing.T) {
 }
 
 func TestSymbolRank(t *testing.T) {
-	content := []byte("func bla() blub")
-	// ----------------012345678901234
+	content := []byte("func bla() blubxxxxx")
+	// ----------------01234567890123456789
 	b := testIndexBuilder(t, nil,
 		Document{
 			Name:    "f1",
@@ -950,11 +957,12 @@ func TestSymbolRank(t *testing.T) {
 
 	res := searchForTest(t, b,
 		&query.Substring{
-			Pattern: "bla",
+			CaseSensitive: false,
+			Pattern:       "bla",
 		})
 
 	if len(res.Files) != 3 {
-		t.Fatalf("got %#v, want 3 files", res.Files)
+		t.Fatalf("got %d files, want 3 files. Full data: %v", len(res.Files), res.Files)
 	}
 	if res.Files[0].FileName != "f2" {
 		t.Errorf("got %#v, want 'f2' as top match", res.Files[0])
