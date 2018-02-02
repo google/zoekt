@@ -194,6 +194,8 @@ func main() {
 		handler.HandleFunc("/debug/events/", trace.Events)
 	}
 
+	handler.HandleFunc("/healthz", healthz)
+
 	watchdogAddr := "http://" + *listen
 	if *sslCert != "" || *sslKey != "" {
 		watchdogAddr = "https://" + *listen
@@ -208,6 +210,14 @@ func main() {
 		err = http.ListenAndServe(*listen, handler)
 	}
 	log.Printf("ListenAndServe: %v", err)
+}
+
+// Always returns 200 OK.
+// Used for kubernetes liveness and readiness checks.
+// https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/
+func healthz(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write([]byte("OK"))
 }
 
 func watchdogOnce(ctx context.Context, client *http.Client, addr string) error {
