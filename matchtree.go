@@ -63,9 +63,24 @@ type matchTree interface {
 
 	// returns whether this matches, and if we are sure.
 	matches(known map[matchTree]bool) (match bool, sure bool)
+}
 
-	// For debugging: print this subtree
-	String() string
+type noMatchTree struct {
+	Why string
+}
+
+func (t *noMatchTree) String() string {
+	return fmt.Sprintf("not(%q)", t.Why)
+}
+
+func (t *noMatchTree) nextDoc() uint32 {
+	return maxUInt32
+}
+
+func (t *noMatchTree) prepare(uint32) {}
+
+func (t *noMatchTree) matches(known map[matchTree]bool) (bool, bool) {
+	return false, true
 }
 
 type docMatchTree struct {
@@ -512,16 +527,12 @@ func (d *indexData) newMatchTree(q query.Q, stats *Stats) (matchTree, error) {
 		if s.Value {
 			return &bruteForceMatchTree{}, nil
 		} else {
-			return &substrMatchTree{
-				query: &query.Substring{Pattern: "FALSE"},
-			}, nil
+			return &noMatchTree{"const"}, nil
 		}
 	case *query.Language:
 		code, ok := d.metaData.LanguageMap[s.Language]
 		if !ok {
-			return &substrMatchTree{
-				query: &query.Substring{Pattern: "LANG"},
-			}, nil
+			return &noMatchTree{"lang"}, nil
 		}
 		docs := make([]uint32, 0, len(d.languages))
 		for d, l := range d.languages {
