@@ -202,6 +202,10 @@ type trimBySectionMatchIter struct {
 	sections []DocumentSection
 }
 
+func (i *trimBySectionMatchIter) String() string {
+	return fmt.Sprintf("trimSection(sz=%d, %v)", i.patternSize, i.matchIterator)
+}
+
 func (d *indexData) newTrimByDocSectionIter(q *query.Substring, iter matchIterator) *trimBySectionMatchIter {
 	return &trimBySectionMatchIter{
 		matchIterator: iter,
