@@ -38,7 +38,27 @@ func displayMatches(files []zoekt.FileMatch, pat string) {
 	}
 }
 
+func loadShard(fn string) (zoekt.Searcher, error) {
+	f, err := os.Open(fn)
+	if err != nil {
+		return nil, err
+	}
+
+	iFile, err := zoekt.NewIndexFile(f)
+	if err != nil {
+		return nil, err
+	}
+	s, err := zoekt.NewSearcher(iFile)
+	if err != nil {
+		iFile.Close()
+		return nil, fmt.Errorf("NewSearcher(%s): %v", fn, err)
+	}
+
+	return s, nil
+}
+
 func main() {
+	shard := flag.String("shard", "", "search in a specific shard")
 	index := flag.String("index_dir",
 		filepath.Join(os.Getenv("HOME"), ".zoekt"), "search for index files in `directory`")
 	cpuProfile := flag.String("cpu_profile", "", "write cpu profile to `file`")
@@ -60,7 +80,14 @@ func main() {
 	}
 	pat := flag.Arg(0)
 
-	searcher, err := shards.NewDirectorySearcher(*index)
+	var searcher zoekt.Searcher
+	var err error
+	if *shard != "" {
+		searcher, err = loadShard(*shard)
+	} else {
+		searcher, err = shards.NewDirectorySearcher(*index)
+	}
+
 	if err != nil {
 		log.Fatal(err)
 	}
