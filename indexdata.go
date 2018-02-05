@@ -158,25 +158,32 @@ func (data *indexData) ngramFrequency(ng ngram, filename bool) uint32 {
 }
 
 type ngramIterationResults struct {
-	cands []*candidateMatch
+	matchIterator
 
 	// The ngram matches cover the pattern, so no need to check
 	// contents.
 	coversContent bool
 
-	// The number of posting bytes
-	bytesRead uint32
+	caseSensitive bool
+	fileName      bool
+	substrBytes   []byte
+	substrLowered []byte
+	byteMatchSz   uint32
+}
+
+func (r *ngramIterationResults) candidates() []*candidateMatch {
+	cs := r.matchIterator.candidates()
+	for _, c := range cs {
+		c.caseSensitive = r.caseSensitive
+		c.fileName = r.fileName
+		c.substrBytes = r.substrBytes
+		c.substrLowered = r.substrLowered
+		c.byteMatchSz = r.byteMatchSz
+	}
+	return cs
 }
 
 func (d *indexData) iterateNgrams(query *query.Substring) (*ngramIterationResults, error) {
-	iter := &ngramDocIterator{}
-
-	if query.FileName {
-		iter.ends = d.fileNameEndRunes
-	} else {
-		iter.ends = d.fileEndRunes
-	}
-
 	str := query.Pattern
 
 	// Find the 2 least common ngrams from the string.
@@ -193,7 +200,11 @@ func (d *indexData) iterateNgrams(query *query.Substring) (*ngramIterationResult
 		}
 
 		if freq == 0 {
-			return &ngramIterationResults{}, nil
+			return &ngramIterationResults{
+				matchIterator: &noMatchTree{
+					Why: "freq=0",
+				},
+			}, nil
 		}
 
 		frequencies = append(frequencies, freq)
@@ -208,8 +219,15 @@ func (d *indexData) iterateNgrams(query *query.Substring) (*ngramIterationResult
 
 	firstNG := ngramOffs[firstI].ngram
 	lastNG := ngramOffs[lastI].ngram
-	iter.leftPad = firstI
-	iter.rightPad = uint32(utf8.RuneCountInString(str)) - firstI
+	iter := &ngramDocIterator{
+		leftPad:  firstI,
+		rightPad: uint32(utf8.RuneCountInString(str)) - firstI,
+	}
+	if query.FileName {
+		iter.ends = d.fileNameEndRunes
+	} else {
+		iter.ends = d.fileEndRunes
+	}
 
 	var coversContent bool
 	if firstI != lastI {
@@ -231,25 +249,19 @@ func (d *indexData) iterateNgrams(query *query.Substring) (*ngramIterationResult
 		coversContent = (iter.leftPad == 0 && iter.rightPad == 3)
 	}
 
-	cands := iter.candidates()
-	result := ngramIterationResults{
-		cands:         cands,
-		bytesRead:     iter.bytesRead(),
-		coversContent: coversContent,
-	}
-
 	patBytes := []byte(query.Pattern)
 	lowerPatBytes := toLower(patBytes)
-	for _, c := range result.cands {
-		c.caseSensitive = query.CaseSensitive
-		c.fileName = query.FileName
-		c.substrBytes = patBytes
-		c.substrLowered = lowerPatBytes
-		// TODO - this is wrong for casefolding searches.
-		c.byteMatchSz = uint32(len(lowerPatBytes))
-	}
 
-	return &result, nil
+	return &ngramIterationResults{
+		matchIterator: iter,
+		coversContent: coversContent,
+		caseSensitive: query.CaseSensitive,
+		fileName:      query.FileName,
+		substrBytes:   patBytes,
+		substrLowered: lowerPatBytes,
+		// TODO - this is wrong for casefolding searches.
+		byteMatchSz: uint32(len(lowerPatBytes)),
+	}, nil
 }
 
 func (d *indexData) fileName(i uint32) []byte {

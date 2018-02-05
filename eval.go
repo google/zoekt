@@ -140,7 +140,6 @@ func (d *indexData) Search(ctx context.Context, q query.Q, opts *SearchOptions) 
 	collectAtoms(mt, func(t matchTree) {
 		totalAtomCount++
 		if st, ok := t.(*substrMatchTree); ok {
-			res.Stats.NgramMatches += len(st.cands)
 			if st.fileName {
 				fileAtoms = append(fileAtoms, st)
 			} else {
@@ -312,6 +311,7 @@ nextFileMatch:
 		addRepo(&res, v)
 	}
 
+	mt.updateStats(&res.Stats)
 	return &res, nil
 }
 

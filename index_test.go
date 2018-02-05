@@ -286,7 +286,7 @@ func TestAndSearch(t *testing.T) {
 		FilesLoaded:        1,
 		ContentBytesLoaded: 18,
 		IndexBytesLoaded:   8,
-		NgramMatches:       4,
+		NgramMatches:       3, // we look at doc 1, because it's max(0,1) due to AND
 		MatchCount:         1,
 		FileCount:          1,
 		FilesConsidered:    2,
@@ -1707,4 +1707,19 @@ func TestSymbolAtomExact(t *testing.T) {
 	if m.Offset != 4 {
 		t.Fatalf("got offset %d, want 7", m.Offset)
 	}
+}
+
+func TestHitIterTerminate(t *testing.T) {
+	// contrived input: trigram frequencies forces selecting abc +
+	// def for the distance iteration. There is no match, so this
+	// will advance the compressedPostingIterator to beyond the
+	// end.
+	content := []byte("abc bcdbcd cdecde abcabc def efg")
+	b := testIndexBuilder(t, nil,
+		Document{
+			Name:    "f1",
+			Content: content,
+		},
+	)
+	searchForTest(t, b, &query.Substring{Pattern: "abcdef"})
 }

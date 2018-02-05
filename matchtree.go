@@ -24,6 +24,21 @@ import (
 	"github.com/google/zoekt/query"
 )
 
+// A docIterator iterates over documents in order.
+type docIterator interface {
+	// provide the next document where we can may find something
+	// interesting.
+	nextDoc() uint32
+
+	// clears any per-document state of the docIterator, and
+	// prepares for evaluating the given doc. The argument is
+	// strictly increasing over time.
+	prepare(nextDoc uint32)
+
+	// collects statistics.
+	updateStats(stats *Stats)
+}
+
 // An expression tree coupled with matches. The matchtree has two
 // functions:
 //
@@ -52,35 +67,10 @@ import (
 //     collect all text matches by looking at leaf matchTrees
 //
 type matchTree interface {
-	// provide the next document where we can may find something
-	// interesting.
-	nextDoc() uint32
-
-	// clears any per-document state of the matchTree, and
-	// prepares for evaluating the given doc. The argument is
-	// strictly increasing over time.
-	prepare(nextDoc uint32)
+	docIterator
 
 	// returns whether this matches, and if we are sure.
 	matches(known map[matchTree]bool) (match bool, sure bool)
-}
-
-type noMatchTree struct {
-	Why string
-}
-
-func (t *noMatchTree) String() string {
-	return fmt.Sprintf("not(%q)", t.Why)
-}
-
-func (t *noMatchTree) nextDoc() uint32 {
-	return maxUInt32
-}
-
-func (t *noMatchTree) prepare(uint32) {}
-
-func (t *noMatchTree) matches(known map[matchTree]bool) (bool, bool) {
-	return false, true
 }
 
 type docMatchTree struct {
@@ -126,8 +116,9 @@ type regexpMatchTree struct {
 }
 
 type substrMatchTree struct {
+	matchIterator
+
 	query         *query.Substring
-	cands         []*candidateMatch
 	coversContent bool
 	caseSensitive bool
 	fileName      bool
@@ -144,6 +135,37 @@ type branchQueryMatchTree struct {
 	// mutable
 	firstDone bool
 	docID     uint32
+}
+
+func (t *noMatchTree) updateStats(s *Stats) {
+}
+
+func (t *bruteForceMatchTree) updateStats(s *Stats) {
+}
+
+func (t *docMatchTree) updateStats(s *Stats) {
+}
+
+func (t *andMatchTree) updateStats(s *Stats) {
+	for _, c := range t.children {
+		c.updateStats(s)
+	}
+}
+
+func (t *orMatchTree) updateStats(s *Stats) {
+	for _, c := range t.children {
+		c.updateStats(s)
+	}
+}
+
+func (t *notMatchTree) updateStats(s *Stats) {
+	t.child.updateStats(s)
+}
+
+func (t *branchQueryMatchTree) updateStats(s *Stats) {
+}
+
+func (t *regexpMatchTree) updateStats(s *Stats) {
 }
 
 // all prepare methods
@@ -188,15 +210,8 @@ func (t *notMatchTree) prepare(doc uint32) {
 }
 
 func (t *substrMatchTree) prepare(nextDoc uint32) {
-	for len(t.cands) > 0 && t.cands[0].file < nextDoc {
-		t.cands = t.cands[1:]
-	}
-
-	i := 0
-	for ; i < len(t.cands) && t.cands[i].file == nextDoc; i++ {
-	}
-	t.current = t.cands[:i]
-	t.cands = t.cands[i:]
+	t.matchIterator.prepare(nextDoc)
+	t.current = t.matchIterator.candidates()
 	t.contEvaluated = false
 }
 
@@ -247,13 +262,6 @@ func (t *notMatchTree) nextDoc() uint32 {
 	return 0
 }
 
-func (t *substrMatchTree) nextDoc() uint32 {
-	if len(t.cands) > 0 {
-		return t.cands[0].file
-	}
-	return maxUInt32
-}
-
 func (t *branchQueryMatchTree) nextDoc() uint32 {
 	var start uint32
 	if t.firstDone {
@@ -300,7 +308,7 @@ func (t *substrMatchTree) String() string {
 		f = "f"
 	}
 
-	return fmt.Sprintf("%ssubstr(%q,%v)", f, t.query.Pattern, t.current)
+	return fmt.Sprintf("%ssubstr(%q,%v, %v)", f, t.query.Pattern, t.current, t.matchIterator)
 }
 
 func (t *branchQueryMatchTree) String() string {
@@ -558,7 +566,7 @@ func (d *indexData) newMatchTree(q query.Q, stats *Stats) (matchTree, error) {
 			return nil, fmt.Errorf("found %T inside query.Symbol", mt)
 		}
 
-		subMT.cands = d.trimByDocSection(s.Atom, subMT.cands, d.runeDocSections)
+		subMT.matchIterator = d.newTrimByDocSectionIter(s.Atom, subMT.matchIterator)
 		return subMT, nil
 	}
 	log.Panicf("type %T", q)
@@ -589,40 +597,6 @@ func (d *indexData) newSubstringMatchTree(s *query.Substring, stats *Stats) (mat
 		return nil, err
 	}
 	st.coversContent = result.coversContent
-	st.cands = result.cands
-	stats.IndexBytesLoaded += int64(result.bytesRead)
+	st.matchIterator = result
 	return st, nil
-}
-
-func (d *indexData) trimByDocSection(q *query.Substring, ms []*candidateMatch, secs []DocumentSection) []*candidateMatch {
-	trimmed := ms[:0]
-
-	patSize := utf8.RuneCount([]byte(q.Pattern))
-	for len(secs) > 0 && len(ms) > 0 {
-		var fileStart uint32
-		if ms[0].file > 0 {
-			fileStart = d.fileEndRunes[ms[0].file-1]
-		}
-
-		start := fileStart + ms[0].runeOffset
-		end := start + uint32(patSize)
-		if start >= secs[0].End {
-			secs = secs[1:]
-			continue
-		}
-
-		if start < secs[0].Start {
-			ms = ms[1:]
-			continue
-		}
-
-		// here we have: sec.Start <= start < sec.End
-		if end <= secs[0].End {
-			// complete match falls inside section.
-			trimmed = append(trimmed, ms[0])
-		}
-
-		ms = ms[1:]
-	}
-	return trimmed
 }
