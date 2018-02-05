@@ -1723,3 +1723,17 @@ func TestHitIterTerminate(t *testing.T) {
 	)
 	searchForTest(t, b, &query.Substring{Pattern: "abcdef"})
 }
+
+func TestDistanceHitIterBailLast(t *testing.T) {
+	content := []byte("AST AST AST UASH")
+	b := testIndexBuilder(t, nil,
+		Document{
+			Name:    "f1",
+			Content: content,
+		},
+	)
+	res := searchForTest(t, b, &query.Substring{Pattern: "UAST"})
+	if len(res.Files) != 0 {
+		t.Fatalf("got %v, want no results", res.Files)
+	}
+}
