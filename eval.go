@@ -333,25 +333,6 @@ func addRepo(res *SearchResult, repo *Repository) {
 	res.LineFragments[repo.Name] = repo.LineFragmentTemplate
 }
 
-func extractSubstringQueries(q query.Q) []*query.Substring {
-	var r []*query.Substring
-	switch s := q.(type) {
-	case *query.And:
-		for _, ch := range s.Children {
-			r = append(r, extractSubstringQueries(ch)...)
-		}
-	case *query.Or:
-		for _, ch := range s.Children {
-			r = append(r, extractSubstringQueries(ch)...)
-		}
-	case *query.Not:
-		r = append(r, extractSubstringQueries(s.Child)...)
-	case *query.Substring:
-		r = append(r, s)
-	}
-	return r
-}
-
 type sortByOffsetSlice []*candidateMatch
 
 func (m sortByOffsetSlice) Len() int      { return len(m) }
