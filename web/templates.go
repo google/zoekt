@@ -195,7 +195,7 @@ var TemplateText = map[string]string{
     <h5>
       {{if .Stats.Crashes}}<br><b>{{.Stats.Crashes}} shards crashed</b><br>{{end}}
       {{ $fileCount := len .FileMatches }}
-      Found {{.Stats.MatchCount}} results in {{.Stats.FileCount}} files{{if or (lt $fileCount .Stats.FileCount) (gt .Stats.FilesSkipped 0) }},
+      Found {{.Stats.MatchCount}} results in {{.Stats.FileCount}} files{{if or (lt $fileCount .Stats.FileCount) (or (gt .Stats.ShardsSkipped 0) (gt .Stats.FilesSkipped 0)) }},
         showing top {{ $fileCount }} files (<a href="search?q={{.Last.Query}}&num={{More .Last.Num}}">show more</a>).
       {{else}}.{{end}}
     </h5>
@@ -233,8 +233,9 @@ var TemplateText = map[string]string{
       {{HumanUnit .Stats.IndexBytesLoaded}}B index data,
       {{.Stats.NgramMatches}} ngram matches,
       {{.Stats.FilesConsidered}} docs considered,
-      {{.Stats.FilesLoaded}} docs ({{HumanUnit .Stats.ContentBytesLoaded}}B) loaded,
-      {{.Stats.FilesSkipped}} docs skipped
+      {{.Stats.FilesLoaded}} docs ({{HumanUnit .Stats.ContentBytesLoaded}}B)
+      loaded{{if or .Stats.FilesSkipped .Stats.ShardsSkipped}},
+      {{.Stats.FilesSkipped}} docs and {{.Stats.ShardsSkipped}} shards skipped{{else}}.{{end}}
     </p>
   </div>
   {{ template "jsdep"}}

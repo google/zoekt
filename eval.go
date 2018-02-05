@@ -126,6 +126,13 @@ func (d *indexData) Search(ctx context.Context, q query.Q, opts *SearchOptions) 
 		return &res, nil
 	}
 
+	select {
+	case <-ctx.Done():
+		res.Stats.ShardsSkipped++
+		return &res, nil
+	default:
+	}
+
 	q = query.Map(q, query.ExpandFileContent)
 
 	mt, err := d.newMatchTree(q, &res.Stats)
@@ -158,17 +165,15 @@ func (d *indexData) Search(ctx context.Context, q query.Q, opts *SearchOptions) 
 	}
 
 	docCount := uint32(len(d.fileBranchMasks))
-	canceled := false
 	lastDoc := int(-1)
 
 nextFileMatch:
 	for {
-		if !canceled {
-			select {
-			case <-ctx.Done():
-				canceled = true
-			default:
-			}
+		canceled := false
+		select {
+		case <-ctx.Done():
+			canceled = true
+		default:
 		}
 
 		nextDoc := mt.nextDoc()
@@ -180,13 +185,14 @@ nextFileMatch:
 		}
 		lastDoc = int(nextDoc)
 
-		res.Stats.FilesConsidered++
-		mt.prepare(nextDoc)
 		if canceled || res.Stats.MatchCount >= opts.ShardMaxMatchCount ||
 			importantMatchCount >= opts.ShardMaxImportantMatch {
-			res.Stats.FilesSkipped++
-			continue
+			res.Stats.FilesSkipped += d.repoListEntry.Stats.Documents - lastDoc
+			break
 		}
+
+		res.Stats.FilesConsidered++
+		mt.prepare(nextDoc)
 
 		cp.setDocument(nextDoc)
 
@@ -476,7 +482,6 @@ func (d *indexData) List(ctx context.Context, q query.Q) (rl *RepoList, err erro
 	l := &RepoList{}
 	if c.Value {
 		l.Repos = append(l.Repos, &d.repoListEntry)
-
 	}
 	return l, nil
 }
