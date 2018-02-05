@@ -19,8 +19,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"sort"
-
-	"github.com/google/zoekt/query"
 )
 
 // candidateMatch is a candidate match for a substring.
@@ -82,76 +80,83 @@ func (m *candidateMatch) line(newlines []uint32, fileSize uint32) (lineNum, line
 	return idx + 1, start, end
 }
 
-type ngramDocIterator struct {
-	query *query.Substring
+type hitIterator interface {
+	// Return the first hit, or maxUInt32 if none.
+	first() uint32
 
-	leftPad  uint32
-	rightPad uint32
+	// Skip until past limit.
+	next(limit uint32)
+
+	// Return how many bytes were read.
+	bytesRead() uint32
+}
+
+type distanceHitIterator struct {
+	started  bool
 	distance uint32
-
-	first hitIterator
-	last  hitIterator
-
-	ends []uint32
+	i1       hitIterator
+	i2       hitIterator
 }
 
-func (s *ngramDocIterator) bytesRead() uint32 {
-	b := s.first.bytesRead()
-
-	if s.first != s.last {
-		b += s.last.bytesRead()
-	}
-	return b
+func (i *distanceHitIterator) String() string {
+	return fmt.Sprintf("dist(%d, %v, %v)", i.distance, i.i1, i.i2)
 }
 
-func (s *ngramDocIterator) next() []*candidateMatch {
-	patBytes := []byte(s.query.Pattern)
-	lowerPatBytes := toLower(patBytes)
-
-	fileIdx := 0
-	var candidates []*candidateMatch
+func (i *distanceHitIterator) findNext() {
 	for {
 		var p1, p2 uint32
-		p1 = s.first.first()
-		p2 = s.last.first()
+		p1 = i.i1.first()
+		p2 = i.i2.first()
 		if p1 == maxUInt32 || p2 == maxUInt32 {
 			break
 		}
 
-		for fileIdx < len(s.ends) && s.ends[fileIdx] <= p1 {
-			fileIdx++
-		}
-		if p1+s.distance < p2 {
-			// TODO: can skip based on p2 - distance?
-			s.first.next(p1)
-		} else if p1+s.distance > p2 {
-			// TODO: can skip based on p1 + distance?
-			s.last.next(p2)
+		if p1+i.distance < p2 {
+			i.i1.next(p2 - i.distance - 1)
+		} else if p1+i.distance > p2 {
+			i.i2.next(p1 + i.distance - 1)
 		} else {
-			s.first.next(p1)
-			s.last.next(p2)
-
-			var fileStart uint32
-			if fileIdx > 0 {
-				fileStart = s.ends[fileIdx-1]
-			}
-			if p1 < s.leftPad+fileStart || p1+s.distance+ngramSize+s.rightPad > s.ends[fileIdx] {
-				continue
-			}
-
-			candidates = append(candidates, &candidateMatch{
-				caseSensitive: s.query.CaseSensitive,
-				fileName:      s.query.FileName,
-				substrBytes:   patBytes,
-				substrLowered: lowerPatBytes,
-				// TODO - this is wrong for casefolding searches.
-				byteMatchSz: uint32(len(lowerPatBytes)),
-				file:        uint32(fileIdx),
-				runeOffset:  p1 - fileStart - s.leftPad,
-			})
+			break
 		}
 	}
-	return candidates
+}
+
+func (i *distanceHitIterator) first() uint32 {
+	if !i.started {
+		i.findNext()
+		i.started = true
+	}
+	return i.i1.first()
+}
+
+func (i *distanceHitIterator) bytesRead() uint32 {
+	return i.i1.bytesRead() + i.i2.bytesRead()
+}
+
+func (i *distanceHitIterator) next(limit uint32) {
+	i.i1.next(limit)
+	i.i2.next(limit + i.distance)
+	i.findNext()
+}
+
+func (d *indexData) newDistanceTrigramIter(ng1, ng2 ngram, dist uint32, caseSensitive, fileName bool) (hitIterator, error) {
+	if dist == 0 {
+		return nil, fmt.Errorf("d == 0")
+	}
+
+	i1, err := d.trigramHitIterator(ng1, caseSensitive, fileName)
+	if err != nil {
+		return nil, err
+	}
+	i2, err := d.trigramHitIterator(ng2, caseSensitive, fileName)
+	if err != nil {
+		return nil, err
+	}
+	return &distanceHitIterator{
+		i1:       i1,
+		i2:       i2,
+		distance: dist,
+	}, nil
 }
 
 func (d *indexData) trigramHitIterator(ng ngram, caseSensitive, fileName bool) (hitIterator, error) {
@@ -189,12 +194,6 @@ func (d *indexData) trigramHitIterator(ng ngram, caseSensitive, fileName bool) (
 	return &mergingIterator{
 		iters: iters,
 	}, nil
-}
-
-type hitIterator interface {
-	first() uint32
-	next(limit uint32)
-	bytesRead() uint32
 }
 
 type inMemoryIterator struct {
@@ -296,4 +295,47 @@ func (i *mergingIterator) next(limit uint32) {
 	for _, j := range i.iters {
 		j.next(limit)
 	}
+}
+
+type ngramDocIterator struct {
+	leftPad  uint32
+	rightPad uint32
+
+	iter hitIterator
+	ends []uint32
+}
+
+func (i *ngramDocIterator) bytesRead() uint32 {
+	return i.iter.bytesRead()
+}
+
+func (i *ngramDocIterator) candidates() []*candidateMatch {
+	var candidates []*candidateMatch
+	fileIdx := 0
+	for {
+		p1 := i.iter.first()
+		if p1 == maxUInt32 {
+			break
+		}
+		i.iter.next(p1)
+
+		for fileIdx < len(i.ends) && i.ends[fileIdx] <= p1 {
+			fileIdx++
+		}
+
+		var fileStart uint32
+		if fileIdx > 0 {
+			fileStart = i.ends[fileIdx-1]
+		}
+
+		if p1 < i.leftPad+fileStart || p1+i.rightPad > i.ends[fileIdx] {
+			continue
+		}
+
+		candidates = append(candidates, &candidateMatch{
+			file:       uint32(fileIdx),
+			runeOffset: p1 - fileStart - i.leftPad,
+		})
+	}
+	return candidates
 }

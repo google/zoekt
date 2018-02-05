@@ -169,9 +169,7 @@ type ngramIterationResults struct {
 }
 
 func (d *indexData) iterateNgrams(query *query.Substring) (*ngramIterationResults, error) {
-	iter := &ngramDocIterator{
-		query: query,
-	}
+	iter := &ngramDocIterator{}
 
 	if query.FileName {
 		iter.ends = d.fileNameEndRunes
@@ -210,35 +208,47 @@ func (d *indexData) iterateNgrams(query *query.Substring) (*ngramIterationResult
 
 	firstNG := ngramOffs[firstI].ngram
 	lastNG := ngramOffs[lastI].ngram
-	iter.distance = lastI - firstI
 	iter.leftPad = firstI
-	iter.rightPad = uint32(utf8.RuneCountInString(str)-ngramSize) - lastI
+	iter.rightPad = uint32(utf8.RuneCountInString(str)) - firstI
 
-	docIter, err := d.trigramHitIterator(firstNG, query.CaseSensitive, query.FileName)
-	if err != nil {
-		return nil, err
-	}
-
-	iter.first = docIter
-
+	var coversContent bool
 	if firstI != lastI {
-		postings, err := d.trigramHitIterator(lastNG, query.CaseSensitive, query.FileName)
+		i, err := d.newDistanceTrigramIter(firstNG, lastNG, lastI-firstI, query.CaseSensitive, query.FileName)
+
 		if err != nil {
 			return nil, err
 		}
-		iter.last = postings
+
+		iter.iter = i
+
+		coversContent = (lastI-firstI <= ngramSize && iter.leftPad == 0 && iter.rightPad == (lastI+ngramSize))
 	} else {
-		// TODO - we could be a little faster and skip the
-		// list intersection
-		iter.last = iter.first
+		hitIter, err := d.trigramHitIterator(lastNG, query.CaseSensitive, query.FileName)
+		if err != nil {
+			return nil, err
+		}
+		iter.iter = hitIter
+		coversContent = (iter.leftPad == 0 && iter.rightPad == 3)
 	}
 
-	cands := iter.next()
+	cands := iter.candidates()
 	result := ngramIterationResults{
 		cands:         cands,
 		bytesRead:     iter.bytesRead(),
-		coversContent: lastI-firstI <= ngramSize && iter.leftPad == 0 && iter.rightPad == 0,
+		coversContent: coversContent,
 	}
+
+	patBytes := []byte(query.Pattern)
+	lowerPatBytes := toLower(patBytes)
+	for _, c := range result.cands {
+		c.caseSensitive = query.CaseSensitive
+		c.fileName = query.FileName
+		c.substrBytes = patBytes
+		c.substrLowered = lowerPatBytes
+		// TODO - this is wrong for casefolding searches.
+		c.byteMatchSz = uint32(len(lowerPatBytes))
+	}
+
 	return &result, nil
 }
 
