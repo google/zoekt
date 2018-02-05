@@ -315,20 +315,21 @@ func (t *branchQueryMatchTree) String() string {
 	return fmt.Sprintf("branch(%x)", t.mask)
 }
 
-func collectAtoms(t matchTree, f func(matchTree)) {
+// Visit the matchTree. Skips noVisitMatchTree
+func visitMatchTree(t matchTree, f func(matchTree)) {
 	switch s := t.(type) {
 	case *andMatchTree:
 		for _, ch := range s.children {
-			collectAtoms(ch, f)
+			visitMatchTree(ch, f)
 		}
 	case *orMatchTree:
 		for _, ch := range s.children {
-			collectAtoms(ch, f)
+			visitMatchTree(ch, f)
 		}
 	case *noVisitMatchTree:
-		collectAtoms(s.matchTree, f)
+		visitMatchTree(s.matchTree, f)
 	case *notMatchTree:
-		collectAtoms(s.child, f)
+		visitMatchTree(s.child, f)
 	default:
 		f(t)
 	}

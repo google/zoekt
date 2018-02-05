@@ -144,7 +144,7 @@ func (d *indexData) Search(ctx context.Context, q query.Q, opts *SearchOptions) 
 	var substrAtoms, fileAtoms []*substrMatchTree
 	var regexpAtoms []*regexpMatchTree
 
-	collectAtoms(mt, func(t matchTree) {
+	visitMatchTree(mt, func(t matchTree) {
 		totalAtomCount++
 		if st, ok := t.(*substrMatchTree); ok {
 			if st.fileName {
