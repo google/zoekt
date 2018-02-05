@@ -137,7 +137,19 @@ func (d *indexData) memoryUse() int {
 
 const maxUInt32 = 0xffffffff
 
-func minarg(xs []uint32) uint32 {
+func firstMinarg(xs []uint32) uint32 {
+	m := uint32(maxUInt32)
+	j := len(xs)
+	for i, x := range xs {
+		if x < m {
+			m = x
+			j = i
+		}
+	}
+	return uint32(j)
+}
+
+func lastMinarg(xs []uint32) uint32 {
 	m := uint32(maxUInt32)
 	j := len(xs)
 	for i, x := range xs {
@@ -169,6 +181,10 @@ type ngramIterationResults struct {
 	substrBytes   []byte
 	substrLowered []byte
 	byteMatchSz   uint32
+}
+
+func (r *ngramIterationResults) String() string {
+	return fmt.Sprintf("wrapper(%v)", r.matchIterator)
 }
 
 func (r *ngramIterationResults) candidates() []*candidateMatch {
@@ -209,10 +225,9 @@ func (d *indexData) iterateNgrams(query *query.Substring) (*ngramIterationResult
 
 		frequencies = append(frequencies, freq)
 	}
-
-	firstI := minarg(frequencies)
+	firstI := firstMinarg(frequencies)
 	frequencies[firstI] = maxUInt32
-	lastI := minarg(frequencies)
+	lastI := lastMinarg(frequencies)
 	if firstI > lastI {
 		lastI, firstI = firstI, lastI
 	}
