@@ -39,6 +39,14 @@ type docIterator interface {
 	updateStats(stats *Stats)
 }
 
+const costConst = 0
+const costMemory = 1
+const costContent = 2
+const costRegexp = 3
+
+const costMin = costConst
+const costMax = costRegexp
+
 // An expression tree coupled with matches. The matchtree has two
 // functions:
 //
@@ -70,7 +78,7 @@ type matchTree interface {
 	docIterator
 
 	// returns whether this matches, and if we are sure.
-	matches(known map[matchTree]bool) (match bool, sure bool)
+	matches(cp *contentProvider, cost int, known map[matchTree]bool) (match bool, sure bool)
 }
 
 type docMatchTree struct {
@@ -308,7 +316,7 @@ func (t *substrMatchTree) String() string {
 		f = "f"
 	}
 
-	return fmt.Sprintf("%ssubstr(%q,%v, %v)", f, t.query.Pattern, t.current, t.matchIterator)
+	return fmt.Sprintf("%ssubstr(%q, %v, %v)", f, t.query.Pattern, t.current, t.matchIterator)
 }
 
 func (t *branchQueryMatchTree) String() string {
@@ -377,19 +385,19 @@ func visitRegexMatches(t matchTree, known map[matchTree]bool, f func(*regexpMatc
 
 // all matches() methods.
 
-func (t *docMatchTree) matches(known map[matchTree]bool) (bool, bool) {
+func (t *docMatchTree) matches(cp *contentProvider, cost int, known map[matchTree]bool) (bool, bool) {
 	return len(t.current) > 0, true
 }
 
-func (t *bruteForceMatchTree) matches(known map[matchTree]bool) (bool, bool) {
+func (t *bruteForceMatchTree) matches(cp *contentProvider, cost int, known map[matchTree]bool) (bool, bool) {
 	return true, true
 }
 
-func (t *andMatchTree) matches(known map[matchTree]bool) (bool, bool) {
+func (t *andMatchTree) matches(cp *contentProvider, cost int, known map[matchTree]bool) (bool, bool) {
 	sure := true
 
 	for _, ch := range t.children {
-		v, ok := evalMatchTree(known, ch)
+		v, ok := evalMatchTree(cp, cost, known, ch)
 		if ok && !v {
 			return false, true
 		}
@@ -400,11 +408,11 @@ func (t *andMatchTree) matches(known map[matchTree]bool) (bool, bool) {
 	return true, sure
 }
 
-func (t *orMatchTree) matches(known map[matchTree]bool) (bool, bool) {
+func (t *orMatchTree) matches(cp *contentProvider, cost int, known map[matchTree]bool) (bool, bool) {
 	matches := false
 	sure := true
 	for _, ch := range t.children {
-		v, ok := evalMatchTree(known, ch)
+		v, ok := evalMatchTree(cp, cost, known, ch)
 		if ok {
 			// we could short-circuit, but we want to use
 			// the other possibilities as a ranking
@@ -417,24 +425,34 @@ func (t *orMatchTree) matches(known map[matchTree]bool) (bool, bool) {
 	return matches, sure
 }
 
-func (t *branchQueryMatchTree) matches(known map[matchTree]bool) (bool, bool) {
+func (t *branchQueryMatchTree) matches(cp *contentProvider, cost int, known map[matchTree]bool) (bool, bool) {
 	return t.fileMasks[t.docID]&t.mask != 0, true
 }
 
-func (t *regexpMatchTree) matches(known map[matchTree]bool) (bool, bool) {
-	if !t.reEvaluated {
+func (t *regexpMatchTree) matches(cp *contentProvider, cost int, known map[matchTree]bool) (bool, bool) {
+	if cost < costRegexp {
 		return false, false
+	}
+
+	idxs := t.regexp.FindAllIndex(cp.data(t.fileName), -1)
+	t.found = make([]*candidateMatch, 0, len(idxs))
+	for _, idx := range idxs {
+		t.found = append(t.found, &candidateMatch{
+			byteOffset:  uint32(idx[0]),
+			byteMatchSz: uint32(idx[1] - idx[0]),
+			fileName:    t.fileName,
+		})
 	}
 
 	return len(t.found) > 0, true
 }
 
-func evalMatchTree(known map[matchTree]bool, mt matchTree) (bool, bool) {
+func evalMatchTree(cp *contentProvider, cost int, known map[matchTree]bool, mt matchTree) (bool, bool) {
 	if v, ok := known[mt]; ok {
 		return v, true
 	}
 
-	v, ok := mt.matches(known)
+	v, ok := mt.matches(cp, cost, known)
 	if ok {
 		known[mt] = v
 	}
@@ -442,18 +460,42 @@ func evalMatchTree(known map[matchTree]bool, mt matchTree) (bool, bool) {
 	return v, ok
 }
 
-func (t *notMatchTree) matches(known map[matchTree]bool) (bool, bool) {
-	v, ok := evalMatchTree(known, t.child)
+func (t *notMatchTree) matches(cp *contentProvider, cost int, known map[matchTree]bool) (bool, bool) {
+	v, ok := evalMatchTree(cp, cost, known, t.child)
 	return !v, ok
 }
 
-func (t *substrMatchTree) matches(known map[matchTree]bool) (bool, bool) {
+func (t *substrMatchTree) matches(cp *contentProvider, cost int, known map[matchTree]bool) (bool, bool) {
 	if len(t.current) == 0 {
 		return false, true
 	}
 
-	sure := (t.coversContent || t.contEvaluated)
-	return true, sure
+	if t.fileName && cost < costMemory {
+		return false, false
+	}
+
+	if !t.fileName && cost < costContent {
+		return false, false
+	}
+
+	if !t.coversContent {
+		pruned := t.current[:0]
+		for _, m := range t.current {
+			if m.byteOffset == 0 && m.runeOffset > 0 {
+				m.byteOffset = cp.findOffset(m.fileName, m.runeOffset)
+			}
+			if m.matchContent(cp.data(m.fileName)) {
+				pruned = append(pruned, m)
+			}
+		}
+		t.current = pruned
+	} else {
+		for _, cm := range t.current {
+			cm.byteOffset = cp.findOffset(cm.fileName, cm.runeOffset)
+		}
+	}
+
+	return len(t.current) > 0, true
 }
 
 func (d *indexData) newMatchTree(q query.Q, stats *Stats) (matchTree, error) {

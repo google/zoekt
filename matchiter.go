@@ -104,7 +104,7 @@ func (t *noMatchTree) nextDoc() uint32 {
 
 func (t *noMatchTree) prepare(uint32) {}
 
-func (t *noMatchTree) matches(known map[matchTree]bool) (bool, bool) {
+func (t *noMatchTree) matches(cp *contentProvider, cost int, known map[matchTree]bool) (bool, bool) {
 	return false, true
 }
 
@@ -137,6 +137,10 @@ func (i *ngramDocIterator) nextDoc() uint32 {
 		return maxUInt32
 	}
 	return i.fileIdx
+}
+
+func (i *ngramDocIterator) String() string {
+	return fmt.Sprintf("ngram(L=%d,R=%d,%v)", i.leftPad, i.rightPad, i.iter)
 }
 
 func (i *ngramDocIterator) prepare(nextDoc uint32) {

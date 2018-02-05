@@ -26,37 +26,6 @@ import (
 	"github.com/google/zoekt/query"
 )
 
-func (p *contentProvider) evalContentMatches(s *substrMatchTree) {
-	if !s.coversContent {
-		pruned := s.current[:0]
-		for _, m := range s.current {
-			if p.matchContent(m) {
-				pruned = append(pruned, m)
-			}
-		}
-		s.current = pruned
-	} else {
-		// TODO - this side effect is kind of hidden and surprising.
-		for _, cm := range s.current {
-			cm.byteOffset = p.findOffset(cm.fileName, cm.runeOffset)
-		}
-	}
-	s.contEvaluated = true
-}
-
-func (p *contentProvider) evalRegexpMatches(s *regexpMatchTree) {
-	idxs := s.regexp.FindAllIndex(p.data(s.fileName), -1)
-	s.found = make([]*candidateMatch, 0, len(idxs))
-	for _, idx := range idxs {
-		s.found = append(s.found, &candidateMatch{
-			byteOffset:  uint32(idx[0]),
-			byteMatchSz: uint32(idx[1] - idx[0]),
-			fileName:    s.fileName,
-		})
-	}
-	s.reEvaluated = true
-}
-
 func (d *indexData) simplify(in query.Q) query.Q {
 	eval := query.Map(in, func(q query.Q) query.Q {
 		if r, ok := q.(*query.Repo); ok {
@@ -141,25 +110,11 @@ func (d *indexData) Search(ctx context.Context, q query.Q, opts *SearchOptions) 
 	}
 
 	totalAtomCount := 0
-	var substrAtoms, fileAtoms []*substrMatchTree
-	var regexpAtoms []*regexpMatchTree
-
 	visitMatchTree(mt, func(t matchTree) {
 		totalAtomCount++
-		if st, ok := t.(*substrMatchTree); ok {
-			if st.fileName {
-				fileAtoms = append(fileAtoms, st)
-			} else {
-				substrAtoms = append(substrAtoms, st)
-			}
-
-		}
-		if re, ok := t.(*regexpMatchTree); ok {
-			regexpAtoms = append(regexpAtoms, re)
-		}
 	})
 
-	cp := contentProvider{
+	cp := &contentProvider{
 		id:    d,
 		stats: &res.Stats,
 	}
@@ -197,39 +152,16 @@ nextFileMatch:
 		cp.setDocument(nextDoc)
 
 		known := make(map[matchTree]bool)
-		if v, ok := evalMatchTree(known, mt); ok && !v {
-			continue nextFileMatch
-		}
-
-		// Files are cheap to match. Do them first.
-		if len(fileAtoms) > 0 {
-			for _, st := range fileAtoms {
-				cp.evalContentMatches(st)
-			}
-			if v, ok := evalMatchTree(known, mt); ok && !v {
-				continue nextFileMatch
-			}
-		}
-
-		for _, st := range substrAtoms {
-			// TODO - this may evaluate too much.
-			cp.evalContentMatches(st)
-		}
-		if len(regexpAtoms) > 0 {
-			if v, ok := evalMatchTree(known, mt); ok && !v {
+		for cost := costMin; cost <= costMax; cost++ {
+			v, ok := mt.matches(cp, cost, known)
+			if ok && !v {
 				continue nextFileMatch
 			}
 
-			for _, re := range regexpAtoms {
-				cp.evalRegexpMatches(re)
+			if cost == costMax && !ok {
+				log.Panicf("did not decide. Repo %s, doc %d, known %v",
+					d.repoMetaData.Name, nextDoc, known)
 			}
-		}
-
-		if v, ok := evalMatchTree(known, mt); !ok {
-			log.Panicf("did not decide. Repo %s, doc %d, known %v",
-				d.repoMetaData.Name, nextDoc, known)
-		} else if !v {
-			continue nextFileMatch
 		}
 
 		fileMatch := FileMatch{
