@@ -80,9 +80,12 @@ func (i *distanceHitIterator) updateStats(s *Stats) {
 
 func (i *distanceHitIterator) next(limit uint32) {
 	i.i1.next(limit)
-	if l2 := limit + i.distance; l2 <= maxUInt32 {
-		i.i2.next(l2)
+	l2 := limit + i.distance
+
+	if l2 < limit { // overflow.
+		l2 = maxUInt32
 	}
+	i.i2.next(l2)
 	i.findNext()
 }
 
