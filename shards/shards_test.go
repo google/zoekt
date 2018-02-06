@@ -17,9 +17,12 @@ package shards
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"log"
 	"os"
+	"runtime"
 	"testing"
+	"time"
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/query"
@@ -61,8 +64,8 @@ func TestCrashResilience(t *testing.T) {
 	log.SetOutput(out)
 	defer log.SetOutput(os.Stderr)
 	ss := newShardedSearcher(2)
-	ss.shards = map[string]zoekt.Searcher{
-		"x": &crashSearcher{},
+	ss.shards = map[string]rankedShard{
+		"x": rankedShard{Searcher: &crashSearcher{}},
 	}
 
 	q := &query.Substring{Pattern: "hoi"}
@@ -77,5 +80,83 @@ func TestCrashResilience(t *testing.T) {
 		t.Fatalf("List: %v", err)
 	} else if res.Crashes != 1 {
 		t.Errorf("got result %#v, want crashes = 1", res)
+	}
+}
+
+type rankSearcher struct {
+	rank uint16
+}
+
+func (s *rankSearcher) Close() {
+}
+
+func (s *rankSearcher) String() string {
+	return ""
+}
+
+func (s *rankSearcher) Search(ctx context.Context, q query.Q, opts *zoekt.SearchOptions) (*zoekt.SearchResult, error) {
+	select {
+	case <-ctx.Done():
+		return &zoekt.SearchResult{}, nil
+	default:
+	}
+
+	// Ugly, but without sleep it's too fast, and we can't
+	// simulate the cutoff.
+	time.Sleep(time.Millisecond)
+	return &zoekt.SearchResult{
+		Files: []zoekt.FileMatch{
+			{
+				FileName: fmt.Sprintf("f%d", s.rank),
+				Score:    float64(s.rank),
+			},
+		},
+		Stats: zoekt.Stats{
+			MatchCount: 1,
+		},
+	}, nil
+}
+
+func (s *rankSearcher) List(ctx context.Context, q query.Q) (*zoekt.RepoList, error) {
+	return &zoekt.RepoList{
+		Repos: []*zoekt.RepoListEntry{
+			{Repository: zoekt.Repository{Rank: s.rank}},
+		},
+	}, nil
+}
+
+func TestOrderByShard(t *testing.T) {
+	ss := newShardedSearcher(1)
+
+	n := 3 * runtime.NumCPU()
+	for i := 0; i < n; i++ {
+		ss.replace(fmt.Sprintf("shard%d", i),
+			&rankSearcher{
+				rank: uint16(i),
+			})
+	}
+
+	opts := zoekt.SearchOptions{
+		TotalMaxMatchCount: 3,
+	}
+	res, err := ss.Search(context.Background(), &query.Substring{Pattern: "bla"}, &opts)
+	if err != nil {
+		t.Errorf("Search: %v", err)
+	}
+
+	if len(res.Files) < opts.TotalMaxMatchCount {
+		t.Errorf("got %d results, want %d", len(res.Files), opts.TotalMaxMatchCount)
+	}
+	if len(res.Files) == n {
+		t.Errorf("got %d results, want < %d", len(res.Files), n)
+	}
+	for i, f := range res.Files {
+		rev := n - 1 - i
+		want := fmt.Sprintf("f%d", rev)
+		got := f.FileName
+
+		if got != want {
+			t.Logf("%d: got %q, want %q", i, got, want)
+		}
 	}
 }

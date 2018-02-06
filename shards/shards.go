@@ -31,6 +31,11 @@ import (
 	"github.com/google/zoekt/query"
 )
 
+type rankedShard struct {
+	zoekt.Searcher
+	rank uint16
+}
+
 type shardedSearcher struct {
 	// Limit the number of parallel queries. Since searching is
 	// CPU bound, we can't do better than #CPU queries in
@@ -39,12 +44,12 @@ type shardedSearcher struct {
 	throttle *semaphore.Weighted
 	capacity int64
 
-	shards map[string]zoekt.Searcher
+	shards map[string]rankedShard
 }
 
 func newShardedSearcher(n int64) *shardedSearcher {
 	ss := &shardedSearcher{
-		shards:   make(map[string]zoekt.Searcher),
+		shards:   make(map[string]rankedShard),
 		throttle: semaphore.NewWeighted(n),
 		capacity: n,
 	}
@@ -102,9 +107,9 @@ func (ss *shardedSearcher) Close() {
 	}
 }
 
-func (ss *shardedSearcher) Search(ctx context.Context, pat query.Q, opts *zoekt.SearchOptions) (sr *zoekt.SearchResult, err error) {
+func (ss *shardedSearcher) Search(ctx context.Context, q query.Q, opts *zoekt.SearchOptions) (sr *zoekt.SearchResult, err error) {
 	tr := trace.New("shardedSearcher.Search", "")
-	tr.LazyLog(pat, true)
+	tr.LazyLog(q, true)
 	tr.LazyPrintf("opts: %+v", opts)
 	defer func() {
 		if sr != nil {
@@ -119,10 +124,6 @@ func (ss *shardedSearcher) Search(ctx context.Context, pat query.Q, opts *zoekt.
 	}()
 
 	start := time.Now()
-	type res struct {
-		sr  *zoekt.SearchResult
-		err error
-	}
 
 	aggregate := &zoekt.SearchResult{
 		RepoURLs:      map[string]string{},
@@ -141,7 +142,7 @@ func (ss *shardedSearcher) Search(ctx context.Context, pat query.Q, opts *zoekt.
 
 	// TODO - allow for canceling the query.
 	shards := ss.getShards()
-	all := make(chan res, len(shards))
+	all := make(chan shardResult, len(shards))
 
 	var childCtx context.Context
 	var cancel context.CancelFunc
@@ -158,24 +159,17 @@ func (ss *shardedSearcher) Search(ctx context.Context, pat query.Q, opts *zoekt.
 	// number of parallel searches. This reduces the peak working
 	// set, which hopefully stops https://cs.bazel.build from crashing
 	// when looking for the string "com".
-	throttle := make(chan int, 10*runtime.NumCPU())
+	feeder := make(chan zoekt.Searcher, len(shards))
 	for _, s := range shards {
-		go func(s zoekt.Searcher) {
-			throttle <- 1
-			defer func() {
-				<-throttle
-				if r := recover(); r != nil {
-					log.Printf("crashed shard: %s: %s, %s", s.String(), r, debug.Stack())
-
-					var r zoekt.SearchResult
-					r.Stats.Crashes = 1
-					all <- res{&r, nil}
-				}
-			}()
-
-			ms, err := s.Search(childCtx, pat, opts)
-			all <- res{ms, err}
-		}(s)
+		feeder <- s
+	}
+	close(feeder)
+	for i := 0; i < runtime.NumCPU(); i++ {
+		go func() {
+			for s := range feeder {
+				searchOneShard(childCtx, s, q, opts, all)
+			}
+		}()
 	}
 
 	for range shards {
@@ -204,6 +198,26 @@ func (ss *shardedSearcher) Search(ctx context.Context, pat query.Q, opts *zoekt.
 	zoekt.SortFilesByScore(aggregate.Files)
 	aggregate.Duration = time.Now().Sub(start)
 	return aggregate, nil
+}
+
+type shardResult struct {
+	sr  *zoekt.SearchResult
+	err error
+}
+
+func searchOneShard(ctx context.Context, s zoekt.Searcher, q query.Q, opts *zoekt.SearchOptions, sink chan shardResult) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("crashed shard: %s: %s, %s", s.String(), r, debug.Stack())
+
+			var r zoekt.SearchResult
+			r.Stats.Crashes = 1
+			sink <- shardResult{&r, nil}
+		}
+	}()
+
+	ms, err := s.Search(ctx, q, opts)
+	sink <- shardResult{ms, err}
 }
 
 func (ss *shardedSearcher) List(ctx context.Context, r query.Q) (rl *zoekt.RepoList, err error) {
@@ -248,7 +262,7 @@ func (ss *shardedSearcher) List(ctx context.Context, r query.Q) (rl *zoekt.RepoL
 			}()
 			ms, err := s.List(ctx, r)
 			all <- res{ms, err}
-		}(s)
+		}(s.Searcher)
 	}
 
 	crashes := 0
@@ -289,12 +303,17 @@ func (s *shardedSearcher) rlock(ctx context.Context) error {
 }
 
 // getShards returns the currently loaded shards. The shards must be
-// accessed under a rlock call.
-func (s *shardedSearcher) getShards() []zoekt.Searcher {
-	var res []zoekt.Searcher
+// accessed under a rlock call. The shards are sorted by decreasing
+// rank.
+func (s *shardedSearcher) getShards() []rankedShard {
+	var res []rankedShard
 	for _, sh := range s.shards {
 		res = append(res, sh)
 	}
+	// TODO: precompute this.
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].rank > res[j].rank
+	})
 	return res
 }
 
@@ -310,18 +329,34 @@ func (s *shardedSearcher) unlock() {
 	s.throttle.Release(s.capacity)
 }
 
+func shardRank(s zoekt.Searcher) uint16 {
+	q := query.Repo{}
+	result, err := s.List(context.Background(), &q)
+	if err != nil {
+		return 0
+	}
+	if len(result.Repos) == 0 {
+		return 0
+	}
+	return result.Repos[0].Repository.Rank
+}
+
 func (s *shardedSearcher) replace(key string, shard zoekt.Searcher) {
 	s.lock(context.Background())
 	defer s.unlock()
 	old := s.shards[key]
-	if old != nil {
+	if old.Searcher != nil {
 		old.Close()
 	}
 
 	if shard == nil {
 		delete(s.shards, key)
 	} else {
-		s.shards[key] = shard
+
+		s.shards[key] = rankedShard{
+			rank:     shardRank(shard),
+			Searcher: shard,
+		}
 	}
 }
 
