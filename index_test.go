@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
 	"reflect"
 	"regexp/syntax"
 	"strings"
@@ -63,7 +62,31 @@ func TestBoundary(t *testing.T) {
 	}
 }
 
-var _ = log.Println
+func TestDocSectionInvalid(t *testing.T) {
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
+	doc := Document{
+		Name:    "f1",
+		Content: []byte("01234567890123"),
+		Symbols: []DocumentSection{{5, 8}, {7, 9}},
+	}
+
+	if err := b.Add(doc); err == nil {
+		t.Errorf("overlapping doc sections should fail")
+	}
+
+	doc = Document{
+		Name:    "f1",
+		Content: []byte("01234567890123"),
+		Symbols: []DocumentSection{{0, 20}},
+	}
+
+	if err := b.Add(doc); err == nil {
+		t.Errorf("doc sections beyond EOF should fail")
+	}
+}
 
 func TestBasic(t *testing.T) {
 	b := testIndexBuilder(t, nil,
@@ -73,7 +96,10 @@ func TestBasic(t *testing.T) {
 			// ------------- 0123456789012345678901234567890123456789
 		})
 
-	res := searchForTest(t, b, &query.Substring{Pattern: "water"})
+	res := searchForTest(t, b, &query.Substring{
+		Pattern:       "water",
+		CaseSensitive: true,
+	})
 	fmatches := res.Files
 	if len(fmatches) != 1 || len(fmatches[0].LineMatches) != 1 {
 		t.Fatalf("got %v, want 1 matches", fmatches)
@@ -185,7 +211,10 @@ func TestFileBasedSearch(t *testing.T) {
 		Document{Name: "f1", Content: c1},
 		Document{Name: "f2", Content: c2},
 	)
-	sres := searchForTest(t, b, &query.Substring{Pattern: "ananas"})
+	sres := searchForTest(t, b, &query.Substring{
+		CaseSensitive: false,
+		Pattern:       "ananas",
+	})
 
 	matches := sres.Files
 	if len(matches) != 2 {
@@ -257,7 +286,7 @@ func TestAndSearch(t *testing.T) {
 		FilesLoaded:        1,
 		ContentBytesLoaded: 18,
 		IndexBytesLoaded:   8,
-		NgramMatches:       4,
+		NgramMatches:       3, // we look at doc 1, because it's max(0,1) due to AND
 		MatchCount:         1,
 		FileCount:          1,
 		FilesConsidered:    2,
@@ -328,8 +357,9 @@ func TestFileSearch(t *testing.T) {
 	}
 
 	b.AddFile("banzana", []byte("x orange y"))
-	// --------------------------0123456879
+	// --------0123456
 	b.AddFile("banana", []byte("x apple y"))
+	// --------789012
 	sres := searchForTest(t, b, &query.Substring{
 		Pattern:  "anan",
 		FileName: true,
@@ -910,8 +940,8 @@ func TestNegativeRegexp(t *testing.T) {
 }
 
 func TestSymbolRank(t *testing.T) {
-	content := []byte("func bla() blub")
-	// ----------------012345678901234
+	content := []byte("func bla() blubxxxxx")
+	// ----------------01234567890123456789
 	b := testIndexBuilder(t, nil,
 		Document{
 			Name:    "f1",
@@ -927,11 +957,12 @@ func TestSymbolRank(t *testing.T) {
 
 	res := searchForTest(t, b,
 		&query.Substring{
-			Pattern: "bla",
+			CaseSensitive: false,
+			Pattern:       "bla",
 		})
 
 	if len(res.Files) != 3 {
-		t.Fatalf("got %#v, want 3 files", res.Files)
+		t.Fatalf("got %d files, want 3 files. Full data: %v", len(res.Files), res.Files)
 	}
 	if res.Files[0].FileName != "f2" {
 		t.Errorf("got %#v, want 'f2' as top match", res.Files[0])
@@ -1590,6 +1621,50 @@ func TestNoPositiveAtoms(t *testing.T) {
 	}
 }
 
+func TestSymbolBoundaryStart(t *testing.T) {
+	content := []byte("start\nbla bla\nend")
+	// ----------------012345 67890123 456
+
+	b := testIndexBuilder(t, &Repository{Name: "reponame"},
+		Document{
+			Name:    "f1",
+			Content: content,
+			Symbols: []DocumentSection{{0, 5}, {14, 17}},
+		},
+	)
+	q := &query.Symbol{&query.Substring{Pattern: "start"}}
+	res := searchForTest(t, b, q)
+	if len(res.Files) != 1 || len(res.Files[0].LineMatches) != 1 {
+		t.Fatalf("got %v, want 1 line in 1 file", res.Files)
+	}
+	m := res.Files[0].LineMatches[0].LineFragments[0]
+	if m.Offset != 0 {
+		t.Fatalf("got offset %d want 0", m.Offset)
+	}
+}
+
+func TestSymbolBoundaryEnd(t *testing.T) {
+	content := []byte("start\nbla bla\nend")
+	// ----------------012345 67890123 456
+
+	b := testIndexBuilder(t, &Repository{Name: "reponame"},
+		Document{
+			Name:    "f1",
+			Content: content,
+			Symbols: []DocumentSection{{14, 17}},
+		},
+	)
+	q := &query.Symbol{&query.Substring{Pattern: "end"}}
+	res := searchForTest(t, b, q)
+	if len(res.Files) != 1 || len(res.Files[0].LineMatches) != 1 {
+		t.Fatalf("got %v, want 1 line in 1 file", res.Files)
+	}
+	m := res.Files[0].LineMatches[0].LineFragments[0]
+	if m.Offset != 14 {
+		t.Fatalf("got offset %d want 0", m.Offset)
+	}
+}
+
 func TestSymbolAtom(t *testing.T) {
 	content := []byte("bla\nsymblabla\nbla")
 	// ----------------0123 456789012
@@ -1603,7 +1678,7 @@ func TestSymbolAtom(t *testing.T) {
 	)
 	q := &query.Symbol{&query.Substring{Pattern: "bla"}}
 	res := searchForTest(t, b, q)
-	if len(res.Files) != 1 && len(res.Files[0].LineMatches) != 1 {
+	if len(res.Files) != 1 || len(res.Files[0].LineMatches) != 1 {
 		t.Fatalf("got %v, want 1 line in 1 file", res.Files)
 	}
 	m := res.Files[0].LineMatches[0].LineFragments[0]
@@ -1625,11 +1700,40 @@ func TestSymbolAtomExact(t *testing.T) {
 	)
 	q := &query.Symbol{&query.Substring{Pattern: "sym"}}
 	res := searchForTest(t, b, q)
-	if len(res.Files) != 1 && len(res.Files[0].LineMatches) != 1 {
+	if len(res.Files) != 1 || len(res.Files[0].LineMatches) != 1 {
 		t.Fatalf("got %v, want 1 line in 1 file", res.Files)
 	}
 	m := res.Files[0].LineMatches[0].LineFragments[0]
 	if m.Offset != 4 {
 		t.Fatalf("got offset %d, want 7", m.Offset)
+	}
+}
+
+func TestHitIterTerminate(t *testing.T) {
+	// contrived input: trigram frequencies forces selecting abc +
+	// def for the distance iteration. There is no match, so this
+	// will advance the compressedPostingIterator to beyond the
+	// end.
+	content := []byte("abc bcdbcd cdecde abcabc def efg")
+	b := testIndexBuilder(t, nil,
+		Document{
+			Name:    "f1",
+			Content: content,
+		},
+	)
+	searchForTest(t, b, &query.Substring{Pattern: "abcdef"})
+}
+
+func TestDistanceHitIterBailLast(t *testing.T) {
+	content := []byte("AST AST AST UASH")
+	b := testIndexBuilder(t, nil,
+		Document{
+			Name:    "f1",
+			Content: content,
+		},
+	)
+	res := searchForTest(t, b, &query.Substring{Pattern: "UAST"})
+	if len(res.Files) != 0 {
+		t.Fatalf("got %v, want no results", res.Files)
 	}
 }

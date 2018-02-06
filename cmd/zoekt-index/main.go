@@ -33,6 +33,10 @@ type fileAggregator struct {
 }
 
 func (a *fileAggregator) add(path string, info os.FileInfo, err error) error {
+	if err != nil {
+		return err
+	}
+
 	if info.IsDir() {
 		base := filepath.Base(path)
 		if _, ok := a.ignoreDirs[base]; ok {
