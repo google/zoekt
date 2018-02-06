@@ -19,11 +19,13 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"math"
 	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -221,6 +223,28 @@ func setTemplatesFromConfig(desc *zoekt.Repository, repoDir string) error {
 	}
 	for _, o := range sec.Options {
 		desc.RawConfig[o.Key] = o.Value
+	}
+
+	// Ranking info.
+
+	// Github:
+	traction := 0
+	for _, s := range []string{"github-stars", "github-forks", "github-watchers", "github-subscribers"} {
+		f, err := strconv.Atoi(configLookupString(sec, s))
+		if err == nil {
+			traction += f
+		}
+	}
+
+	if strings.Contains(desc.Name, "googlesource.com/") && traction == 0 {
+		// Pretend everything on googlesource.com has 1000
+		// github stars.
+		traction = 1000
+	}
+
+	if traction > 0 {
+		l := math.Log(float64(traction))
+		desc.Rank = uint16((1.0 - 1.0/(1+l)) * 10000)
 	}
 
 	return nil
