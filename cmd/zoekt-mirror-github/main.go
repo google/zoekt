@@ -235,7 +235,7 @@ func cloneRepos(destDir string, repos []*github.Repository) error {
 		}
 
 		if err := updateConfig(destDir, r); err != nil {
-			return fmt.Errorf("updateConfig", err)
+			return fmt.Errorf("updateConfig: %v", err)
 		}
 	}
 
