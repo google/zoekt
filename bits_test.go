@@ -59,3 +59,20 @@ func TestGenerateCaseNgrams(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 }
+
+func TestNextFileIndex(t *testing.T) {
+	for _, tc := range []struct {
+		off, curFile uint32
+		ends         []uint32
+		want         uint32
+	}{
+		{maxUInt32, 0, []uint32{34}, 1},
+		{9, 0, []uint32{34}, 0},
+		{450, 0, []uint32{100, 200, 300, 400, 500, 600}, 4},
+	} {
+		got := nextFileIndex(tc.off, tc.curFile, tc.ends)
+		if got != tc.want {
+			t.Errorf("%v: got %d, want %d", tc, got, tc.want)
+		}
+	}
+}
