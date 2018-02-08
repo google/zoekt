@@ -70,6 +70,13 @@ func (d *indexData) Search(ctx context.Context, q query.Q, opts *SearchOptions) 
 		return &res, nil
 	}
 
+	select {
+	case <-ctx.Done():
+		res.Stats.ShardsSkipped++
+		return &res, nil
+	default:
+	}
+
 	tr := trace.New("indexData.Search", d.file.Name())
 	tr.LazyPrintf("opts: %+v", opts)
 	defer func() {
@@ -93,13 +100,6 @@ func (d *indexData) Search(ctx context.Context, q query.Q, opts *SearchOptions) 
 	if opts.EstimateDocCount {
 		res.Stats.ShardFilesConsidered = len(d.fileBranchMasks)
 		return &res, nil
-	}
-
-	select {
-	case <-ctx.Done():
-		res.Stats.ShardsSkipped++
-		return &res, nil
-	default:
 	}
 
 	q = query.Map(q, query.ExpandFileContent)
