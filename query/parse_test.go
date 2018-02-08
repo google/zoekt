@@ -92,6 +92,11 @@ func TestParseQuery(t *testing.T) {
 		{"abc case:auto", &Substring{Pattern: "abc", CaseSensitive: false}},
 		{"ABC case:auto", &Substring{Pattern: "ABC", CaseSensitive: true}},
 		{"ABC case:\"auto\"", &Substring{Pattern: "ABC", CaseSensitive: true}},
+		{"abc -f:def case:yes", NewAnd(
+			&Substring{Pattern: "abc", CaseSensitive: true},
+			&Not{Child: &Substring{Pattern: "def", FileName: true, CaseSensitive: true}},
+		)},
+
 		// errors.
 		{"\"abc", nil},
 		{"\"a\\", nil},
