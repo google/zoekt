@@ -26,6 +26,8 @@ import (
 	"github.com/google/zoekt/query"
 )
 
+const maxUInt16 = 0xffff
+
 func (d *indexData) simplify(in query.Q) query.Q {
 	eval := query.Map(in, func(q query.Q) query.Q {
 		if r, ok := q.(*query.Repo); ok {
@@ -167,12 +169,8 @@ nextFileMatch:
 		fileMatch := FileMatch{
 			Repository: d.repoMetaData.Name,
 			FileName:   string(d.fileName(nextDoc)),
-			// Maintain ordering of input files. This
-			// strictly dominates the in-file ordering of
-			// the matches.
-			Score:    10 * float64(nextDoc) / float64(len(d.boundaries)),
-			Checksum: d.getChecksum(nextDoc),
-			Language: d.languageMap[d.languages[nextDoc]],
+			Checksum:   d.getChecksum(nextDoc),
+			Language:   d.languageMap[d.languages[nextDoc]],
 		}
 
 		if s := d.subRepos[nextDoc]; s > 0 {
@@ -197,7 +195,6 @@ nextFileMatch:
 		visitMatches(mt, known, func(mt matchTree) {
 			atomMatchCount++
 		})
-		fileMatch.Score += float64(atomMatchCount) / float64(totalAtomCount) * scoreFactorAtomMatch
 		finalCands := gatherMatches(mt, known)
 
 		if len(finalCands) == 0 {
@@ -224,15 +221,21 @@ nextFileMatch:
 			}
 
 			// Order by ordering in file.
-			fileMatch.LineMatches[i].Score += 1.0 - (float64(i) / float64(len(fileMatch.LineMatches)))
+			fileMatch.LineMatches[i].Score += scoreLineOrderFactor * (1.0 - (float64(i) / float64(len(fileMatch.LineMatches))))
 		}
-		fileMatch.Score += maxFileScore
+
+		// Maintain ordering of input files. This
+		// strictly dominates the in-file ordering of
+		// the matches.
+		fileMatch.Score = maxFileScore
+		fileMatch.Score += float64(atomMatchCount) / float64(totalAtomCount) * scoreFactorAtomMatch
+		fileMatch.Score += scoreFileOrderFactor * float64(nextDoc) / float64(len(d.boundaries))
+		fileMatch.Score += scoreShardRankFactor * float64(d.repoMetaData.Rank) / maxUInt16
 
 		if fileMatch.Score > scoreImportantThreshold {
 			importantMatchCount++
 		}
 		fileMatch.Branches = d.gatherBranches(nextDoc, mt, known)
-
 		sortMatchesByScore(fileMatch.LineMatches)
 		if opts.Whole {
 			fileMatch.Content = cp.data(false)
