@@ -124,15 +124,25 @@ type ngramDocIterator struct {
 	matchCount int
 }
 
-func (i *ngramDocIterator) updateFileIndex() {
-	idx := i.iter.first()
-	for i.fileIdx < uint32(len(i.ends)) && i.ends[i.fileIdx] <= idx {
-		i.fileIdx++
+// nextFileIndex returns the smallest index j of ends such that
+// ends[j] > offset, assuming ends[f] <= offset.
+func nextFileIndex(offset, f uint32, ends []uint32) uint32 {
+	d := uint32(1)
+	for f < uint32(len(ends)) && ends[f] <= offset {
+		if f+d < uint32(len(ends)) && ends[f+d] <= offset {
+			f += d
+			d *= 2
+		} else if d > 1 {
+			d = d/4 + 1
+		} else {
+			f++
+		}
 	}
+	return f
 }
 
 func (i *ngramDocIterator) nextDoc() uint32 {
-	i.updateFileIndex()
+	i.fileIdx = nextFileIndex(i.iter.first(), i.fileIdx, i.ends)
 	if i.fileIdx >= uint32(len(i.ends)) {
 		return maxUInt32
 	}

@@ -188,6 +188,9 @@ type Repository struct {
 
 	// All zoekt.* configuration settings.
 	RawConfig map[string]string
+
+	// Importance of the repository, bigger is more important
+	Rank uint16
 }
 
 // IndexMetadata holds metadata stored in the index file.

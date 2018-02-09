@@ -27,7 +27,10 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+
+	git "gopkg.in/src-d/go-git.v4"
 
 	"github.com/google/go-github/github"
 	"golang.org/x/oauth2"
@@ -113,7 +116,7 @@ func main() {
 	}
 
 	if err := cloneRepos(destDir, repos); err != nil {
-		log.Fatal(err)
+		log.Fatalf("cloneRepos: %v", err)
 	}
 
 	if *deleteRepos {
@@ -226,11 +229,63 @@ func cloneRepos(destDir string, repos []*github.Repository) error {
 			"zoekt.web-url-type": "github",
 			"zoekt.web-url":      *r.HTMLURL,
 			"zoekt.name":         filepath.Join("github.com", *r.FullName),
-			// TODO - insert stars/forks for repo ranking too.
 		}
 		if err := gitindex.CloneRepo(destDir, *r.FullName, *r.CloneURL, config); err != nil {
 			return err
 		}
+
+		if err := updateConfig(destDir, r); err != nil {
+			return fmt.Errorf("updateConfig: %v", err)
+		}
+	}
+
+	return nil
+}
+
+func updateConfig(destDir string, r *github.Repository) error {
+	p := filepath.Join(destDir, *r.FullName+".git")
+	repo, err := git.PlainOpen(p)
+	if err != nil {
+		return fmt.Errorf("PlainOpen(%s): %v", p, err)
+	}
+
+	cfg, err := repo.Config()
+	if err != nil {
+		return err
+	}
+
+	for k, v := range map[string]*int{
+		"github-stars":       r.StargazersCount,
+		"github-watchers":    r.WatchersCount,
+		"github-subscribers": r.SubscribersCount,
+		"github-forks":       r.ForksCount,
+	} {
+		if v != nil {
+			cfg.Raw.AddOption("zoekt", "", k, strconv.Itoa(*v))
+		}
+	}
+
+	f, err := ioutil.TempFile(p, "")
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	out, err := cfg.Marshal()
+	if err != nil {
+		return err
+	}
+
+	if _, err := f.Write(out); err != nil {
+		return err
+	}
+
+	if err := f.Close(); err != nil {
+		return err
+	}
+
+	if err := os.Rename(f.Name(), filepath.Join(p, "config")); err != nil {
+		return err
 	}
 
 	return nil

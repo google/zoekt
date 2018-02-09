@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/pprof"
+	"time"
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/query"
@@ -62,6 +63,7 @@ func main() {
 	index := flag.String("index_dir",
 		filepath.Join(os.Getenv("HOME"), ".zoekt"), "search for index files in `directory`")
 	cpuProfile := flag.String("cpu_profile", "", "write cpu profile to `file`")
+	profileTime := flag.Duration("profile_time", time.Second, "run this long to gather stats.")
 	verbose := flag.Bool("v", false, "print some background data")
 
 	flag.Usage = func() {
@@ -113,9 +115,14 @@ func main() {
 		if *verbose {
 			log.Println("Displaying matches...")
 		}
+
+		t := time.Now()
 		pprof.StartCPUProfile(f)
-		for i := 0; i < 10; i++ {
+		for {
 			sres, err = searcher.Search(context.Background(), query, &sOpts)
+			if time.Now().Sub(t) > *profileTime {
+				break
+			}
 		}
 		pprof.StopCPUProfile()
 	}
