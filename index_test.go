@@ -1737,3 +1737,24 @@ func TestDistanceHitIterBailLast(t *testing.T) {
 		t.Fatalf("got %v, want no results", res.Files)
 	}
 }
+
+func TestDocumentSectionRuneBoundary(t *testing.T) {
+	content := string([]rune{kelvinCodePoint, kelvinCodePoint, kelvinCodePoint})
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
+
+	for i, sec := range []DocumentSection{
+		{2, 6},
+		{3, 7},
+	} {
+		if err := b.Add(Document{
+			Name:    "f1",
+			Content: []byte(content),
+			Symbols: []DocumentSection{sec},
+		}); err == nil {
+			t.Errorf("%d: Add succeeded", i)
+		}
+	}
+}
