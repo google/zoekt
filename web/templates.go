@@ -196,7 +196,8 @@ var TemplateText = map[string]string{
       {{if .Stats.Crashes}}<br><b>{{.Stats.Crashes}} shards crashed</b><br>{{end}}
       {{ $fileCount := len .FileMatches }}
       Found {{.Stats.MatchCount}} results in {{.Stats.FileCount}} files{{if or (lt $fileCount .Stats.FileCount) (or (gt .Stats.ShardsSkipped 0) (gt .Stats.FilesSkipped 0)) }},
-        showing top {{ $fileCount }} files (<a href="search?q={{.Last.Query}}&num={{More .Last.Num}}">show more</a>).
+        showing top {{ $fileCount }} files (<a rel="nofollow"
+           href="search?q={{.Last.Query}}&num={{More .Last.Num}}">show more</a>).
       {{else}}.{{end}}
     </h5>
     {{range .FileMatches}}
