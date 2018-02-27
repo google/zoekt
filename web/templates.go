@@ -46,7 +46,6 @@ var TemplateText = map[string]string{
 <style>
   #navsearchbox { width: 350px !important; }
   #maxhits { width: 100px !important; }
-  #results { padding-top: 60px; }
   .label-dup {
     border-width: 1px !important;
     border-style: solid !important;
@@ -60,11 +59,20 @@ var TemplateText = map[string]string{
   .result {
     display: block;
     content: " ";
-    margin-top: -60px;
-    height: 60px;
     visibility: hidden;
   }
-  .inline-pre { border: unset; background-color: unset; margin: unset; padding: unset; }
+  .container-results {
+     overflow: auto;
+     max-height: calc(100% - 72px);
+  } 
+  .inline-pre {
+     border: unset;
+     background-color: unset;
+     margin: unset;
+     padding: unset;
+     overflow: unset;
+  }
+  :target { background-color: #ccf; }
   table tbody tr td { border: none !important; padding: 2px !important; }
 </style>
 </head>
@@ -94,7 +102,7 @@ var TemplateText = map[string]string{
 `,
 
 	"navbar": `
-<nav class="navbar navbar-default navbar-fixed-top">
+<nav class="navbar navbar-default">
   <div class="container-fluid">
     <div class="navbar-header">
       <a class="navbar-brand" href="/">Zoekt</a>
@@ -191,7 +199,7 @@ var TemplateText = map[string]string{
 <title>Results for {{.QueryStr}}</title>
 <body id="results">
   {{template "navbar" .Last}}
-  <div class="container-fluid">
+  <div class="container-fluid container-results">
     <h5>
       {{if .Stats.Crashes}}<br><b>{{.Stats.Crashes}} shards crashed</b><br>{{end}}
       {{ $fileCount := len .FileMatches }}
@@ -282,23 +290,18 @@ var TemplateText = map[string]string{
 
 	"print": `
 <html>
-  <head>
-    <title>{{.Repo}}:{{.Name}}</title>
-  </head>
-<body>{{template "searchbox" .Last}}
-<hr>
-<p>
-  <tt>{{.Repo}} : {{.Name}}</tt>
-</p>
-
-
-<div style="background: #eef;">
-{{ range $index, $ln := .Lines}}
-  <pre><a name="l{{Inc $index}}" href="#l{{Inc $index}}">{{Inc $index}}</a>: {{$ln}}</pre>
-{{end}}
-<pre>
-</pre>
-</div>
+  {{template "head"}}
+  <title>{{.Repo}}:{{.Name}}</title>
+<body id="results">
+  {{template "navbar" .Last}}
+  <div class="container-fluid container-results" >
+     <div class="table table-hover table-condensed" style="overflow:auto; background: #eef;">
+       {{ range $index, $ln := .Lines}}
+	 <pre id="l{{Inc $index}}" class="inline-pre"><a href="#l{{Inc $index}}">{{Inc $index}}</a>: {{$ln}}</pre>
+       {{end}}
+     </div>
+  </div>
+  {{ template "jsdep"}}
 </body>
 </html>
 `,
