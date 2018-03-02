@@ -241,7 +241,8 @@ nextFileMatch:
 		fileMatch.addScore("fragment", maxFileScore)
 		fileMatch.addScore("atom", float64(atomMatchCount)/float64(totalAtomCount)*scoreFactorAtomMatch)
 
-		fileMatch.addScore("doc-order", scoreFileOrderFactor*(float64(nextDoc)/float64(len(d.boundaries))))
+		// Prefer earlier docs.
+		fileMatch.addScore("doc-order", scoreFileOrderFactor*(1.0-float64(nextDoc)/float64(len(d.boundaries))))
 		fileMatch.addScore("shard-order", scoreShardRankFactor*float64(d.repoMetaData.Rank)/maxUInt16)
 
 		if fileMatch.Score > scoreImportantThreshold {

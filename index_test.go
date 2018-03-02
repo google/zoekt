@@ -613,6 +613,29 @@ func TestWordBoundaryRanking(t *testing.T) {
 	}
 }
 
+func TestDocumentOrder(t *testing.T) {
+	var docs []Document
+	for i := 0; i < 3; i++ {
+		docs = append(docs, Document{Name: fmt.Sprintf("f%d", i), Content: []byte("needle")})
+	}
+
+	b := testIndexBuilder(t, nil, docs...)
+
+	sres := searchForTest(t, b, query.NewAnd(
+		&query.Substring{
+			Pattern: "needle",
+		}))
+
+	want := []string{"f0", "f1", "f2"}
+	var got []string
+	for _, f := range sres.Files {
+		got = append(got, f.FileName)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
 func TestBranchMask(t *testing.T) {
 	b := testIndexBuilder(t, &Repository{
 		Branches: []RepositoryBranch{
@@ -634,8 +657,8 @@ func TestBranchMask(t *testing.T) {
 			Pattern: "table",
 		}))
 
-	if len(sres.Files) != 2 || sres.Files[0].FileName != "f3" || sres.Files[1].FileName != "f2" {
-		t.Fatalf("got %v, want 2 result from [f3,f2]", sres.Files)
+	if len(sres.Files) != 2 || sres.Files[0].FileName != "f2" || sres.Files[1].FileName != "f3" {
+		t.Fatalf("got %v, want 2 result from [f2,f3]", sres.Files)
 	}
 
 	if len(sres.Files[0].Branches) != 1 || sres.Files[0].Branches[0] != "stable" {
