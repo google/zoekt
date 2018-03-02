@@ -20,6 +20,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -78,7 +79,7 @@ func TestBasic(t *testing.T) {
 	ctx := context.Background()
 	result, err := ss.Search(ctx, q, &sOpts)
 	if err != nil {
-		t.Fatalf("Parse(111): %v", err)
+		t.Fatalf("Search(%v): %v", q, err)
 	}
 
 	if len(result.Files) != 1 || result.Files[0].FileName != "F1" {
@@ -294,5 +295,80 @@ func TestPartialSuccess(t *testing.T) {
 		t.Errorf("glob(%s): %v", dir, err)
 	} else if len(fs) != 0 {
 		t.Errorf("got shards %v, want []", fs)
+	}
+}
+
+type filerankCase struct {
+	name string
+	docs []*zoekt.Document
+	want []int
+}
+
+func testFileRankAspect(t *testing.T, c filerankCase) {
+	var want []*zoekt.Document
+	for _, j := range c.want {
+		want = append(want, c.docs[j])
+	}
+
+	got := make([]*zoekt.Document, len(c.docs))
+	copy(got, c.docs)
+	sortDocuments(got)
+
+	print := func(ds []*zoekt.Document) string {
+		r := ""
+		for _, d := range ds {
+			r += fmt.Sprintf("%v, ", d)
+		}
+		return r
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got docs [%v], want [%v]", print(got), print(want))
+	}
+}
+
+func TestFileRank(t *testing.T) {
+	for _, c := range []filerankCase{{
+		name: "filename",
+		docs: []*zoekt.Document{
+			{
+				Name:    "longlonglong",
+				Content: []byte("bla"),
+			},
+			{
+				Name:    "short",
+				Content: []byte("bla"),
+			}},
+		want: []int{1, 0},
+	}, {
+		name: "test",
+		docs: []*zoekt.Document{
+			{
+				Name:    "test",
+				Content: []byte("bla"),
+			},
+			{
+				Name:    "longlonglong",
+				Content: []byte("bla"),
+			},
+		},
+		want: []int{1, 0},
+	}, {
+		name: "content",
+		docs: []*zoekt.Document{
+			{
+				Content: []byte("bla"),
+			},
+			{
+				Content: []byte("blablablabla"),
+			},
+			{
+				Content: []byte("blabla"),
+			},
+		},
+		want: []int{0, 2, 1},
+	}} {
+		t.Run(c.name, func(t *testing.T) {
+			testFileRankAspect(t, c)
+		})
 	}
 }
