@@ -28,6 +28,17 @@ import (
 
 const maxUInt16 = 0xffff
 
+// DebugScore controls whether we collect data on match scores are
+// constructed. Intended for use in tests.
+var DebugScore = false
+
+func (m *FileMatch) addScore(what string, s float64) {
+	if DebugScore {
+		m.Debug += fmt.Sprintf("%s:%f, ", what, s)
+	}
+	m.Score += s
+}
+
 func (d *indexData) simplify(in query.Q) query.Q {
 	eval := query.Map(in, func(q query.Q) query.Q {
 		if r, ok := q.(*query.Repo); ok {
@@ -227,10 +238,11 @@ nextFileMatch:
 		// Maintain ordering of input files. This
 		// strictly dominates the in-file ordering of
 		// the matches.
-		fileMatch.Score = maxFileScore
-		fileMatch.Score += float64(atomMatchCount) / float64(totalAtomCount) * scoreFactorAtomMatch
-		fileMatch.Score += scoreFileOrderFactor * float64(nextDoc) / float64(len(d.boundaries))
-		fileMatch.Score += scoreShardRankFactor * float64(d.repoMetaData.Rank) / maxUInt16
+		fileMatch.addScore("fragment", maxFileScore)
+		fileMatch.addScore("atom", float64(atomMatchCount)/float64(totalAtomCount)*scoreFactorAtomMatch)
+
+		fileMatch.addScore("doc-order", scoreFileOrderFactor*(float64(nextDoc)/float64(len(d.boundaries))))
+		fileMatch.addScore("shard-order", scoreShardRankFactor*float64(d.repoMetaData.Rank)/maxUInt16)
 
 		if fileMatch.Score > scoreImportantThreshold {
 			importantMatchCount++

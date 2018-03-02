@@ -35,6 +35,7 @@ func clearScores(r *SearchResult) {
 			r.Files[i].LineMatches[j].Score = 0.0
 		}
 		r.Files[i].Checksum = nil
+		r.Files[i].Debug = ""
 	}
 }
 
@@ -634,7 +635,7 @@ func TestBranchMask(t *testing.T) {
 		}))
 
 	if len(sres.Files) != 2 || sres.Files[0].FileName != "f3" || sres.Files[1].FileName != "f2" {
-		t.Fatalf("got %v, want 1 result from f2", sres.Files)
+		t.Fatalf("got %v, want 2 result from [f3,f2]", sres.Files)
 	}
 
 	if len(sres.Files[0].Branches) != 1 || sres.Files[0].Branches[0] != "stable" {
