@@ -52,9 +52,9 @@ func loggedRun(cmd *exec.Cmd) {
 	}
 }
 
-func refresh(repoDir, indexDir, indexConfigFile string, fetchInterval time.Duration, cpuFraction float64) {
+func refresh(repoDir, indexDir, indexConfigFile string, fetchInterval time.Duration, cpuFraction float64, submodules bool) {
 	// Start with indexing something, so we can start the webserver.
-	runIndexCommand(indexDir, repoDir, indexConfigFile, cpuFraction)
+	runIndexCommand(indexDir, repoDir, indexConfigFile, cpuFraction, submodules)
 
 	t := time.NewTicker(fetchInterval)
 	for {
@@ -73,7 +73,7 @@ func refresh(repoDir, indexDir, indexConfigFile string, fetchInterval time.Durat
 			loggedRun(cmd)
 		}
 
-		runIndexCommand(indexDir, repoDir, indexConfigFile, cpuFraction)
+		runIndexCommand(indexDir, repoDir, indexConfigFile, cpuFraction, submodules)
 		<-t.C
 	}
 }
@@ -107,7 +107,7 @@ func repositoryOnRepoHost(repoBaseDir, dir string, repoHosts []RepoHostConfig) b
 	return false
 }
 
-func runIndexCommand(indexDir, repoDir, indexConfigFile string, cpuFraction float64) {
+func runIndexCommand(indexDir, repoDir, indexConfigFile string, cpuFraction float64, submodules bool) {
 	var indexConfig *IndexConfig
 	if indexConfigFile != "" {
 		var err error
@@ -145,6 +145,7 @@ func runIndexCommand(indexDir, repoDir, indexConfigFile string, cpuFraction floa
 		cmd := exec.Command("zoekt-git-index",
 			//"-require_ctags",
 			fmt.Sprintf("-parallelism=%d", cpuCount),
+			fmt.Sprintf("-submodules=%t", submodules),
 			"-repo_cache", repoDir,
 			"-index", indexDir, "-incremental", dir)
 		loggedRun(cmd)
@@ -237,6 +238,7 @@ func main() {
 	mirrorInterval := flag.Duration("mirror_duration", 24*time.Hour, "clone new repos at this frequency.")
 	cpuFraction := flag.Float64("cpu_fraction", 0.25,
 		"use this fractoin of the cores for indexing.")
+	submodules := flag.Bool("submodules", true, "if set to false, do not recurse into submodules")
 	flag.Parse()
 
 	if *cpuFraction <= 0.0 || *cpuFraction > 1.0 {
@@ -274,5 +276,5 @@ func main() {
 	go deleteLogs(logDir, *maxLogAge)
 	go deleteStaleIndexes(indexDir, repoDir, *fetchInterval)
 
-	refresh(repoDir, indexDir, *indexConfig, *fetchInterval, *cpuFraction)
+	refresh(repoDir, indexDir, *indexConfig, *fetchInterval, *cpuFraction, *submodules)
 }
