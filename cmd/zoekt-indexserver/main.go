@@ -52,9 +52,9 @@ func loggedRun(cmd *exec.Cmd) {
 	}
 }
 
-func refresh(repoDir, indexDir, indexConfigFile string, fetchInterval time.Duration, cpuFraction float64) {
+func refresh(repoDir, indexDir, indexConfigFile, indexFlags string, fetchInterval time.Duration, cpuFraction float64) {
 	// Start with indexing something, so we can start the webserver.
-	runIndexCommand(indexDir, repoDir, indexConfigFile, cpuFraction)
+	runIndexCommand(indexDir, repoDir, indexConfigFile, indexFlags, cpuFraction)
 
 	t := time.NewTicker(fetchInterval)
 	for {
@@ -73,7 +73,7 @@ func refresh(repoDir, indexDir, indexConfigFile string, fetchInterval time.Durat
 			loggedRun(cmd)
 		}
 
-		runIndexCommand(indexDir, repoDir, indexConfigFile, cpuFraction)
+		runIndexCommand(indexDir, repoDir, indexConfigFile, indexFlags, cpuFraction)
 		<-t.C
 	}
 }
@@ -107,7 +107,7 @@ func repositoryOnRepoHost(repoBaseDir, dir string, repoHosts []RepoHostConfig) b
 	return false
 }
 
-func runIndexCommand(indexDir, repoDir, indexConfigFile string, cpuFraction float64) {
+func runIndexCommand(indexDir, repoDir, indexConfigFile, indexFlags string, cpuFraction float64) {
 	var indexConfig *IndexConfig
 	if indexConfigFile != "" {
 		var err error
@@ -142,11 +142,17 @@ func runIndexCommand(indexDir, repoDir, indexConfigFile string, cpuFraction floa
 			// submodule separately too.
 		}
 
-		cmd := exec.Command("zoekt-git-index",
+		args := []string{
 			"-require_ctags",
 			fmt.Sprintf("-parallelism=%d", cpuCount),
 			"-repo_cache", repoDir,
-			"-index", indexDir, "-incremental", dir)
+			"-index", indexDir,
+			"-incremental", dir,
+		}
+		if indexFlags != "" {
+			args = append(args, strings.Split(indexFlags, " ")...)
+		}
+		cmd := exec.Command("zoekt-git-index", args...)
 		loggedRun(cmd)
 	}
 }
@@ -235,6 +241,7 @@ func main() {
 	mirrorInterval := flag.Duration("mirror_duration", 24*time.Hour, "clone new repos at this frequency.")
 	cpuFraction := flag.Float64("cpu_fraction", 0.25,
 		"use this fractoin of the cores for indexing.")
+	indexFlags := flag.String("git_index_flags", "", "flags passed through to zoekt-git-index (e.g. -git_index_flags='-symbols=false'")
 	flag.Parse()
 
 	if *cpuFraction <= 0.0 || *cpuFraction > 1.0 {
@@ -272,5 +279,5 @@ func main() {
 	go deleteLogs(logDir, *maxLogAge)
 	go deleteStaleIndexes(indexDir, repoDir, *fetchInterval)
 
-	refresh(repoDir, indexDir, *indexConfig, *fetchInterval, *cpuFraction)
+	refresh(repoDir, indexDir, *indexConfig, *indexFlags, *fetchInterval, *cpuFraction)
 }
