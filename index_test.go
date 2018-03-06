@@ -35,6 +35,7 @@ func clearScores(r *SearchResult) {
 			r.Files[i].LineMatches[j].Score = 0.0
 		}
 		r.Files[i].Checksum = nil
+		r.Files[i].Debug = ""
 	}
 }
 
@@ -612,6 +613,29 @@ func TestWordBoundaryRanking(t *testing.T) {
 	}
 }
 
+func TestDocumentOrder(t *testing.T) {
+	var docs []Document
+	for i := 0; i < 3; i++ {
+		docs = append(docs, Document{Name: fmt.Sprintf("f%d", i), Content: []byte("needle")})
+	}
+
+	b := testIndexBuilder(t, nil, docs...)
+
+	sres := searchForTest(t, b, query.NewAnd(
+		&query.Substring{
+			Pattern: "needle",
+		}))
+
+	want := []string{"f0", "f1", "f2"}
+	var got []string
+	for _, f := range sres.Files {
+		got = append(got, f.FileName)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
 func TestBranchMask(t *testing.T) {
 	b := testIndexBuilder(t, &Repository{
 		Branches: []RepositoryBranch{
@@ -633,8 +657,8 @@ func TestBranchMask(t *testing.T) {
 			Pattern: "table",
 		}))
 
-	if len(sres.Files) != 2 || sres.Files[0].FileName != "f3" || sres.Files[1].FileName != "f2" {
-		t.Fatalf("got %v, want 1 result from f2", sres.Files)
+	if len(sres.Files) != 2 || sres.Files[0].FileName != "f2" || sres.Files[1].FileName != "f3" {
+		t.Fatalf("got %v, want 2 result from [f2,f3]", sres.Files)
 	}
 
 	if len(sres.Files[0].Branches) != 1 || sres.Files[0].Branches[0] != "stable" {
@@ -1735,5 +1759,26 @@ func TestDistanceHitIterBailLast(t *testing.T) {
 	res := searchForTest(t, b, &query.Substring{Pattern: "UAST"})
 	if len(res.Files) != 0 {
 		t.Fatalf("got %v, want no results", res.Files)
+	}
+}
+
+func TestDocumentSectionRuneBoundary(t *testing.T) {
+	content := string([]rune{kelvinCodePoint, kelvinCodePoint, kelvinCodePoint})
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
+
+	for i, sec := range []DocumentSection{
+		{2, 6},
+		{3, 7},
+	} {
+		if err := b.Add(Document{
+			Name:    "f1",
+			Content: []byte(content),
+			Symbols: []DocumentSection{sec},
+		}); err == nil {
+			t.Errorf("%d: Add succeeded", i)
+		}
 	}
 }

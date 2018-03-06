@@ -246,7 +246,7 @@ func setTemplatesFromConfig(desc *zoekt.Repository, repoDir string) error {
 
 	if traction > 0 {
 		l := math.Log(float64(traction))
-		desc.Rank = uint16((1.0 - 1.0/(1+l)) * 10000)
+		desc.Rank = uint16((1.0 - 1.0/math.Pow(1+l, 0.6)) * 10000)
 	}
 
 	return nil

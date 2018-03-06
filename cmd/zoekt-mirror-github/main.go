@@ -261,7 +261,7 @@ func updateConfig(destDir string, r *github.Repository) error {
 		"github-forks":       r.ForksCount,
 	} {
 		if v != nil {
-			cfg.Raw.AddOption("zoekt", "", k, strconv.Itoa(*v))
+			cfg.Raw.SetOption("zoekt", "", k, strconv.Itoa(*v))
 		}
 	}
 

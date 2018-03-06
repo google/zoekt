@@ -26,8 +26,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"runtime/pprof"
+	"sort"
 	"strings"
 	"sync"
 
@@ -342,6 +344,72 @@ func (b *Builder) writeMemProfile(name string) {
 	log.Printf("wrote mem profile %q", nm)
 }
 
+// map [0,inf) to [0,1) monotonically
+func squashRange(j int) float64 {
+	x := float64(j)
+	return x / (1 + x)
+}
+
+var testRe = regexp.MustCompile("test")
+
+type rankedDoc struct {
+	*zoekt.Document
+	rank []float64
+}
+
+func rank(d *zoekt.Document, origIdx int) []float64 {
+	test := 0.0
+	if testRe.MatchString(d.Name) {
+		test = 1.0
+	}
+
+	// Smaller is earlier (=better).
+	return []float64{
+		// Prefer docs that are not tests
+		test,
+
+		// With many symbols
+		1.0 - squashRange(len(d.Symbols)),
+
+		// With short content
+		squashRange(len(d.Content)),
+
+		// With short names
+		squashRange(len(d.Name)),
+
+		// That is present is as many branches as possible
+		1.0 - squashRange(len(d.Branches)),
+
+		// Preserve original ordering.
+		squashRange(origIdx),
+	}
+}
+
+func sortDocuments(todo []*zoekt.Document) {
+	rs := make([]rankedDoc, 0, len(todo))
+	for i, t := range todo {
+		rd := rankedDoc{t, rank(t, i)}
+		rs = append(rs, rd)
+	}
+	sort.Slice(rs, func(i, j int) bool {
+		r1 := rs[i].rank
+		r2 := rs[j].rank
+		for i := range r1 {
+			if r1[i] < r2[i] {
+				return true
+			}
+			if r1[i] > r2[i] {
+				return false
+			}
+		}
+
+		return false
+	})
+	for i := range todo {
+		todo[i] = rs[i].Document
+	}
+}
+
 func (b *Builder) buildShard(todo []*zoekt.Document, nextShardNum int) (*finishedShard, error) {
 	if b.opts.CTags != "" {
 		err := ctagsAddSymbols(todo, b.parser, b.opts.CTags)
@@ -362,7 +430,7 @@ func (b *Builder) buildShard(todo []*zoekt.Document, nextShardNum int) (*finishe
 	if err != nil {
 		return nil, err
 	}
-
+	sortDocuments(todo)
 	for _, t := range todo {
 		if err := shardBuilder.Add(*t); err != nil {
 			return nil, err
