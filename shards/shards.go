@@ -196,6 +196,10 @@ func (ss *shardedSearcher) Search(ctx context.Context, q query.Q, opts *zoekt.Se
 	}
 
 	zoekt.SortFilesByScore(aggregate.Files)
+	if max := opts.MaxDocDisplayCount; max > 0 && len(aggregate.Files) > max {
+		aggregate.Files = aggregate.Files[:max]
+	}
+
 	aggregate.Duration = time.Now().Sub(start)
 	return aggregate, nil
 }

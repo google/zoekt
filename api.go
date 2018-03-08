@@ -283,6 +283,10 @@ type SearchOptions struct {
 
 	// Abort the search after this much time has passed.
 	MaxWallTime time.Duration
+
+	// Trim the number of results after collating and sorting the
+	// results
+	MaxDocDisplayCount int
 }
 
 func (s *SearchOptions) String() string {
