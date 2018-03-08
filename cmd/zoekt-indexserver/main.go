@@ -147,11 +147,12 @@ func runIndexCommand(indexDir, repoDir, indexConfigFile, indexFlags string, cpuF
 			fmt.Sprintf("-parallelism=%d", cpuCount),
 			"-repo_cache", repoDir,
 			"-index", indexDir,
-			"-incremental", dir,
+			"-incremental",
 		}
 		if indexFlags != "" {
 			args = append(args, strings.Split(indexFlags, " ")...)
 		}
+		args = append(args, dir)
 		cmd := exec.Command("zoekt-git-index", args...)
 		loggedRun(cmd)
 	}
