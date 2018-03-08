@@ -160,3 +160,76 @@ func TestOrderByShard(t *testing.T) {
 		}
 	}
 }
+
+type memSeeker struct {
+	data []byte
+}
+
+func (s *memSeeker) Name() string {
+	return "memseeker"
+}
+
+func (s *memSeeker) Close() {}
+func (s *memSeeker) Read(off, sz uint32) ([]byte, error) {
+	return s.data[off : off+sz], nil
+}
+
+func (s *memSeeker) Size() (uint32, error) {
+	return uint32(len(s.data)), nil
+}
+
+func TestUnloadIndex(t *testing.T) {
+	b, err := zoekt.NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
+
+	for i, d := range []zoekt.Document{{
+		Name:    "filename",
+		Content: []byte("needle needle needle"),
+	}} {
+		if err := b.Add(d); err != nil {
+			t.Fatalf("Add %d: %v", i, err)
+		}
+	}
+
+	var buf bytes.Buffer
+	b.Write(&buf)
+	indexBytes := buf.Bytes()
+	indexFile := &memSeeker{indexBytes}
+	searcher, err := zoekt.NewSearcher(indexFile)
+	if err != nil {
+		t.Fatalf("NewSearcher: %v", err)
+	}
+
+	ss := newShardedSearcher(2)
+	ss.replace("key", searcher)
+
+	var opts zoekt.SearchOptions
+	q := &query.Substring{Pattern: "needle"}
+	res, err := ss.Search(context.Background(), q, &opts)
+	if err != nil {
+		t.Fatalf("Search(%s): %v", q, err)
+	}
+
+	forbidden := byte(29)
+	for i := range indexBytes {
+		// non-ASCII
+		indexBytes[i] = forbidden
+	}
+
+	for _, f := range res.Files {
+		if bytes.Index(f.Content, []byte{forbidden}) >= 0 {
+			t.Errorf("found %d in content %q", forbidden, f.Content)
+		}
+		if bytes.Index(f.Checksum, []byte{forbidden}) >= 0 {
+			t.Errorf("found %d in checksum %q", forbidden, f.Checksum)
+		}
+
+		for _, l := range f.LineMatches {
+			if bytes.Index(l.Line, []byte{forbidden}) >= 0 {
+				t.Errorf("found %d in line %q", forbidden, l.Line)
+			}
+		}
+	}
+}
