@@ -1760,3 +1760,33 @@ func TestDocumentSectionRuneBoundary(t *testing.T) {
 		}
 	}
 }
+
+func TestUnicodeQuery(t *testing.T) {
+	content := string([]rune{kelvinCodePoint, kelvinCodePoint, kelvinCodePoint})
+	b := testIndexBuilder(t, nil,
+		Document{
+			Name:    "f1",
+			Content: []byte(content),
+		},
+	)
+
+	q := &query.Substring{Pattern: content}
+	res := searchForTest(t, b, q)
+	if len(res.Files) != 1 {
+		t.Fatalf("want 1 match, got %v", res.Files)
+	}
+
+	f := res.Files[0]
+	if len(f.LineMatches) != 1 {
+		t.Fatalf("want 1 line, got %v", f.LineMatches)
+	}
+	l := f.LineMatches[0]
+
+	if len(l.LineFragments) != 1 {
+		t.Fatalf("want 1 line fragment, got %v", l.LineFragments)
+	}
+	fr := l.LineFragments[0]
+	if fr.MatchLength != len(content) {
+		t.Fatalf("got MatchLength %d want %d", fr.MatchLength, len(content))
+	}
+}

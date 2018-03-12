@@ -176,7 +176,6 @@ type ngramIterationResults struct {
 	fileName      bool
 	substrBytes   []byte
 	substrLowered []byte
-	byteMatchSz   uint32
 }
 
 func (r *ngramIterationResults) String() string {
@@ -190,7 +189,6 @@ func (r *ngramIterationResults) candidates() []*candidateMatch {
 		c.fileName = r.fileName
 		c.substrBytes = r.substrBytes
 		c.substrLowered = r.substrLowered
-		c.byteMatchSz = r.byteMatchSz
 	}
 	return cs
 }
@@ -265,8 +263,6 @@ func (d *indexData) iterateNgrams(query *query.Substring) (*ngramIterationResult
 		fileName:      query.FileName,
 		substrBytes:   patBytes,
 		substrLowered: lowerPatBytes,
-		// TODO - this is wrong for casefolding searches.
-		byteMatchSz: uint32(len(lowerPatBytes)),
 	}, nil
 }
 
