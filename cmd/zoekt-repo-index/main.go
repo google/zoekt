@@ -52,6 +52,16 @@ import (
 
 var _ = log.Println
 
+type fileKey struct {
+	SubRepoPath string
+	Path        string
+	ID          plumbing.Hash
+}
+
+func (k *fileKey) FullPath() string {
+	return filepath.Join(k.SubRepoPath, k.Path)
+}
+
 type branchFile struct {
 	branch, file string
 	mf           *manifest.Manifest
@@ -168,7 +178,7 @@ func main() {
 		}
 	}
 
-	perBranch := map[string]map[gitindex.FileKey]gitindex.BlobLocation{}
+	perBranch := map[string]map[fileKey]gitindex.BlobLocation{}
 	opts.SubRepositories = map[string]*zoekt.Repository{}
 
 	// branch => repo => version
@@ -234,7 +244,7 @@ func main() {
 	}
 
 	// key => branch
-	all := map[gitindex.FileKey][]string{}
+	all := map[fileKey][]string{}
 	for br, files := range perBranch {
 		for k := range files {
 			all[k] = append(all[k], br)
@@ -316,8 +326,8 @@ func getManifest(repo *git.Repository, branch, path string) (*manifest.Manifest,
 // iterateManifest constructs a complete tree from the given Manifest.
 func iterateManifest(mf *manifest.Manifest,
 	baseURL url.URL, revPrefix string,
-	cache *gitindex.RepoCache) (map[gitindex.FileKey]gitindex.BlobLocation, map[string]plumbing.Hash, error) {
-	allFiles := map[gitindex.FileKey]gitindex.BlobLocation{}
+	cache *gitindex.RepoCache) (map[fileKey]gitindex.BlobLocation, map[string]plumbing.Hash, error) {
+	allFiles := map[fileKey]gitindex.BlobLocation{}
 	allVersions := map[string]plumbing.Hash{}
 	for _, p := range mf.Project {
 		rev := mf.ProjectRevision(&p)
@@ -356,7 +366,7 @@ func iterateManifest(mf *manifest.Manifest,
 		}
 
 		for key, repo := range files {
-			allFiles[gitindex.FileKey{
+			allFiles[fileKey{
 				SubRepoPath: filepath.Join(p.GetPath(), key.SubRepoPath),
 				Path:        key.Path,
 				ID:          key.ID,

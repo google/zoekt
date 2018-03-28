@@ -344,10 +344,10 @@ func IndexGitRepo(opts Options) error {
 	defer repoCache.Close()
 
 	// branch => (path, sha1) => repo.
-	repos := map[FileKey]BlobLocation{}
+	repos := map[fileKey]BlobLocation{}
 
-	// FileKey => branches
-	branchMap := map[FileKey][]string{}
+	// fileKey => branches
+	branchMap := map[fileKey][]string{}
 
 	// Branch => Repo => SHA1
 	branchVersions := map[string]map[string]plumbing.Hash{}
@@ -426,7 +426,7 @@ func IndexGitRepo(opts Options) error {
 	}
 
 	var names []string
-	fileKeys := map[string][]FileKey{}
+	fileKeys := map[string][]fileKey{}
 	for key := range repos {
 		n := key.FullPath()
 		fileKeys[n] = append(fileKeys[n], key)
