@@ -432,11 +432,13 @@ func IndexGitRepo(opts Options) error {
 		fileKeys[n] = append(fileKeys[n], key)
 		names = append(names, n)
 	}
-	// not strictly necessary, but nice for reproducibility.
+
 	sort.Strings(names)
+	names = uniq(names)
 
 	for _, name := range names {
 		keys := fileKeys[name]
+
 		for _, key := range keys {
 			brs := branchMap[key]
 			blob, err := repos[key].Repo.BlobObject(key.ID)
@@ -475,4 +477,16 @@ func blobContents(blob *object.Blob) ([]byte, error) {
 		return nil, err
 	}
 	return c, nil
+}
+
+func uniq(ss []string) []string {
+	result := ss[:0]
+	var last string
+	for i, s := range ss {
+		if i == 0 || s != last {
+			result = append(result, s)
+		}
+		last = s
+	}
+	return result
 }
