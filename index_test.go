@@ -726,28 +726,6 @@ func TestBranchVersions(t *testing.T) {
 	}
 }
 
-func TestCoversContent(t *testing.T) {
-	b := testIndexBuilder(t, nil,
-		Document{Name: "f1", Content: []byte("needle the bla")})
-
-	sres := searchForTest(t, b,
-		query.NewAnd(
-			&query.Substring{
-				Pattern: "needle",
-			},
-			&query.Not{Child: &query.Substring{
-				Pattern: "the",
-			}}))
-
-	if len(sres.Files) > 0 {
-		t.Fatalf("got %v, want no results", sres.Files)
-	}
-
-	if sres.Stats.FilesLoaded > 0 {
-		t.Errorf("got %#v, want no FilesLoaded", sres.Stats)
-	}
-}
-
 func mustParseRE(s string) *syntax.Regexp {
 	r, err := syntax.Parse(s, 0)
 	if err != nil {
@@ -1780,5 +1758,35 @@ func TestDocumentSectionRuneBoundary(t *testing.T) {
 		}); err == nil {
 			t.Errorf("%d: Add succeeded", i)
 		}
+	}
+}
+
+func TestUnicodeQuery(t *testing.T) {
+	content := string([]rune{kelvinCodePoint, kelvinCodePoint, kelvinCodePoint})
+	b := testIndexBuilder(t, nil,
+		Document{
+			Name:    "f1",
+			Content: []byte(content),
+		},
+	)
+
+	q := &query.Substring{Pattern: content}
+	res := searchForTest(t, b, q)
+	if len(res.Files) != 1 {
+		t.Fatalf("want 1 match, got %v", res.Files)
+	}
+
+	f := res.Files[0]
+	if len(f.LineMatches) != 1 {
+		t.Fatalf("want 1 line, got %v", f.LineMatches)
+	}
+	l := f.LineMatches[0]
+
+	if len(l.LineFragments) != 1 {
+		t.Fatalf("want 1 line fragment, got %v", l.LineFragments)
+	}
+	fr := l.LineFragments[0]
+	if fr.MatchLength != len(content) {
+		t.Fatalf("got MatchLength %d want %d", fr.MatchLength, len(content))
 	}
 }

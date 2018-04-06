@@ -238,14 +238,11 @@ func (s *Server) serveSearchErr(w http.ResponseWriter, r *http.Request) error {
 		sOpts.TotalMaxMatchCount = n
 		sOpts.TotalMaxImportantMatch = n
 	}
+	sOpts.MaxDocDisplayCount = num
 
 	result, err := s.Searcher.Search(ctx, q, &sOpts)
 	if err != nil {
 		return err
-	}
-
-	if len(result.Files) > num {
-		result.Files = result.Files[:num]
 	}
 
 	fileMatches, err := s.formatResults(result, queryStr, s.Print)

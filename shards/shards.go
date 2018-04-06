@@ -196,8 +196,25 @@ func (ss *shardedSearcher) Search(ctx context.Context, q query.Q, opts *zoekt.Se
 	}
 
 	zoekt.SortFilesByScore(aggregate.Files)
+	if max := opts.MaxDocDisplayCount; max > 0 && len(aggregate.Files) > max {
+		aggregate.Files = aggregate.Files[:max]
+	}
+	for i := range aggregate.Files {
+		copySlice(&aggregate.Files[i].Content)
+		copySlice(&aggregate.Files[i].Checksum)
+		for l := range aggregate.Files[i].LineMatches {
+			copySlice(&aggregate.Files[i].LineMatches[l].Line)
+		}
+	}
+
 	aggregate.Duration = time.Now().Sub(start)
 	return aggregate, nil
+}
+
+func copySlice(src *[]byte) {
+	dst := make([]byte, len(*src))
+	copy(dst, *src)
+	*src = dst
 }
 
 type shardResult struct {

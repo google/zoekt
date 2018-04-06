@@ -346,10 +346,10 @@ func IndexGitRepo(opts Options) error {
 	defer repoCache.Close()
 
 	// branch => (path, sha1) => repo.
-	repos := map[FileKey]BlobLocation{}
+	repos := map[fileKey]BlobLocation{}
 
-	// FileKey => branches
-	branchMap := map[FileKey][]string{}
+	// fileKey => branches
+	branchMap := map[fileKey][]string{}
 
 	// Branch => Repo => SHA1
 	branchVersions := map[string]map[string]plumbing.Hash{}
@@ -428,17 +428,19 @@ func IndexGitRepo(opts Options) error {
 	}
 
 	var names []string
-	fileKeys := map[string][]FileKey{}
+	fileKeys := map[string][]fileKey{}
 	for key := range repos {
 		n := key.FullPath()
 		fileKeys[n] = append(fileKeys[n], key)
 		names = append(names, n)
 	}
-	// not strictly necessary, but nice for reproducibility.
+
 	sort.Strings(names)
+	names = uniq(names)
 
 	for _, name := range names {
 		keys := fileKeys[name]
+
 		for _, key := range keys {
 			brs := branchMap[key]
 			blob, err := repos[key].Repo.BlobObject(key.ID)
@@ -477,4 +479,16 @@ func blobContents(blob *object.Blob) ([]byte, error) {
 		return nil, err
 	}
 	return c, nil
+}
+
+func uniq(ss []string) []string {
+	result := ss[:0]
+	var last string
+	for i, s := range ss {
+		if i == 0 || s != last {
+			result = append(result, s)
+		}
+		last = s
+	}
+	return result
 }

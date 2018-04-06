@@ -337,6 +337,8 @@ func TestBranchWildcard(t *testing.T) {
 		t.Errorf("got %v, want 1 result", rlist.Repos)
 	} else if repo := rlist.Repos[0]; len(repo.Repository.Branches) != 2 {
 		t.Errorf("got branches %v, want 2", repo.Repository.Branches)
+	} else if repo := rlist.Repos[0]; repo.Stats.Documents != 3 {
+		t.Errorf("got document count %d, want 3", repo.Stats.Documents)
 	}
 }
 
@@ -431,4 +433,14 @@ func TestFullAndShortRefNames(t *testing.T) {
 	} else if repo := rlist.Repos[0]; len(repo.Repository.Branches) != 3 {
 		t.Errorf("got branches %v, want 3", repo.Repository.Branches)
 	}
+}
+
+func TestUniq(t *testing.T) {
+	in := []string{"a", "b", "b", "c", "c"}
+	want := []string{"a", "b", "c"}
+	got := uniq(in)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+
 }
