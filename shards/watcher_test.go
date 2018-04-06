@@ -18,7 +18,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 )
@@ -50,10 +49,11 @@ func TestDirWatcherUnloadOnce(t *testing.T) {
 		loads: make(chan string, 10),
 		drops: make(chan string, 10),
 	}
-	_, err = NewDirectoryWatcher(dir, logger)
-	if err == nil || !strings.Contains(err.Error(), "empty") {
-		t.Fatalf("got %v, want 'empty'", err)
-	}
+	// Upstream fails if empty. Sourcegraph does not
+	// _, err := NewDirectoryWatcher(dir, logger)
+	// if err == nil || !strings.Contains(err.Error(), "empty") {
+	// 	t.Fatalf("got %v, want 'empty'", err)
+	// }
 
 	shard := filepath.Join(dir, "foo.zoekt")
 	if err := ioutil.WriteFile(shard, []byte("hello"), 0644); err != nil {
@@ -94,6 +94,32 @@ func TestDirWatcherUnloadOnce(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
+	dw.Close()
+
+	select {
+	case k := <-logger.loads:
+		t.Errorf("spurious load of %q", k)
+	case k := <-logger.drops:
+		t.Errorf("spurious drops of %q", k)
+	default:
+	}
+}
+
+func TestDirWatcherLoadEmpty(t *testing.T) {
+	dir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	logger := &loggingLoader{
+		loads: make(chan string, 10),
+		drops: make(chan string, 10),
+	}
+	dw, err := NewDirectoryWatcher(dir, logger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	advanceFS()
 	dw.Close()
 
 	select {
