@@ -53,7 +53,20 @@ var Funcmap = template.FuncMap{
 		}
 
 		return fmt.Sprintf("%d%s", b, suffix)
-	}}
+	},
+	"LimitPre": func(limit int, pre string) string {
+		if len(pre) < limit {
+			return pre
+		}
+		return fmt.Sprintf("...(%d bytes skipped)...%s", len(pre)-limit, pre[len(pre)-limit:])
+	},
+	"LimitPost": func(limit int, post string) string {
+		if len(post) < limit {
+			return post
+		}
+		return fmt.Sprintf("%s...(%d bytes skipped)...", post[:limit], len(post)-limit)
+	},
+}
 
 const defaultNumResults = 50
 
