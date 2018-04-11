@@ -149,6 +149,9 @@ func TestBasic(t *testing.T) {
 	if notWant := "crashed"; strings.Contains(result, notWant) {
 		t.Errorf("result has %q: %s", notWant, result)
 	}
+	if notWant := "bytes skipped)..."; strings.Contains(result, notWant) {
+		t.Errorf("result has %q: %s", notWant, result)
+	}
 }
 
 type crashSearcher struct {
@@ -291,5 +294,61 @@ func TestDupResult(t *testing.T) {
 
 	if got, want := string(resultBytes), "Duplicate result"; !strings.Contains(got, want) {
 		t.Fatalf("got %s, want substring %q", got, want)
+	}
+}
+
+func TestTruncateLine(t *testing.T) {
+	b, err := zoekt.NewIndexBuilder(&zoekt.Repository{
+		Name: "name",
+	})
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
+
+	largePadding := bytes.Repeat([]byte{'a'}, 100*1000) // 100kb
+	if err := b.Add(zoekt.Document{
+		Name:    "file",
+		Content: append(append(largePadding, []byte("helloworld")...), largePadding...),
+	}); err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+	s := searcherForTest(t, b)
+	srv := Server{
+		Searcher: s,
+		Top:      Top,
+		HTML:     true,
+	}
+
+	mux, err := NewMux(&srv)
+	if err != nil {
+		t.Fatalf("NewMux: %v", err)
+	}
+
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+
+	req, err := http.NewRequest("GET", ts.URL+"/search?q=helloworld", &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("NewRequest: %v", err)
+	}
+	res, err := (&http.Client{}).Do(req)
+	if err != nil {
+		t.Fatalf("Do(%v): %v", req, err)
+	}
+	resultBytes, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+
+	if got, want := len(resultBytes)/1000, 10; got > want {
+		t.Fatalf("got %dkb response, want <= %dkb", got, want)
+	}
+	result := string(resultBytes)
+	if want := "aa<b>helloworld</b>aa"; !strings.Contains(result, want) {
+		t.Fatalf("got %s, want substring %q", result, want)
+	}
+	if want := "bytes skipped)..."; !strings.Contains(result, want) {
+		t.Fatalf("got %s, want substring %q", result, want)
 	}
 }
