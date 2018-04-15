@@ -10,3 +10,6 @@ Parameters are in the `zoekt` section of the git-config.
 
 * `web-url-type`: type of URL, eg. github. Supported are cgit,
   gitiles, gitweb and cgit.
+
+* `github-stars`, `github-forks`, `github-watchers`,
+  `github-subscribers`: counters for github interactions
