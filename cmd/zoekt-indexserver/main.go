@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// This program manages a zoekt deployment:
+// This program manages a zoekt indexing deployment:
 // * recycling logs
 // * periodically fetching new data.
+// * periodically reindexing all git repos.
 
 package main
 
@@ -231,7 +232,7 @@ func deleteStaleIndexes(indexDir, repoDir string, watchInterval time.Duration) {
 }
 
 func main() {
-	maxLogAge := flag.Duration("max_log_age", 3*day, "recycle logs after this much time")
+	maxLogAge := flag.Duration("max_log_age", 3*day, "recycle index logs after this much time")
 	fetchInterval := flag.Duration("fetch_interval", time.Hour, "run fetches this often")
 	dataDir := flag.String("data_dir",
 		filepath.Join(os.Getenv("HOME"), "zoekt-serving"), "directory holding all data.")
@@ -239,9 +240,9 @@ func main() {
 		"", "JSON file holding mirror configuration.")
 	indexConfig := flag.String("index_config",
 		"", "JSON file holding index configuration.")
-	mirrorInterval := flag.Duration("mirror_duration", 24*time.Hour, "clone new repos at this frequency.")
+	mirrorInterval := flag.Duration("mirror_duration", 24*time.Hour, "find and clone new repos at this frequency.")
 	cpuFraction := flag.Float64("cpu_fraction", 0.25,
-		"use this fractoin of the cores for indexing.")
+		"use this fraction of the cores for indexing.")
 	indexFlags := flag.String("git_index_flags", "", "flags passed through to zoekt-git-index (e.g. -git_index_flags='-symbols=false'")
 	flag.Parse()
 
@@ -271,12 +272,22 @@ func main() {
 		}
 	}
 
-	_, err := readConfig(*mirrorConfig)
-	if err != nil {
-		log.Fatalf("readConfig(%s): %v", *mirrorConfig, err)
+	if strings.HasPrefix(*mirrorConfig, "https://") || strings.HasPrefix(*mirrorConfig, "http://") {
+		_, err := readConfigURL(*mirrorConfig)
+		if err != nil {
+			log.Fatalf("readConfigURL(%s): %v", *mirrorConfig, err)
+		} else {
+			go periodicMirrorURL(repoDir, *mirrorConfig, *mirrorInterval)
+		}
 	} else {
-		go periodicMirror(repoDir, *mirrorConfig, *mirrorInterval)
+		_, err := readConfigFile(*mirrorConfig)
+		if err != nil {
+			log.Fatalf("readConfig(%s): %v", *mirrorConfig, err)
+		} else {
+			go periodicMirrorFile(repoDir, *mirrorConfig, *mirrorInterval)
+		}
 	}
+
 	go deleteLogs(logDir, *maxLogAge)
 	go deleteStaleIndexes(indexDir, repoDir, *fetchInterval)
 
