@@ -53,7 +53,7 @@ func loggedRun(cmd *exec.Cmd) {
 	}
 }
 
-func refresh(repoDir, indexDir, indexConfigFile, indexFlags string, fetchInterval time.Duration, cpuFraction float64) {
+func refresh(repoDir, indexDir, indexConfigFile string, indexFlags []string, fetchInterval time.Duration, cpuFraction float64) {
 	// Start with indexing something, so we can start the webserver.
 	runIndexCommand(indexDir, repoDir, indexConfigFile, indexFlags, cpuFraction)
 
@@ -92,7 +92,6 @@ func repoIndexCommand(indexDir, repoDir string, configs []RepoHostConfig) {
 			"-manifest_rev_prefix", cfg.ManifestRevPrefix)
 
 		cmd.Args = append(cmd.Args, cfg.BranchXMLs...)
-		log.Println(cmd.Args)
 		loggedRun(cmd)
 	}
 }
@@ -108,7 +107,7 @@ func repositoryOnRepoHost(repoBaseDir, dir string, repoHosts []RepoHostConfig) b
 	return false
 }
 
-func runIndexCommand(indexDir, repoDir, indexConfigFile, indexFlags string, cpuFraction float64) {
+func runIndexCommand(indexDir, repoDir, indexConfigFile string, indexFlags []string, cpuFraction float64) {
 	var indexConfig *IndexConfig
 	if indexConfigFile != "" {
 		var err error
@@ -150,9 +149,7 @@ func runIndexCommand(indexDir, repoDir, indexConfigFile, indexFlags string, cpuF
 			"-index", indexDir,
 			"-incremental",
 		}
-		if indexFlags != "" {
-			args = append(args, strings.Split(indexFlags, " ")...)
-		}
+		args = append(args, indexFlags...)
 		args = append(args, dir)
 		cmd := exec.Command("zoekt-git-index", args...)
 		loggedRun(cmd)
@@ -243,7 +240,7 @@ func main() {
 	mirrorInterval := flag.Duration("mirror_duration", 24*time.Hour, "find and clone new repos at this frequency.")
 	cpuFraction := flag.Float64("cpu_fraction", 0.25,
 		"use this fraction of the cores for indexing.")
-	indexFlags := flag.String("git_index_flags", "", "flags passed through to zoekt-git-index (e.g. -git_index_flags='-symbols=false'")
+	indexFlagsStr := flag.String("git_index_flags", "", "space separated list of flags passed through to zoekt-git-index (e.g. -git_index_flags='-symbols=false -submodules=false'")
 	flag.Parse()
 
 	if *cpuFraction <= 0.0 || *cpuFraction > 1.0 {
@@ -251,6 +248,11 @@ func main() {
 	}
 	if *dataDir == "" {
 		log.Fatal("must set --data_dir")
+	}
+
+	var indexFlags []string
+	if *indexFlagsStr != "" {
+		indexFlags = strings.Split(*indexFlagsStr, " ")
 	}
 
 	// Automatically prepend our own path at the front, to minimize
@@ -291,5 +293,5 @@ func main() {
 	go deleteLogs(logDir, *maxLogAge)
 	go deleteStaleIndexes(indexDir, repoDir, *fetchInterval)
 
-	refresh(repoDir, indexDir, *indexConfig, *indexFlags, *fetchInterval, *cpuFraction)
+	refresh(repoDir, indexDir, *indexConfig, indexFlags, *fetchInterval, *cpuFraction)
 }
