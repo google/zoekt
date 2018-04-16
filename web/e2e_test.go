@@ -100,18 +100,7 @@ func TestBasic(t *testing.T) {
 	ts := httptest.NewServer(mux)
 	defer ts.Close()
 
-	res, err := http.Get(ts.URL + "/search?q=water")
-	if err != nil {
-		t.Fatal(err)
-	}
-	resultBytes, err := ioutil.ReadAll(res.Body)
-	res.Body.Close()
-	if err != nil {
-		t.Fatalf("ReadAll: %v", err)
-	}
-
 	nowStr := time.Now().Format("Jan 02, 2006 15:04")
-	result := string(resultBytes)
 	for req, needles := range map[string][]string{
 		"/": []string{"from 1 repositories"},
 		"/search?q=water": []string{
@@ -145,13 +134,14 @@ func TestBasic(t *testing.T) {
 				t.Errorf("query %q: result did not have %q: %s", req, want, result)
 			}
 		}
+		if notWant := "crashed"; strings.Contains(result, notWant) {
+			t.Errorf("result has %q: %s", notWant, result)
+		}
+		if notWant := "bytes skipped)..."; strings.Contains(result, notWant) {
+			t.Errorf("result has %q: %s", notWant, result)
+		}
 	}
-	if notWant := "crashed"; strings.Contains(result, notWant) {
-		t.Errorf("result has %q: %s", notWant, result)
-	}
-	if notWant := "bytes skipped)..."; strings.Contains(result, notWant) {
-		t.Errorf("result has %q: %s", notWant, result)
-	}
+
 }
 
 func TestPrint(t *testing.T) {
