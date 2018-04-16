@@ -484,7 +484,11 @@ func (s *Server) servePrintErr(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	if len(result.Files) != 1 {
-		return fmt.Errorf("got %d matches, want 1", len(result.Files))
+		var ss []string
+		for _, n := range result.Files {
+			ss = append(ss, n.FileName)
+		}
+		return fmt.Errorf("ambiguous result: %v", ss)
 	}
 
 	f := result.Files[0]
