@@ -19,6 +19,11 @@ access to the indexing machine.
 Use the following invocation to compile and install universal-ctags:
 
 ```
+sudo apt-get install
+  pkg-config autoconf \
+  libseccomp-dev libseccomp \
+  libjansson-dev libjansson 
+
 ./autogen.sh
 LDFLAGS=-static ./configure --enable-json --enable-seccomp
 make -j4
