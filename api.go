@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package zoekt
+package zoekt // import "github.com/google/zoekt"
 
 import (
 	"context"
