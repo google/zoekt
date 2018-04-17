@@ -1790,3 +1790,16 @@ func TestUnicodeQuery(t *testing.T) {
 		t.Fatalf("got MatchLength %d want %d", fr.MatchLength, len(content))
 	}
 }
+
+func TestIsText(t *testing.T) {
+	for _, text := range []string{"", "simple ascii", "símplé unicödé", "\uFEFFwith utf8 'bom'", "with \uFFFD unicode replacement char"} {
+		if !IsText([]byte(text)) {
+			t.Errorf("IsText(%q) is false", text)
+		}
+	}
+	for _, text := range []string{"zero\x00byte", "high\xEFbyte"} {
+		if IsText([]byte(text)) {
+			t.Errorf("IsText(%q) is true", text)
+		}
+	}
+}
