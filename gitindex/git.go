@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package gitindex provides functions for indexing Git repositories.
 package gitindex
 
 import (
@@ -66,7 +67,7 @@ func RepoModTime(dir string) (time.Time, error) {
 	return last, nil
 }
 
-// FindGitRepos finds directories holding git repositories.
+// FindGitRepos finds directories holding git repositories below the given directory.
 func FindGitRepos(arg string) ([]string, error) {
 	arg, err := filepath.Abs(arg)
 	if err != nil {
@@ -266,16 +267,32 @@ func SetTemplatesFromOrigin(desc *zoekt.Repository, u *url.URL) error {
 	}
 }
 
+// The Options structs controls details of the indexing process.
 type Options struct {
-	Submodules         bool
-	Incremental        bool
-	AllowMissingBranch bool
-	RepoCacheDir       string
-	BuildOptions       build.Options
-	RepoDir            string
+	// The repository to be indexed.
 
+	RepoDir string
+	// If set, follow submodule links. This requires RepoCacheDir to be set.
+	Submodules bool
+
+	// If set, skip indexing if the existing index shard is newer
+	// than the refs in the repository.
+	Incremental bool
+
+	// Don't error out if some branch is missing
+	AllowMissingBranch bool
+
+	// Specifies the root of a Repository cache. Needed for submodule indexing.
+	RepoCacheDir string
+
+	// Indexing options.
+	BuildOptions build.Options
+
+	// Prefix of the branch to index, e.g. `remotes/origin`.
 	BranchPrefix string
-	Branches     []string
+
+	// List of branch names to index, e.g. []string{"HEAD", "stable"}
+	Branches []string
 }
 
 func expandBranches(repo *git.Repository, bs []string, prefix string) ([]string, error) {
@@ -334,7 +351,6 @@ func IndexGitRepo(opts Options) error {
 	}
 	repo, err := git.PlainOpen(opts.RepoDir)
 	if err != nil {
-		log.Println("B")
 		return err
 	}
 
@@ -343,7 +359,6 @@ func IndexGitRepo(opts Options) error {
 	}
 
 	repoCache := NewRepoCache(opts.RepoCacheDir)
-	defer repoCache.Close()
 
 	// branch => (path, sha1) => repo.
 	repos := map[fileKey]BlobLocation{}

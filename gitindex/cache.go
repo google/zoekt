@@ -24,6 +24,8 @@ import (
 	git "gopkg.in/src-d/go-git.v4"
 )
 
+// RepoCache is a set of repositories on the file system, named and
+// stored by URL.
 type RepoCache struct {
 	baseDir string
 
@@ -31,16 +33,12 @@ type RepoCache struct {
 	repos   map[string]*git.Repository
 }
 
+// NewRepoCache creates a new RepoCache rooted at the given directory.
 func NewRepoCache(dir string) *RepoCache {
 	return &RepoCache{
 		baseDir: dir,
 		repos:   make(map[string]*git.Repository),
 	}
-}
-
-func (rc *RepoCache) Close() {
-	rc.reposMu.Lock()
-	defer rc.reposMu.Unlock()
 }
 
 func repoKey(u *url.URL) string {
@@ -63,9 +61,8 @@ func (rc *RepoCache) Path(u *url.URL) string {
 }
 
 // Open opens a git repository. The cache retains a pointer to the
-// repository, so it cannot be freed.
+// repository.
 func (rc *RepoCache) Open(u *url.URL) (*git.Repository, error) {
-
 	dir := rc.Path(u)
 	rc.reposMu.Lock()
 	defer rc.reposMu.Unlock()

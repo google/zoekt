@@ -21,6 +21,8 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"regexp"
+	"regexp/syntax"
 	"strconv"
 	"sync"
 	"time"
@@ -469,8 +471,12 @@ func (s *Server) servePrintErr(w http.ResponseWriter, r *http.Request) error {
 		num = defaultNumResults
 	}
 
+	re, err := syntax.Parse("^"+regexp.QuoteMeta(fileStr)+"$", 0)
+	if err != nil {
+		return err
+	}
 	qs := []query.Q{
-		&query.Substring{Pattern: fileStr, FileName: true},
+		&query.Regexp{Regexp: re, FileName: true, CaseSensitive: true},
 		&query.Repo{Pattern: repoStr},
 	}
 
@@ -491,7 +497,11 @@ func (s *Server) servePrintErr(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	if len(result.Files) != 1 {
-		return fmt.Errorf("got %d matches, want 1", len(result.Files))
+		var ss []string
+		for _, n := range result.Files {
+			ss = append(ss, n.FileName)
+		}
+		return fmt.Errorf("ambiguous result: %v", ss)
 	}
 
 	f := result.Files[0]

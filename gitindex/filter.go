@@ -37,18 +37,18 @@ func (f *Filter) Include(name string) bool {
 }
 
 // NewFilter creates a new filter.
-func NewFilter(inc, exc string) (*Filter, error) {
+func NewFilter(includeRegex, excludeRegex string) (*Filter, error) {
 	f := &Filter{}
 	var err error
-	if inc != "" {
-		f.inc, err = regexp.Compile(inc)
+	if includeRegex != "" {
+		f.inc, err = regexp.Compile(includeRegex)
 
 		if err != nil {
 			return nil, err
 		}
 	}
-	if exc != "" {
-		f.exc, err = regexp.Compile(exc)
+	if excludeRegex != "" {
+		f.exc, err = regexp.Compile(excludeRegex)
 		if err != nil {
 			return nil, err
 		}

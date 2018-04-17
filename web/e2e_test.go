@@ -100,18 +100,7 @@ func TestBasic(t *testing.T) {
 	ts := httptest.NewServer(mux)
 	defer ts.Close()
 
-	res, err := http.Get(ts.URL + "/search?q=water")
-	if err != nil {
-		t.Fatal(err)
-	}
-	resultBytes, err := ioutil.ReadAll(res.Body)
-	res.Body.Close()
-	if err != nil {
-		t.Fatalf("ReadAll: %v", err)
-	}
-
 	nowStr := time.Now().Format("Jan 02, 2006 15:04")
-	result := string(resultBytes)
 	for req, needles := range map[string][]string{
 		"/": []string{"from 1 repositories"},
 		"/search?q=water": []string{
@@ -145,12 +134,87 @@ func TestBasic(t *testing.T) {
 				t.Errorf("query %q: result did not have %q: %s", req, want, result)
 			}
 		}
+		if notWant := "crashed"; strings.Contains(result, notWant) {
+			t.Errorf("result has %q: %s", notWant, result)
+		}
+		if notWant := "bytes skipped)..."; strings.Contains(result, notWant) {
+			t.Errorf("result has %q: %s", notWant, result)
+		}
 	}
-	if notWant := "crashed"; strings.Contains(result, notWant) {
-		t.Errorf("result has %q: %s", notWant, result)
+
+}
+
+func TestPrint(t *testing.T) {
+	b, err := zoekt.NewIndexBuilder(&zoekt.Repository{
+		Name:                 "name",
+		URL:                  "repo-url",
+		CommitURLTemplate:    "{{.Version}}",
+		FileURLTemplate:      "file-url",
+		LineFragmentTemplate: "line",
+		Branches:             []zoekt.RepositoryBranch{{Name: "master", Version: "1234"}},
+	})
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
 	}
-	if notWant := "bytes skipped)..."; strings.Contains(result, notWant) {
-		t.Errorf("result has %q: %s", notWant, result)
+	if err := b.Add(zoekt.Document{
+		Name:     "f2",
+		Content:  []byte("to carry water in the no later bla"),
+		Branches: []string{"master"},
+	}); err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+
+	if err := b.Add(zoekt.Document{
+		Name:     "dir/f2",
+		Content:  []byte("blabla"),
+		Branches: []string{"master"},
+	}); err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+
+	s := searcherForTest(t, b)
+	srv := Server{
+		Searcher: s,
+		Top:      Top,
+		HTML:     true,
+		Print:    true,
+	}
+
+	mux, err := NewMux(&srv)
+	if err != nil {
+		t.Fatalf("NewMux: %v", err)
+	}
+
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+
+	for req, needles := range map[string][]string{
+		"/print?q=bla&r=name&f=f2": []string{
+			`pre id="l1" class="inline-pre"><a href="#l1">`,
+		},
+	} {
+		res, err := http.Get(ts.URL + req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resultBytes, err := ioutil.ReadAll(res.Body)
+		res.Body.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		result := string(resultBytes)
+		for _, want := range needles {
+			if !strings.Contains(result, want) {
+				t.Errorf("query %q: result did not have %q: %s", req, want, result)
+			}
+		}
+		if notWant := "crashed"; strings.Contains(result, notWant) {
+			t.Errorf("result has %q: %s", notWant, result)
+		}
+		if notWant := "bytes skipped)..."; strings.Contains(result, notWant) {
+			t.Errorf("result has %q: %s", notWant, result)
+		}
 	}
 }
 

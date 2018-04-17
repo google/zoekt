@@ -20,6 +20,7 @@ import (
 	"gopkg.in/src-d/go-git.v4/plumbing/format/config"
 )
 
+// SubmoduleEntry represent one entry in a .gitmodules file
 type SubmoduleEntry struct {
 	Path   string
 	URL    string

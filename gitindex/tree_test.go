@@ -99,7 +99,6 @@ func TestTreeToFiles(t *testing.T) {
 	}
 
 	cache := NewRepoCache(dir)
-	defer cache.Close()
 
 	aURL, _ := url.Parse("http://gerrit.googlesource.com/adir")
 	repo, err := cache.Open(aURL)
