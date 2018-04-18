@@ -92,6 +92,10 @@ func listRepos(root *url.URL) ([]string, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to list repositories: status %s", resp.Status)
+	}
+
 	var data []struct {
 		URI string
 	}
@@ -114,6 +118,10 @@ func resolveRevision(root *url.URL, repo, spec string) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to resolve revision %s@%s: status %s", repo, spec, resp.Status)
+	}
 
 	var b bytes.Buffer
 	_, err = b.ReadFrom(resp.Body)
