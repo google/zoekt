@@ -15,11 +15,16 @@
 package ctags
 
 import (
+	"os/exec"
 	"reflect"
 	"testing"
 )
 
 func TestJSON(t *testing.T) {
+	if _, err := exec.LookPath("universal-ctags"); err != nil {
+		t.Skip(err)
+	}
+
 	p, err := newProcess("universal-ctags")
 	if err != nil {
 		t.Fatal("newProcess", err)

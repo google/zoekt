@@ -190,7 +190,7 @@ func TestPrint(t *testing.T) {
 
 	for req, needles := range map[string][]string{
 		"/print?q=bla&r=name&f=f2": []string{
-			`pre id="l1" class="inline-pre"><a href="#l1">`,
+			`pre id="l1" class="inline-pre"><span class="noselect"><a href="#l1">`,
 		},
 	} {
 		res, err := http.Get(ts.URL + req)
