@@ -199,17 +199,6 @@ func executeMirror(cfg []configEntry, repoDir string) {
 			}
 			cmd.Args = append(cmd.Args, c.CGitURL)
 			loggedRun(cmd)
-		} else if c.SourcegraphURL != "" {
-			cmd := exec.Command("zoekt-mirror-sourcegraph",
-				"-dest", repoDir)
-			if c.Name != "" {
-				cmd.Args = append(cmd.Args, "-name", c.Name)
-			}
-			if c.Exclude != "" {
-				cmd.Args = append(cmd.Args, "-exclude", c.Exclude)
-			}
-			cmd.Args = append(cmd.Args, c.SourcegraphURL)
-			loggedRun(cmd)
 		}
 	}
 }
