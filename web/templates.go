@@ -261,13 +261,16 @@ var TemplateText = map[string]string{
 <body id="results">
   <div class="container">
     {{template "navbar" .Last}}
+    <div><b>
+    Found {{.Stats.Repos}} repositories ({{.Stats.Documents}} files, {{HumanUnit .Stats.ContentBytes}}b content)
+    </b></div>
     <table class="table table-hover table-condensed">
     <thead>
       <tr>
-        <th>Found {{.Stats.Repos}} repositories ({{.Stats.Documents}} files, {{HumanUnit .Stats.ContentBytes}}b content)</th>
-        <th>Last updated</th>
+        <th>Name <a href="/search?q={{.Last.Query}}&order=name">▼</a><a href="/search?q={{.Last.Query}}&order=revname">▲</a></th>
+        <th>Last updated <a href="/search?q={{.Last.Query}}&order=revtime">▼</a><a href="/search?q={{.Last.Query}}&order=time">▲</a></th>
         <th>Branches</th>
-        <th>Size</th>
+        <th>Size <a href="/search?q={{.Last.Query}}&order=revsize">▼</a><a href="/search?q={{.Last.Query}}&order=size">▲</a></th>
       </tr>
     </thead>
     <tbody>
