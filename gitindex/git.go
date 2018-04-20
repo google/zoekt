@@ -67,9 +67,12 @@ func RepoModTime(dir string) (time.Time, error) {
 	return last, nil
 }
 
-// FindGitRepos finds directories holding git repositories below the given directory.
-func FindGitRepos(arg string) ([]string, error) {
-	arg, err := filepath.Abs(arg)
+// FindGitRepos finds directories holding git repositories below the
+// given directory. It will find both bare and the ".git" dirs in
+// non-bare repositories. It returns the full path including the dir
+// passed in.
+func FindGitRepos(dir string) ([]string, error) {
+	arg, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, err
 	}
