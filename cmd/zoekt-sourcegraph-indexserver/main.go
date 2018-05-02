@@ -52,6 +52,13 @@ func refresh(root *url.URL, indexDir string, interval time.Duration, cpuFraction
 		for _, name := range repos {
 			commit, err := resolveRevision(root, name, "HEAD")
 			if err != nil || commit == "" {
+				if os.IsNotExist(err) {
+					// If we get to this point, it means we have an empty
+					// repository (ie we know it exists). As such, we just
+					// create an empty shard.
+					createEmptyShard(indexDir, name)
+					continue
+				}
 				log.Printf("failed to resolve revision HEAD for %v: %v", name, err)
 				continue
 			}
@@ -82,6 +89,19 @@ func refresh(root *url.URL, indexDir string, interval time.Duration, cpuFraction
 
 		<-t.C
 	}
+}
+
+func createEmptyShard(indexDir, name string) {
+	cmd := exec.Command("zoekt-archive-index",
+		"-index", indexDir,
+		"-incremental",
+		"-branch", "HEAD",
+		"-commit", "404aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		"-name", name,
+		"-")
+	// Empty archive
+	cmd.Stdin = bytes.NewBuffer(bytes.Repeat([]byte{0}, 1024))
+	loggedRun(cmd)
 }
 
 func listRepos(root *url.URL) ([]string, error) {
@@ -119,6 +139,9 @@ func resolveRevision(root *url.URL, repo, spec string) (string, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusNotFound {
+		return "", os.ErrNotExist
+	}
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("failed to resolve revision %s@%s: status %s", repo, spec, resp.Status)
 	}
