@@ -146,6 +146,7 @@ func (s *Server) createEmptyShard(tr trace.Trace, name string) {
 		"-index", s.IndexDir,
 		"-incremental",
 		"-branch", "HEAD",
+		// dummy commit
 		"-commit", "404aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		"-name", name,
 		"-")
