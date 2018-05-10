@@ -87,8 +87,11 @@ func (s *postingsBuilder) newSearchableString(data []byte, byteSections []Docume
 		if sz > 1 {
 			s.isPlainASCII = false
 		}
-		if c == 0 || c == utf8.RuneError {
-			return nil, nil, fmt.Errorf("zoekt: binary content at byte offset %d", byteCount)
+		if c == 0 {
+			return nil, nil, &skipError{fmt.Sprintf("binary content at byte offset %d", byteCount)}
+		}
+		if c == utf8.RuneError {
+			return nil, nil, &skipError{fmt.Sprintf("invalid UTF-8 at byte offset %d", byteCount)}
 		}
 		data = data[sz:]
 
@@ -252,6 +255,10 @@ type Document struct {
 	SubRepositoryPath string
 	Language          string
 
+	// If set, something is wrong with the file contents, and this
+	// is the reason it wasn't indexed.
+	SkipReason string
+
 	// Document sections for symbols. Offsets should use bytes.
 	Symbols []DocumentSection
 }
@@ -319,10 +326,25 @@ func (b *IndexBuilder) populateSubRepoIndices() {
 	}
 }
 
-// Add a file which only occurs in certain branches. The document
-// should be checked for sanity with IsText first.
+const notIndexedMarker = "NOT-INDEXED: "
+
+// skipError is an error for conditions that we can record in the index.
+type skipError struct {
+	reason string
+}
+
+func (e *skipError) Error() string {
+	return e.reason
+}
+
+// Add a file which only occurs in certain branches.
 func (b *IndexBuilder) Add(doc Document) error {
 	hasher := crc64.New(crc64.MakeTable(crc64.ISO))
+
+	if doc.SkipReason != "" {
+		doc.Content = []byte(notIndexedMarker + doc.SkipReason)
+		doc.Symbols = nil
+	}
 
 	sort.Sort(docSectionSlice(doc.Symbols))
 	var last DocumentSection
@@ -345,7 +367,14 @@ func (b *IndexBuilder) Add(doc Document) error {
 		}
 	}
 	docStr, runeSecs, err := b.contentPostings.newSearchableString(doc.Content, doc.Symbols)
-	if err != nil {
+	if t, ok := err.(*skipError); err != nil && ok {
+		doc.SkipReason = t.reason
+		doc.Content = []byte(notIndexedMarker + doc.SkipReason)
+		doc.Symbols = nil
+		doc.Language = "binary"
+
+		docStr, runeSecs, _ = b.contentPostings.newSearchableString(doc.Content, doc.Symbols)
+	} else if err != nil {
 		return err
 	}
 	nameStr, _, err := b.namePostings.newSearchableString([]byte(doc.Name), nil)

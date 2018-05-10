@@ -1791,33 +1791,36 @@ func TestUnicodeQuery(t *testing.T) {
 	}
 }
 
-func TestSkipBinary(t *testing.T) {
-	content := []byte("abc def \x00 abc")
-	b, err := NewIndexBuilder(nil)
-	if err != nil {
-		t.Fatalf("NewIndexBuilder: %v", err)
-	}
+func TestSkipInvalidContent(t *testing.T) {
+	for _, content := range []string{
+		// Binary
+		"abc def \x00 abc",
+		// Invalid UTF-8.
+		"abc def \xff abc"} {
 
-	if err := b.Add(Document{
-		Name:    "f1",
-		Content: content,
-	}); err == nil {
-		t.Errorf("indexed binary content")
-	}
-}
+		b, err := NewIndexBuilder(nil)
+		if err != nil {
+			t.Fatalf("NewIndexBuilder: %v", err)
+		}
 
-func TestInvalidUTF8(t *testing.T) {
-	content := []byte("abc def \xff abc")
-	b, err := NewIndexBuilder(nil)
-	if err != nil {
-		t.Fatalf("NewIndexBuilder: %v", err)
-	}
+		if err := b.Add(Document{
+			Name:    "f1",
+			Content: []byte(content),
+		}); err != nil {
+			t.Fatal(err)
+		}
 
-	if err := b.Add(Document{
-		Name:    "f1",
-		Content: content,
-	}); err == nil {
-		t.Errorf("indexed invalid utf8 content")
+		q := &query.Substring{Pattern: "abc def"}
+		res := searchForTest(t, b, q)
+		if len(res.Files) != 0 {
+			t.Fatalf("got %v, want no results", res.Files)
+		}
+
+		q = &query.Substring{Pattern: "NOT-INDEXED"}
+		res = searchForTest(t, b, q)
+		if len(res.Files) != 1 {
+			t.Fatalf("got %v, want 1 result", res.Files)
+		}
 	}
 }
 
