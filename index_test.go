@@ -1791,6 +1791,36 @@ func TestUnicodeQuery(t *testing.T) {
 	}
 }
 
+func TestSkipBinary(t *testing.T) {
+	content := []byte("abc def \x00 abc")
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
+
+	if err := b.Add(Document{
+		Name:    "f1",
+		Content: content,
+	}); err == nil {
+		t.Errorf("indexed binary content")
+	}
+}
+
+func TestInvalidUTF8(t *testing.T) {
+	content := []byte("abc def \xff abc")
+	b, err := NewIndexBuilder(nil)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
+
+	if err := b.Add(Document{
+		Name:    "f1",
+		Content: content,
+	}); err == nil {
+		t.Errorf("indexed invalid utf8 content")
+	}
+}
+
 func TestIsText(t *testing.T) {
 	for _, text := range []string{"", "simple ascii", "símplé unicödé", "\uFEFFwith utf8 'bom'", "with \uFFFD unicode replacement char"} {
 		if !IsText([]byte(text)) {
