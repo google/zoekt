@@ -88,14 +88,14 @@ func (s *Server) Refresh() {
 		s.repos = repos
 		s.mu.Unlock()
 
+		start := time.Now()
 		log.Printf("indexing %d repositories", len(repos))
 		for _, name := range repos {
 			s.Index(name)
 		}
+		log.Printf("indexed %d repositories after %s", len(repos), time.Since(start))
 
-		if len(repos) == 0 {
-			log.Printf("no repos found")
-		} else {
+		if len(repos) > 0 {
 			// Only delete shards if we found repositories
 			exists := make(map[string]bool)
 			for _, name := range repos {
