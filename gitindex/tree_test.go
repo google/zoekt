@@ -93,6 +93,7 @@ func TestTreeToFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TempDir: %v", err)
 	}
+	defer os.RemoveAll(dir)
 
 	if err := createSubmoduleRepo(dir); err != nil {
 		t.Fatalf("TempDir: %v", err)
@@ -150,6 +151,7 @@ func TestSubmoduleIndex(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TempDir: %v", err)
 	}
+	defer os.RemoveAll(dir)
 
 	if err := createSubmoduleRepo(dir); err != nil {
 		t.Fatalf("createSubmoduleRepo: %v", err)
@@ -346,7 +348,7 @@ func TestSkipSubmodules(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TempDir: %v", err)
 	}
-	//	defer os.RemoveAll(dir)
+	defer os.RemoveAll(dir)
 
 	if err := createSubmoduleRepo(dir); err != nil {
 		t.Fatalf("createMultibranchRepo: %v", err)
@@ -441,5 +443,4 @@ func TestUniq(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
-
 }
