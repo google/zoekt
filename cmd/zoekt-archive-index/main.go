@@ -20,7 +20,6 @@ import (
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
-	"github.com/google/zoekt/gitindex"
 )
 
 // stripComponents removes the specified number of leading path
@@ -113,9 +112,10 @@ func do(opts Options, bopts build.Options) error {
 		if err != nil {
 			return err
 		}
-		if err := gitindex.SetTemplatesFromOrigin(&bopts.RepositoryDescription, u); err != nil {
-			return err
-		}
+		// We do not use this functionality to avoid pulling in the transitive deps of gitindex
+		//if err := gitindex.SetTemplatesFromOrigin(&bopts.RepositoryDescription, u); err != nil {
+		//	return err
+		//}
 	}
 	bopts.SetDefaults()
 	bopts.RepositoryDescription.Branches = []zoekt.RepositoryBranch{{Name: opts.Branch, Version: opts.Commit}}
