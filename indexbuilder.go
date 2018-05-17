@@ -33,6 +33,9 @@ type searchableString struct {
 	data []byte
 }
 
+// Filled by the linker (see build-deploy.sh)
+var Version string
+
 // Store character (unicode codepoint) offset (in bytes) this often.
 const runeOffsetFrequency = 100
 

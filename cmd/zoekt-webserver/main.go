@@ -31,15 +31,13 @@ import (
 
 	"golang.org/x/net/trace"
 
+	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
 	"github.com/google/zoekt/shards"
 	"github.com/google/zoekt/web"
 )
 
 const logFormat = "2006-01-02T15-04-05.999999999Z07"
-
-// To be set from the linker.
-var Version string
 
 func divertLogs(dir string, interval time.Duration) {
 	t := time.NewTicker(interval)
@@ -118,8 +116,13 @@ func main() {
 
 	templateDir := flag.String("template_dir", "", "set directory from which to load custom .html.tpl template files")
 	dumpTemplates := flag.Bool("dump_templates", false, "dump templates into --template_dir and exit.")
-
+	version := flag.Bool("version", false, "Print version number")
 	flag.Parse()
+
+	if *version {
+		fmt.Printf("zoekt-webserver version %q\n", zoekt.Version)
+		os.Exit(0)
+	}
 
 	if *dumpTemplates {
 		if err := writeTemplates(*templateDir); err != nil {
@@ -146,7 +149,7 @@ func main() {
 	s := &web.Server{
 		Searcher: searcher,
 		Top:      web.Top,
-		Version:  Version,
+		Version:  zoekt.Version,
 	}
 
 	if *templateDir != "" {
