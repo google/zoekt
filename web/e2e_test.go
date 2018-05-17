@@ -69,7 +69,7 @@ func TestBasic(t *testing.T) {
 		URL:                  "repo-url",
 		CommitURLTemplate:    "{{.Version}}",
 		FileURLTemplate:      "file-url",
-		LineFragmentTemplate: "line",
+		LineFragmentTemplate: "#line",
 		Branches:             []zoekt.RepositoryBranch{{Name: "master", Version: "1234"}},
 	})
 	if err != nil {

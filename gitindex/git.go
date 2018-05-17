@@ -107,12 +107,12 @@ func setTemplates(repo *zoekt.Repository, u *url.URL, typ string) error {
 		/// eg. https://gerrit.googlesource.com/gitiles/+/master/tools/run_dev.sh#20
 		repo.CommitURLTemplate = u.String() + "/+/{{.Version}}"
 		repo.FileURLTemplate = u.String() + "/+/{{.Version}}/{{.Path}}"
-		repo.LineFragmentTemplate = "{{.LineNumber}}"
+		repo.LineFragmentTemplate = "#{{.LineNumber}}"
 	case "github":
 		// eg. https://github.com/hanwen/go-fuse/blob/notify/genversion.sh#L10
 		repo.CommitURLTemplate = u.String() + "/commit/{{.Version}}"
 		repo.FileURLTemplate = u.String() + "/blob/{{.Version}}/{{.Path}}"
-		repo.LineFragmentTemplate = "L{{.LineNumber}}"
+		repo.LineFragmentTemplate = "#L{{.LineNumber}}"
 
 	case "cgit":
 
@@ -120,14 +120,20 @@ func setTemplates(repo *zoekt.Repository, u *url.URL, typ string) error {
 
 		repo.CommitURLTemplate = u.String() + "/commit/?id={{.Version}}"
 		repo.FileURLTemplate = u.String() + "/tree/{{.Path}}/?id={{.Version}}"
-		repo.LineFragmentTemplate = "n{{.LineNumber}}"
+		repo.LineFragmentTemplate = "#n{{.LineNumber}}"
 
 	case "gitweb":
 		// https://gerrit.libreoffice.org/gitweb?p=online.git;a=blob;f=Makefile.am;h=cfcfd7c36fbae10e269653dc57a9b68c92d4c10b;hb=848145503bf7b98ce4a4aa0a858a0d71dd0dbb26#l10
 		repo.FileURLTemplate = u.String() + ";a=blob;f={{.Path}};hb={{.Version}}"
 		repo.CommitURLTemplate = u.String() + ";a=commit;h={{.Version}}"
-		repo.LineFragmentTemplate = "l{{.LineNumber}}"
+		repo.LineFragmentTemplate = "#l{{.LineNumber}}"
 
+	case "source.bazel.build":
+		// https://source.bazel.build/bazel/+/57bc201346e61c62a921c1cbf32ad24f185c10c9
+		// https://source.bazel.build/bazel/+/57bc201346e61c62a921c1cbf32ad24f185c10c9:tools/cpp/BUILD.empty;l=10
+		repo.CommitURLTemplate = u.String() + "/+/{{.Version}}"
+		repo.FileURLTemplate = u.String() + "/+/{{.Version}}:{{.Path}}"
+		repo.LineFragmentTemplate = ";l={{.LineNumber}}"
 	default:
 		return fmt.Errorf("URL scheme type %q unknown", typ)
 	}
@@ -189,7 +195,6 @@ func setTemplatesFromConfig(desc *zoekt.Repository, repoDir string) error {
 	sec := cfg.Raw.Section("zoekt")
 
 	webURLStr := configLookupString(sec, "web-url")
-
 	webURLType := configLookupString(sec, "web-url-type")
 
 	if webURLType != "" && webURLStr != "" {

@@ -35,7 +35,8 @@ const IndexFormatVersion = 15
 // 3: Rank documents within shards
 // 4: Dedup file bugfix
 // 5: Remove max line size limit
-const FeatureVersion = 5
+// 6: Include '#' into the LineFragment template
+const FeatureVersion = 6
 
 type indexTOC struct {
 	fileContents compoundSection
