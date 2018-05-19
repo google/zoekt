@@ -70,6 +70,7 @@ func loadTemplates(tpl *template.Template, dir string) error {
 		log.Fatalf("Glob: %v", err)
 	}
 
+	log.Printf("loading templates: %v", fs)
 	for _, fn := range fs {
 		content, err := ioutil.ReadFile(fn)
 		if err != nil {
@@ -77,7 +78,7 @@ func loadTemplates(tpl *template.Template, dir string) error {
 		}
 
 		base := filepath.Base(fn)
-		base = strings.TrimSuffix(base, ".html")
+		base = strings.TrimSuffix(base, templateExtension)
 		if _, err := tpl.New(base).Parse(string(content)); err != nil {
 			return fmt.Errorf("Parse(%s): %v", fn, err)
 		}
