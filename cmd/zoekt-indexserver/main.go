@@ -227,6 +227,7 @@ func main() {
 	fetchInterval := flag.Duration("fetch_interval", time.Hour, "run fetches this often")
 	dataDir := flag.String("data_dir",
 		filepath.Join(os.Getenv("HOME"), "zoekt-serving"), "directory holding all data.")
+	indexDir := flag.String("index_dir", "", "directory holding index shards. Defaults to $data_dir/index/")
 	mirrorConfig := flag.String("mirror_config",
 		"", "JSON file holding mirror configuration.")
 	indexConfig := flag.String("index_config",
@@ -256,9 +257,11 @@ func main() {
 	}
 
 	logDir := filepath.Join(*dataDir, "logs")
-	indexDir := filepath.Join(*dataDir, "index")
+	if *indexDir == "" {
+		*indexDir = filepath.Join(*dataDir, "index")
+	}
 	repoDir := filepath.Join(*dataDir, "repos")
-	for _, s := range []string{logDir, indexDir, repoDir} {
+	for _, s := range []string{logDir, *indexDir, repoDir} {
 		if _, err := os.Stat(s); err == nil {
 			continue
 		}
@@ -285,7 +288,7 @@ func main() {
 	}
 
 	go deleteLogs(logDir, *maxLogAge)
-	go deleteStaleIndexes(indexDir, repoDir, *fetchInterval)
+	go deleteStaleIndexes(*indexDir, repoDir, *fetchInterval)
 
-	refresh(repoDir, indexDir, *indexConfig, indexFlags, *fetchInterval, *cpuFraction)
+	refresh(repoDir, *indexDir, *indexConfig, indexFlags, *fetchInterval, *cpuFraction)
 }
