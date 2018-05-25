@@ -1634,7 +1634,9 @@ func TestSymbolBoundaryStart(t *testing.T) {
 			Symbols: []DocumentSection{{0, 5}, {14, 17}},
 		},
 	)
-	q := &query.Symbol{&query.Substring{Pattern: "start"}}
+	q := &query.Symbol{
+		Atom: &query.Substring{Pattern: "start"},
+	}
 	res := searchForTest(t, b, q)
 	if len(res.Files) != 1 || len(res.Files[0].LineMatches) != 1 {
 		t.Fatalf("got %v, want 1 line in 1 file", res.Files)
@@ -1656,7 +1658,9 @@ func TestSymbolBoundaryEnd(t *testing.T) {
 			Symbols: []DocumentSection{{14, 17}},
 		},
 	)
-	q := &query.Symbol{&query.Substring{Pattern: "end"}}
+	q := &query.Symbol{
+		Atom: &query.Substring{Pattern: "end"},
+	}
 	res := searchForTest(t, b, q)
 	if len(res.Files) != 1 || len(res.Files[0].LineMatches) != 1 {
 		t.Fatalf("got %v, want 1 line in 1 file", res.Files)
@@ -1678,7 +1682,9 @@ func TestSymbolAtom(t *testing.T) {
 			Symbols: []DocumentSection{{4, 12}},
 		},
 	)
-	q := &query.Symbol{&query.Substring{Pattern: "bla"}}
+	q := &query.Symbol{
+		Atom: &query.Substring{Pattern: "bla"},
+	}
 	res := searchForTest(t, b, q)
 	if len(res.Files) != 1 || len(res.Files[0].LineMatches) != 1 {
 		t.Fatalf("got %v, want 1 line in 1 file", res.Files)
@@ -1700,7 +1706,9 @@ func TestSymbolAtomExact(t *testing.T) {
 			Symbols: []DocumentSection{{4, 7}},
 		},
 	)
-	q := &query.Symbol{&query.Substring{Pattern: "sym"}}
+	q := &query.Symbol{
+		Atom: &query.Substring{Pattern: "sym"},
+	}
 	res := searchForTest(t, b, q)
 	if len(res.Files) != 1 || len(res.Files[0].LineMatches) != 1 {
 		t.Fatalf("got %v, want 1 line in 1 file", res.Files)
