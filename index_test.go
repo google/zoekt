@@ -1824,15 +1824,15 @@ func TestSkipInvalidContent(t *testing.T) {
 	}
 }
 
-func TestIsText(t *testing.T) {
+func TestCheckText(t *testing.T) {
 	for _, text := range []string{"", "simple ascii", "símplé unicödé", "\uFEFFwith utf8 'bom'", "with \uFFFD unicode replacement char"} {
-		if !IsText([]byte(text)) {
-			t.Errorf("IsText(%q) is false", text)
+		if err := CheckText([]byte(text)); err != nil {
+			t.Errorf("CheckText(%q): %v", text, err)
 		}
 	}
 	for _, text := range []string{"zero\x00byte", "high\xEFbyte"} {
-		if IsText([]byte(text)) {
-			t.Errorf("IsText(%q) is true", text)
+		if err := CheckText([]byte(text)); err == nil {
+			t.Errorf("CheckText(%q) succeeded", text)
 		}
 	}
 }

@@ -276,25 +276,31 @@ func (b *IndexBuilder) AddFile(name string, content []byte) error {
 
 const maxTrigramCount = 20000
 
-// IsText returns false if the given contents are probably not source texts.
-func IsText(content []byte) bool {
+// CheckText returns a reason why the given contents are probably not source texts.
+func CheckText(content []byte) error {
+	if len(content) == 0 {
+		return nil
+	}
+
 	if len(content) < ngramSize {
-		return true
+		return fmt.Errorf("file size smaller than %d", ngramSize)
 	}
 
 	trigrams := map[ngram]struct{}{}
 
 	var cur [3]rune
+	byteCount := 0
 	for len(content) > 0 {
 		if content[0] == 0 {
-			return false
+			return fmt.Errorf("binary data at byte offset %d", byteCount)
 		}
 
 		r, sz := utf8.DecodeRune(content)
 		if r == utf8.RuneError && sz < 2 {
-			return false
+			return fmt.Errorf("invalid UTF-8 at byte offset %d", byteCount)
 		}
 		content = content[sz:]
+		byteCount += sz
 
 		cur[0], cur[1], cur[2] = cur[1], cur[2], r
 		if cur[0] == 0 {
@@ -305,10 +311,10 @@ func IsText(content []byte) bool {
 		trigrams[runesToNGram(cur)] = struct{}{}
 		if len(trigrams) > maxTrigramCount {
 			// probably not text.
-			return false
+			return fmt.Errorf("number of trigrams exceeds %d", maxTrigramCount)
 		}
 	}
-	return true
+	return nil
 }
 
 func (b *IndexBuilder) populateSubRepoIndices() {

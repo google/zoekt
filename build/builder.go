@@ -222,8 +222,8 @@ func (b *Builder) Add(doc zoekt.Document) error {
 	// insert a reason here too.
 	if len(doc.Content) > b.opts.SizeMax {
 		doc.SkipReason = fmt.Sprintf("document size %d larger than limit %d", len(doc.Content), b.opts.SizeMax)
-	} else if !zoekt.IsText(doc.Content) {
-		doc.SkipReason = "probably not text"
+	} else if err := zoekt.CheckText(doc.Content); err != nil {
+		doc.SkipReason = err.Error()
 		doc.Language = "binary"
 	}
 
