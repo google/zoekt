@@ -90,9 +90,6 @@ func (s *postingsBuilder) newSearchableString(data []byte, byteSections []Docume
 		if c == 0 {
 			return nil, nil, &skipError{fmt.Sprintf("binary content at byte offset %d", byteCount)}
 		}
-		if c == utf8.RuneError {
-			return nil, nil, &skipError{fmt.Sprintf("invalid UTF-8 at byte offset %d", byteCount)}
-		}
 		data = data[sz:]
 
 		runeGram[0], runeGram[1], runeGram[2] = runeGram[1], runeGram[2], c
@@ -296,9 +293,6 @@ func CheckText(content []byte) error {
 		}
 
 		r, sz := utf8.DecodeRune(content)
-		if r == utf8.RuneError && sz < 2 {
-			return fmt.Errorf("invalid UTF-8 at byte offset %d", byteCount)
-		}
 		content = content[sz:]
 		byteCount += sz
 

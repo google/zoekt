@@ -1803,8 +1803,7 @@ func TestSkipInvalidContent(t *testing.T) {
 	for _, content := range []string{
 		// Binary
 		"abc def \x00 abc",
-		// Invalid UTF-8.
-		"abc def \xff abc"} {
+	} {
 
 		b, err := NewIndexBuilder(nil)
 		if err != nil {
@@ -1838,7 +1837,7 @@ func TestCheckText(t *testing.T) {
 			t.Errorf("CheckText(%q): %v", text, err)
 		}
 	}
-	for _, text := range []string{"zero\x00byte", "high\xEFbyte"} {
+	for _, text := range []string{"zero\x00byte", "xx"} {
 		if err := CheckText([]byte(text)); err == nil {
 			t.Errorf("CheckText(%q) succeeded", text)
 		}
