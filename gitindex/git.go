@@ -470,6 +470,14 @@ func IndexGitRepo(opts Options) error {
 			}
 
 			if blob.Size > int64(opts.BuildOptions.SizeMax) {
+				if err := builder.Add(zoekt.Document{
+					SkipReason:        fmt.Sprintf("file size %d exceeds maximum size %d", blob.Size, opts.BuildOptions.SizeMax),
+					Name:              key.FullPath(),
+					Branches:          brs,
+					SubRepositoryPath: key.SubRepoPath,
+				}); err != nil {
+					return err
+				}
 				continue
 			}
 
@@ -477,12 +485,14 @@ func IndexGitRepo(opts Options) error {
 			if err != nil {
 				return err
 			}
-			builder.Add(zoekt.Document{
+			if err := builder.Add(zoekt.Document{
 				SubRepositoryPath: key.SubRepoPath,
 				Name:              key.FullPath(),
 				Content:           contents,
 				Branches:          brs,
-			})
+			}); err != nil {
+				return err
+			}
 		}
 	}
 	return builder.Finish()
