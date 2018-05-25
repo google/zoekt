@@ -15,6 +15,7 @@
 package zoekt
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"hash/crc64"
@@ -64,6 +65,9 @@ func newPostingsBuilder() *postingsBuilder {
 	}
 }
 
+// Store trigram offsets for the given UTF-8 data. The
+// DocumentSections must correspond to rune boundaries in the UTF-8
+// data.
 func (s *postingsBuilder) newSearchableString(data []byte, byteSections []DocumentSection) (*searchableString, []DocumentSection, error) {
 	dest := searchableString{
 		data: data,
@@ -86,9 +90,6 @@ func (s *postingsBuilder) newSearchableString(data []byte, byteSections []Docume
 		c, sz := utf8.DecodeRune(data)
 		if sz > 1 {
 			s.isPlainASCII = false
-		}
-		if c == 0 {
-			return nil, nil, &skipError{fmt.Sprintf("binary content at byte offset %d", byteCount)}
 		}
 		data = data[sz:]
 
@@ -328,18 +329,14 @@ func (b *IndexBuilder) populateSubRepoIndices() {
 
 const notIndexedMarker = "NOT-INDEXED: "
 
-// skipError is an error for conditions that we can record in the index.
-type skipError struct {
-	reason string
-}
-
-func (e *skipError) Error() string {
-	return e.reason
-}
-
 // Add a file which only occurs in certain branches.
 func (b *IndexBuilder) Add(doc Document) error {
 	hasher := crc64.New(crc64.MakeTable(crc64.ISO))
+
+	if idx := bytes.IndexByte(doc.Content, 0); idx >= 0 {
+		doc.SkipReason = fmt.Sprintf("binary content at byte offset %d", idx)
+		doc.Language = "binary"
+	}
 
 	if doc.SkipReason != "" {
 		doc.Content = []byte(notIndexedMarker + doc.SkipReason)
@@ -367,14 +364,7 @@ func (b *IndexBuilder) Add(doc Document) error {
 		}
 	}
 	docStr, runeSecs, err := b.contentPostings.newSearchableString(doc.Content, doc.Symbols)
-	if t, ok := err.(*skipError); err != nil && ok {
-		doc.SkipReason = t.reason
-		doc.Content = []byte(notIndexedMarker + doc.SkipReason)
-		doc.Symbols = nil
-		doc.Language = "binary"
-
-		docStr, runeSecs, _ = b.contentPostings.newSearchableString(doc.Content, doc.Symbols)
-	} else if err != nil {
+	if err != nil {
 		return err
 	}
 	nameStr, _, err := b.namePostings.newSearchableString([]byte(doc.Name), nil)
