@@ -36,7 +36,8 @@ const IndexFormatVersion = 15
 // 4: Dedup file bugfix
 // 5: Remove max line size limit
 // 6: Include '#' into the LineFragment template
-const FeatureVersion = 6
+// 7: Record skip reasons in the index.
+const FeatureVersion = 7
 
 type indexTOC struct {
 	fileContents compoundSection
