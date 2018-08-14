@@ -32,12 +32,11 @@ import (
 )
 
 type configEntry struct {
-	GithubUser     string
-	GitilesURL     string
-	CGitURL        string
-	SourcegraphURL string
-	Name           string
-	Exclude        string
+	GithubUser string
+	GitilesURL string
+	CGitURL    string
+	Name       string
+	Exclude    string
 }
 
 func randomize(entries []configEntry) []configEntry {
