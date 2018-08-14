@@ -88,6 +88,39 @@ EOF
 	return nil
 }
 
+func TestFindGitRepos(t *testing.T) {
+	dir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatalf("TempDir: %v", err)
+	}
+
+	if err := createSubmoduleRepo(dir); err != nil {
+		t.Error("createSubmoduleRepo", err)
+	}
+	repos, err := FindGitRepos(dir)
+
+	got := map[string]bool{}
+	for _, r := range repos {
+		p, err := filepath.Rel(dir, r)
+		if err != nil {
+			t.Fatalf("Relative: %v", err)
+		}
+
+		got[p] = true
+	}
+
+	want := map[string]bool{
+		"gerrit.googlesource.com/bdir.git":     true,
+		"gerrit.googlesource.com/sub/bdir.git": true,
+		"adir/.git":                            true,
+		"bdir/.git":                            true,
+		"gerrit.googlesource.com/adir.git":     true,
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v want %v", got, want)
+	}
+}
+
 func TestTreeToFiles(t *testing.T) {
 	dir, err := ioutil.TempDir("", "")
 	if err != nil {

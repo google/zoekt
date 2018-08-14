@@ -16,11 +16,13 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
 	"github.com/google/zoekt/gitindex"
 )
@@ -42,7 +44,13 @@ func main() {
 		"this is used to find repositories for submodules. "+
 		"It also affects name if the indexed repository is under this directory.")
 	ctags := flag.Bool("require_ctags", false, "If set, ctags calls must succeed.")
+	version := flag.Bool("version", false, "Print version number")
 	flag.Parse()
+
+	if *version {
+		fmt.Printf("zoekt-git-index version %q\n", zoekt.Version)
+		os.Exit(0)
+	}
 
 	if *repoCacheDir != "" {
 		dir, err := filepath.Abs(*repoCacheDir)

@@ -1634,7 +1634,9 @@ func TestSymbolBoundaryStart(t *testing.T) {
 			Symbols: []DocumentSection{{0, 5}, {14, 17}},
 		},
 	)
-	q := &query.Symbol{&query.Substring{Pattern: "start"}}
+	q := &query.Symbol{
+		Atom: &query.Substring{Pattern: "start"},
+	}
 	res := searchForTest(t, b, q)
 	if len(res.Files) != 1 || len(res.Files[0].LineMatches) != 1 {
 		t.Fatalf("got %v, want 1 line in 1 file", res.Files)
@@ -1656,7 +1658,9 @@ func TestSymbolBoundaryEnd(t *testing.T) {
 			Symbols: []DocumentSection{{14, 17}},
 		},
 	)
-	q := &query.Symbol{&query.Substring{Pattern: "end"}}
+	q := &query.Symbol{
+		Atom: &query.Substring{Pattern: "end"},
+	}
 	res := searchForTest(t, b, q)
 	if len(res.Files) != 1 || len(res.Files[0].LineMatches) != 1 {
 		t.Fatalf("got %v, want 1 line in 1 file", res.Files)
@@ -1678,7 +1682,9 @@ func TestSymbolAtom(t *testing.T) {
 			Symbols: []DocumentSection{{4, 12}},
 		},
 	)
-	q := &query.Symbol{&query.Substring{Pattern: "bla"}}
+	q := &query.Symbol{
+		Atom: &query.Substring{Pattern: "bla"},
+	}
 	res := searchForTest(t, b, q)
 	if len(res.Files) != 1 || len(res.Files[0].LineMatches) != 1 {
 		t.Fatalf("got %v, want 1 line in 1 file", res.Files)
@@ -1700,7 +1706,9 @@ func TestSymbolAtomExact(t *testing.T) {
 			Symbols: []DocumentSection{{4, 7}},
 		},
 	)
-	q := &query.Symbol{&query.Substring{Pattern: "sym"}}
+	q := &query.Symbol{
+		Atom: &query.Substring{Pattern: "sym"},
+	}
 	res := searchForTest(t, b, q)
 	if len(res.Files) != 1 || len(res.Files[0].LineMatches) != 1 {
 		t.Fatalf("got %v, want 1 line in 1 file", res.Files)
@@ -1791,15 +1799,47 @@ func TestUnicodeQuery(t *testing.T) {
 	}
 }
 
-func TestIsText(t *testing.T) {
-	for _, text := range []string{"", "simple ascii", "símplé unicödé", "\uFEFFwith utf8 'bom'", "with \uFFFD unicode replacement char"} {
-		if !IsText([]byte(text)) {
-			t.Errorf("IsText(%q) is false", text)
+func TestSkipInvalidContent(t *testing.T) {
+	for _, content := range []string{
+		// Binary
+		"abc def \x00 abc",
+	} {
+
+		b, err := NewIndexBuilder(nil)
+		if err != nil {
+			t.Fatalf("NewIndexBuilder: %v", err)
+		}
+
+		if err := b.Add(Document{
+			Name:    "f1",
+			Content: []byte(content),
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		q := &query.Substring{Pattern: "abc def"}
+		res := searchForTest(t, b, q)
+		if len(res.Files) != 0 {
+			t.Fatalf("got %v, want no results", res.Files)
+		}
+
+		q = &query.Substring{Pattern: "NOT-INDEXED"}
+		res = searchForTest(t, b, q)
+		if len(res.Files) != 1 {
+			t.Fatalf("got %v, want 1 result", res.Files)
 		}
 	}
-	for _, text := range []string{"zero\x00byte", "high\xEFbyte"} {
-		if IsText([]byte(text)) {
-			t.Errorf("IsText(%q) is true", text)
+}
+
+func TestCheckText(t *testing.T) {
+	for _, text := range []string{"", "simple ascii", "símplé unicödé", "\uFEFFwith utf8 'bom'", "with \uFFFD unicode replacement char"} {
+		if err := CheckText([]byte(text)); err != nil {
+			t.Errorf("CheckText(%q): %v", text, err)
+		}
+	}
+	for _, text := range []string{"zero\x00byte", "xx"} {
+		if err := CheckText([]byte(text)); err == nil {
+			t.Errorf("CheckText(%q) succeeded", text)
 		}
 	}
 }
