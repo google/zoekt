@@ -160,7 +160,7 @@ func main() {
 	opts.SetDefaults()
 	baseURL, err := url.Parse(*baseURLStr)
 	if err != nil {
-		log.Fatalf("Parse baseURL %q: %v", baseURLStr, err)
+		log.Fatalf("Parse baseURL %q: %v", *baseURLStr, err)
 	}
 
 	branches, err := parseBranches(*manifestRepoURL, *manifestRevPrefix, repoCache, flag.Args())
