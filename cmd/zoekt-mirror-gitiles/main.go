@@ -52,7 +52,7 @@ func main() {
 	case "cgit":
 		crawler = getCGitRepos
 	default:
-		log.Fatalf("unknown host type %q", hostType)
+		log.Fatalf("unknown host type %q", *hostType)
 	}
 
 	rootURL, err := url.Parse(flag.Arg(0))
