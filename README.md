@@ -6,6 +6,32 @@
 This is a fast text search engine, intended for use with source
 code. (Pronunciation: roughly as you would pronounce "zooked" in English)
 
+**Note:** This is a [Sourcegraph](https://github.com/sourcegraph/zoekt) fork
+of [github.com/google/zoekt](https://github.com/google/zoekt). It contains
+some changes that do not make sense to upstream and or have not yet been
+upstreamed. Differences:
+
+- [zoekt-sourcegraph-indexserver](cmd/zoekt-sourcegraph-indexserver/main.go)
+  is a Sourcegraph specific command which indexes all enabled repositories on
+  Sourcegraph, as well as keeping the indexes up to date.
+- We have exposed the API via
+  [sourcegraph/rpc](https://github.com/sourcegraph/rpc) (a fork of `net/rpc`
+  which supports cancellation).
+- Query primitive `RepoSet` to efficiently specify a set of repositories to
+  search.
+- We vendor in all dependencies.
+- Allow empty shard directories on startup. Needed when starting a fresh
+  instance which hasn't indexed anything yet.
+- We disable ctags at the source level.
+- Other minor changes.
+
+Assuming you have the gerrit upstream configured, a useful way to see what we
+changed is:
+
+``` shellsession
+$ git diff gerrit/master -- ':(exclude)vendor/' ':(exclude)Gopkg*'
+```
+
 INSTRUCTIONS
 ============
 
