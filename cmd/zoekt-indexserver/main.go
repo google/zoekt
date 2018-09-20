@@ -125,7 +125,7 @@ func runIndexCommand(indexDir, repoDir, indexConfigFile string, indexFlags []str
 		return
 	}
 
-	cpuCount := int(math.Round(float64(runtime.NumCPU()) * cpuFraction))
+	cpuCount := int(math.Trunc(float64(runtime.NumCPU()) * cpuFraction))
 	if cpuCount < 1 {
 		cpuCount = 1
 	}
