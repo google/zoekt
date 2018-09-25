@@ -15,7 +15,7 @@ upstreamed. Differences:
   is a Sourcegraph specific command which indexes all enabled repositories on
   Sourcegraph, as well as keeping the indexes up to date.
 - We have exposed the API via
-  [sourcegraph/rpc](https://github.com/sourcegraph/rpc) (a fork of `net/rpc`
+  [keegancsmith/rpc](https://github.com/keegancsmith/rpc) (a fork of `net/rpc`
   which supports cancellation).
 - Query primitive `RepoSet` to efficiently specify a set of repositories to
   search.
