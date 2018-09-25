@@ -12,7 +12,7 @@ import (
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/query"
 	"github.com/google/zoekt/rpc/internal/srv"
-	"github.com/sourcegraph/rpc"
+	"github.com/keegancsmith/rpc"
 )
 
 // DefaultRPCPath is the rpc path used by zoekt-webserver

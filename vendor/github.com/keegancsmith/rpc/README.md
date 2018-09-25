@@ -1,12 +1,16 @@
-# rpc [![Build Status](https://travis-ci.org/sourcegraph/rpc.svg?branch=master)](http://travis-ci.org/sourcegraph/rpc)
+# rpc  [![Build Status](https://travis-ci.org/keegancsmith/rpc.svg?branch=master)](https://travis-ci.org/keegancsmith/rpc)
 
 This is a fork of the stdlib [net/rpc](https://golang.org/pkg/net/rpc/) which
 is frozen. It adds support for `context.Context` on the client and server,
-including propogating cancellation.
+including propagating cancellation.
 
 The API is exactly the same, except `Client.Call` takes a `context.Context`,
 and Server methods are expected to take a `context.Context` as the first
-argument.
+argument. Additionally the wire protocol is unchanged, so is backwards
+compatible with `net/rpc` clients.
+
+`DialHTTPPathTimeout` function is also added. A future release of rpc may
+update all Dial functions to instead take a context.
 
 ## Why use net/rpc
 
@@ -32,6 +36,7 @@ freeze net/rpc](https://github.com/golang/go/issues/16844).
 
 ## Details
 
-Forked from commit
-[a89fa7040b](https://github.com/golang/go/commit/a89fa7040b) on 25 January
-2018.
+Last forked from commit [08ab820](https://github.com/golang/go/commit/08ab820)
+on 25 September 2018.
+
+Cancellation implemented via the rpc call `_goRPC_.Cancel`.

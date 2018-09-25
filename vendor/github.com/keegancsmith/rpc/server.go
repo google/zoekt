@@ -6,12 +6,13 @@
 	Package rpc is a fork of the stdlib net/rpc which is frozen. It adds
 	support for context.Context on the client and server, including
 	propogating cancellation. See the README at
-	https://github.com/sourcegraph/rpc for motivation why this exists.
+	https://github.com/keegancsmith/rpc for motivation why this exists.
 
 	The API is exactly the same, except Client.Call takes a context.Context,
 	and Server methods are expected to take a context.Context as the first
 	argument. The following is the original rpc godoc updated to include
-	context.Context.
+	context.Context. Additionally the wire protocol is unchanged, so is
+	backwards compatible with net/rpc clients.
 
 	Package rpc provides access to the exported methods of an object across a
 	network or other I/O connection.  A server registers an object, making it visible
@@ -153,7 +154,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/sourcegraph/rpc/internal/svc"
+	"github.com/keegancsmith/rpc/internal/svc"
 )
 
 const (
@@ -478,6 +479,7 @@ func (c *gobServerCodec) Close() error {
 // The caller typically invokes ServeConn in a go statement.
 // ServeConn uses the gob wire format (see package gob) on the
 // connection. To use an alternate codec, use ServeCodec.
+// See NewClient's comment for information about concurrent access.
 func (server *Server) ServeConn(conn io.ReadWriteCloser) {
 	buf := bufio.NewWriter(conn)
 	srv := &gobServerCodec{
@@ -689,12 +691,13 @@ func RegisterName(name string, rcvr interface{}) error {
 // write a response back. The server calls Close when finished with the
 // connection. ReadRequestBody may be called with a nil
 // argument to force the body of the request to be read and discarded.
+// See NewClient's comment for information about concurrent access.
 type ServerCodec interface {
 	ReadRequestHeader(*Request) error
 	ReadRequestBody(interface{}) error
-	// WriteResponse must be safe for concurrent use by multiple goroutines.
 	WriteResponse(*Response, interface{}) error
 
+	// Close can be called multiple times and must be idempotent.
 	Close() error
 }
 
@@ -703,6 +706,7 @@ type ServerCodec interface {
 // The caller typically invokes ServeConn in a go statement.
 // ServeConn uses the gob wire format (see package gob) on the
 // connection. To use an alternate codec, use ServeCodec.
+// See NewClient's comment for information about concurrent access.
 func ServeConn(conn io.ReadWriteCloser) {
 	DefaultServer.ServeConn(conn)
 }

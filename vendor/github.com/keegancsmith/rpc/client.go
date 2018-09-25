@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sourcegraph/rpc/internal/svc"
+	"github.com/keegancsmith/rpc/internal/svc"
 )
 
 // ServerError represents an error that has been returned from
@@ -64,8 +64,8 @@ type Client struct {
 // connection. ReadResponseBody may be called with a nil
 // argument to force the body of the response to be read and then
 // discarded.
+// See NewClient's comment for information about concurrent access.
 type ClientCodec interface {
-	// WriteRequest must be safe for concurrent use by multiple goroutines.
 	WriteRequest(*Request, interface{}) error
 	ReadResponseHeader(*Response) error
 	ReadResponseBody(interface{}) error
@@ -80,8 +80,8 @@ func (client *Client) send(call *Call) {
 	// Register this call.
 	client.mutex.Lock()
 	if client.shutdown || client.closing {
-		call.Error = ErrShutdown
 		client.mutex.Unlock()
+		call.Error = ErrShutdown
 		call.done()
 		return
 	}
@@ -198,6 +198,11 @@ func (call *Call) done() {
 // set of services at the other end of the connection.
 // It adds a buffer to the write side of the connection so
 // the header and payload are sent as a unit.
+//
+// The read and write halves of the connection are serialized independently,
+// so no interlocking is required. However each half may be accessed
+// concurrently so the implementation of conn should protect against
+// concurrent reads or concurrent writes.
 func NewClient(conn io.ReadWriteCloser) *Client {
 	encBuf := bufio.NewWriter(conn)
 	client := &gobClientCodec{conn, gob.NewDecoder(conn), gob.NewEncoder(encBuf), encBuf}
@@ -257,7 +262,9 @@ func DialHTTPPath(network, address, path string) (*Client, error) {
 }
 
 // DialHTTPPathTimeout connects to an HTTP RPC server
-// at the specified network address and path with the specified timeout.
+// at the specified network address and path with the specified timeout for Dialing.
+//
+// This is a function added by github.com/keegancsmith/rpc
 func DialHTTPPathTimeout(network, address, path string, timeout time.Duration) (*Client, error) {
 	var err error
 	conn, err := net.DialTimeout(network, address, timeout)

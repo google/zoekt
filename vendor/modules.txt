@@ -19,6 +19,9 @@ github.com/google/go-querystring/query
 github.com/google/slothfs/manifest
 # github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99
 github.com/jbenet/go-context/io
+# github.com/keegancsmith/rpc v1.1.0
+github.com/keegancsmith/rpc
+github.com/keegancsmith/rpc/internal/svc
 # github.com/kevinburke/ssh_config v0.0.0-20180317175531-9fc7bb800b55
 github.com/kevinburke/ssh_config
 # github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348
@@ -30,9 +33,6 @@ github.com/mitchellh/go-homedir
 github.com/pelletier/go-buffruneio
 # github.com/sergi/go-diff v1.0.0
 github.com/sergi/go-diff/diffmatchpatch
-# github.com/sourcegraph/rpc v0.0.0-20180329203801-5eaf49b36f85
-github.com/sourcegraph/rpc
-github.com/sourcegraph/rpc/internal/svc
 # github.com/src-d/gcfg v1.3.0
 github.com/src-d/gcfg
 github.com/src-d/gcfg/scanner
