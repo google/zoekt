@@ -108,15 +108,12 @@ func (s *Server) Run() {
 			sem.Wait()
 			tr.Finish()
 
-			// Only delete shards if we found repositories, to prevent strange
-			// bugs in responses causing us to delete everything.
-			if len(repos) > 0 {
-				exists := make(map[string]bool)
-				for _, name := range repos {
-					exists[name] = true
-				}
-				s.deleteStaleIndexes(exists)
+			// Remove indexes for repos which no longer exist.
+			exists := make(map[string]bool)
+			for _, name := range repos {
+				exists[name] = true
 			}
+			s.deleteStaleIndexes(exists)
 
 			<-t.C
 		}
