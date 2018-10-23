@@ -45,7 +45,9 @@ func CloneRepo(destDir, name, cloneURL string, settings map[string]string) error
 
 	var config []string
 	for _, k := range keys {
-		config = append(config, "--config", k+"="+settings[k])
+		if settings[k] != "" {
+			config = append(config, "--config", k+"="+settings[k])
+		}
 	}
 
 	cmd := exec.Command(
