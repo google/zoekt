@@ -39,25 +39,67 @@ import (
 
 const day = time.Hour * 24
 
-func loggedRun(cmd *exec.Cmd) {
-	out := &bytes.Buffer{}
-	errOut := &bytes.Buffer{}
-	cmd.Stdout = out
-	cmd.Stderr = errOut
+func loggedRun(cmd *exec.Cmd) (out, err []byte) {
+	outBuf := &bytes.Buffer{}
+	errBuf := &bytes.Buffer{}
+	cmd.Stdout = outBuf
+	cmd.Stderr = errBuf
 
+	log.Printf("run %v", cmd.Args)
 	if err := cmd.Run(); err != nil {
 		log.Printf("command %s failed: %v\nOUT: %s\nERR: %s",
-			cmd.Args, err, out.String(), errOut.String())
-	} else {
-		log.Printf("ran successfully %s", cmd.Args)
+			cmd.Args, err, outBuf.String(), errBuf.String())
+	}
+
+	return outBuf.Bytes(), errBuf.Bytes()
+}
+
+type Options struct {
+	cpuFraction      float64
+	cpuCount         int
+	fetchInterval    time.Duration
+	mirrorInterval   time.Duration
+	indexFlagsStr    string
+	indexFlags       []string
+	indexConfigFile  string
+	mirrorConfigFile string
+	maxLogAge        time.Duration
+}
+
+func (o *Options) validate() {
+	if o.cpuFraction <= 0.0 || o.cpuFraction > 1.0 {
+		log.Fatal("cpu_fraction must be between 0.0 and 1.0")
+	}
+
+	o.cpuCount = int(math.Trunc(float64(runtime.NumCPU()) * o.cpuFraction))
+	if o.cpuCount < 1 {
+		o.cpuCount = 1
+	}
+	if o.indexFlagsStr != "" {
+		o.indexFlags = strings.Split(o.indexFlagsStr, " ")
 	}
 }
 
-func refresh(repoDir, indexDir, indexConfigFile string, indexFlags []string, fetchInterval time.Duration, cpuFraction float64) {
-	// Start with indexing something, so we can start the webserver.
-	runIndexCommand(indexDir, repoDir, indexConfigFile, indexFlags, cpuFraction)
+func (o *Options) defineFlags() {
+	flag.DurationVar(&o.maxLogAge, "max_log_age", 3*day, "recycle index logs after this much time")
+	flag.DurationVar(&o.fetchInterval, "fetch_interval", time.Hour, "run fetches this often")
+	flag.StringVar(&o.indexConfigFile, "index_config",
+		"", "JSON file holding index configuration.")
 
-	t := time.NewTicker(fetchInterval)
+	flag.StringVar(&o.mirrorConfigFile, "mirror_config",
+		"", "JSON file holding mirror configuration.")
+
+	flag.DurationVar(&o.mirrorInterval, "mirror_duration", 24*time.Hour, "find and clone new repos at this frequency.")
+	flag.Float64Var(&o.cpuFraction, "cpu_fraction", 0.25,
+		"use this fraction of the cores for indexing.")
+	flag.StringVar(&o.indexFlagsStr, "git_index_flags", "", "space separated list of flags passed through to zoekt-git-index (e.g. -git_index_flags='-symbols=false -submodules=false'")
+}
+
+func refresh(repoDir, indexDir string, opts *Options) {
+	// Start with indexing something, so we can start the webserver.
+	runIndexCommand(indexDir, repoDir, opts)
+
+	t := time.NewTicker(opts.fetchInterval)
 	for {
 		repos, err := gitindex.FindGitRepos(repoDir)
 		if err != nil {
@@ -67,6 +109,7 @@ func refresh(repoDir, indexDir, indexConfigFile string, indexFlags []string, fet
 		if len(repos) == 0 {
 			log.Printf("no repos found under %s", repoDir)
 		}
+
 		for _, dir := range repos {
 			cmd := exec.Command("git", "--git-dir", dir, "fetch", "origin")
 			// Prevent prompting
@@ -74,7 +117,7 @@ func refresh(repoDir, indexDir, indexConfigFile string, indexFlags []string, fet
 			loggedRun(cmd)
 		}
 
-		runIndexCommand(indexDir, repoDir, indexConfigFile, indexFlags, cpuFraction)
+		runIndexCommand(indexDir, repoDir, opts)
 		<-t.C
 	}
 }
@@ -107,11 +150,11 @@ func repositoryOnRepoHost(repoBaseDir, dir string, repoHosts []RepoHostConfig) b
 	return false
 }
 
-func runIndexCommand(indexDir, repoDir, indexConfigFile string, indexFlags []string, cpuFraction float64) {
+func runIndexCommand(indexDir, repoDir string, opts *Options) {
 	var indexConfig *IndexConfig
-	if indexConfigFile != "" {
+	if opts.indexConfigFile != "" {
 		var err error
-		indexConfig, err = readIndexConfig(indexConfigFile)
+		indexConfig, err = readIndexConfig(opts.indexConfigFile)
 		if err != nil {
 			log.Printf("index config: %v", err)
 		}
@@ -125,10 +168,6 @@ func runIndexCommand(indexDir, repoDir, indexConfigFile string, indexFlags []str
 		return
 	}
 
-	cpuCount := int(math.Trunc(float64(runtime.NumCPU()) * cpuFraction))
-	if cpuCount < 1 {
-		cpuCount = 1
-	}
 	for _, dir := range repos {
 		if indexConfig != nil {
 			// Don't want to index the subrepos of a repo
@@ -144,12 +183,12 @@ func runIndexCommand(indexDir, repoDir, indexConfigFile string, indexFlags []str
 
 		args := []string{
 			"-require_ctags",
-			fmt.Sprintf("-parallelism=%d", cpuCount),
+			fmt.Sprintf("-parallelism=%d", opts.cpuCount),
 			"-repo_cache", repoDir,
 			"-index", indexDir,
 			"-incremental",
 		}
-		args = append(args, indexFlags...)
+		args = append(args, opts.indexFlags...)
 		args = append(args, dir)
 		cmd := exec.Command("zoekt-git-index", args...)
 		loggedRun(cmd)
@@ -158,19 +197,22 @@ func runIndexCommand(indexDir, repoDir, indexConfigFile string, indexFlags []str
 
 // deleteLogs deletes old logs.
 func deleteLogs(logDir string, maxAge time.Duration) {
+	fs, err := filepath.Glob(filepath.Join(logDir, "*"))
+	if err != nil {
+		log.Fatalf("filepath.Glob(%s): %v", logDir, err)
+	}
+
+	threshold := time.Now().Add(-maxAge)
+	for _, fn := range fs {
+		if fi, err := os.Lstat(fn); err == nil && fi.ModTime().Before(threshold) {
+			os.Remove(fn)
+		}
+	}
+}
+func deleteLogsLoop(logDir string, maxAge time.Duration) {
 	tick := time.NewTicker(maxAge / 100)
 	for {
-		fs, err := filepath.Glob(filepath.Join(logDir, "*"))
-		if err != nil {
-			log.Fatalf("filepath.Glob(%s): %v", logDir, err)
-		}
-
-		threshold := time.Now().Add(-maxAge)
-		for _, fn := range fs {
-			if fi, err := os.Lstat(fn); err == nil && fi.ModTime().Before(threshold) {
-				os.Remove(fn)
-			}
-		}
+		deleteLogs(logDir, maxAge)
 		<-tick.C
 	}
 }
@@ -223,31 +265,16 @@ func deleteOrphanIndexes(indexDir, repoDir string, watchInterval time.Duration) 
 }
 
 func main() {
-	maxLogAge := flag.Duration("max_log_age", 3*day, "recycle index logs after this much time")
-	fetchInterval := flag.Duration("fetch_interval", time.Hour, "run fetches this often")
+	var opts Options
+	opts.defineFlags()
 	dataDir := flag.String("data_dir",
 		filepath.Join(os.Getenv("HOME"), "zoekt-serving"), "directory holding all data.")
 	indexDir := flag.String("index_dir", "", "directory holding index shards. Defaults to $data_dir/index/")
-	mirrorConfig := flag.String("mirror_config",
-		"", "JSON file holding mirror configuration.")
-	indexConfig := flag.String("index_config",
-		"", "JSON file holding index configuration.")
-	mirrorInterval := flag.Duration("mirror_duration", 24*time.Hour, "find and clone new repos at this frequency.")
-	cpuFraction := flag.Float64("cpu_fraction", 0.25,
-		"use this fraction of the cores for indexing.")
-	indexFlagsStr := flag.String("git_index_flags", "", "space separated list of flags passed through to zoekt-git-index (e.g. -git_index_flags='-symbols=false -submodules=false'")
 	flag.Parse()
+	opts.validate()
 
-	if *cpuFraction <= 0.0 || *cpuFraction > 1.0 {
-		log.Fatal("cpu_fraction must be between 0.0 and 1.0")
-	}
 	if *dataDir == "" {
 		log.Fatal("must set --data_dir")
-	}
-
-	var indexFlags []string
-	if *indexFlagsStr != "" {
-		indexFlags = strings.Split(*indexFlagsStr, " ")
 	}
 
 	// Automatically prepend our own path at the front, to minimize
@@ -271,24 +298,14 @@ func main() {
 		}
 	}
 
-	if strings.HasPrefix(*mirrorConfig, "https://") || strings.HasPrefix(*mirrorConfig, "http://") {
-		_, err := readConfigURL(*mirrorConfig)
-		if err != nil {
-			log.Fatalf("readConfigURL(%s): %v", *mirrorConfig, err)
-		} else {
-			go periodicMirrorURL(repoDir, *mirrorConfig, *mirrorInterval)
-		}
-	} else {
-		_, err := readConfigFile(*mirrorConfig)
-		if err != nil {
-			log.Fatalf("readConfig(%s): %v", *mirrorConfig, err)
-		} else {
-			go periodicMirrorFile(repoDir, *mirrorConfig, *mirrorInterval)
-		}
+	_, err := readConfigURL(opts.mirrorConfigFile)
+	if err != nil {
+		log.Fatalf("readConfigURL(%s): %v", opts.mirrorConfigFile, err)
 	}
 
-	go deleteLogs(logDir, *maxLogAge)
-	go deleteOrphanIndexes(*indexDir, repoDir, *fetchInterval)
+	go periodicMirrorFile(repoDir, &opts)
+	go deleteLogsLoop(logDir, opts.maxLogAge)
+	go deleteOrphanIndexes(*indexDir, repoDir, opts.fetchInterval)
 
-	refresh(repoDir, *indexDir, *indexConfig, indexFlags, *fetchInterval, *cpuFraction)
+	refresh(repoDir, *indexDir, &opts)
 }

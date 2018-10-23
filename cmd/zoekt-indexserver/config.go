@@ -50,34 +50,29 @@ func randomize(entries []configEntry) []configEntry {
 	return shuffled
 }
 
-func readConfigFile(filename string) ([]configEntry, error) {
-	var result []configEntry
-
-	if filename == "" {
-		return result, nil
-	}
-
-	content, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return nil, err
-	}
-	if err := json.Unmarshal(content, &result); err != nil {
-		return nil, err
-	}
-
-	return result, nil
+func isHTTP(u string) bool {
+	asURL, err := url.Parse(u)
+	return err == nil && (asURL.Scheme == "http" || asURL.Scheme == "https")
 }
 
 func readConfigURL(u string) ([]configEntry, error) {
-	rep, err := http.Get(u)
-	if err != nil {
-		return nil, err
-	}
-	defer rep.Body.Close()
+	var body []byte
+	var readErr error
 
-	body, err := ioutil.ReadAll(rep.Body)
-	if err != nil {
-		return nil, err
+	if isHTTP(u) {
+		rep, err := http.Get(u)
+		if err != nil {
+			return nil, err
+		}
+		defer rep.Body.Close()
+
+		body, readErr = ioutil.ReadAll(rep.Body)
+	} else {
+		body, readErr = ioutil.ReadFile(u)
+	}
+
+	if readErr != nil {
+		return nil, readErr
 	}
 
 	var result []configEntry
@@ -118,18 +113,23 @@ func watchFile(path string) (<-chan struct{}, error) {
 	return out, nil
 }
 
-func periodicMirrorFile(repoDir string, cfgFile string, interval time.Duration) {
-	t := time.NewTicker(interval)
-	watcher, err := watchFile(cfgFile)
-	if err != nil {
-		log.Printf("watchFile(%q): %v", cfgFile, err)
+func periodicMirrorFile(repoDir string, opts *Options) {
+	ticker := time.NewTicker(opts.mirrorInterval)
+
+	var watcher <-chan struct{}
+	if !isHTTP(opts.mirrorConfigFile) {
+		var err error
+		watcher, err = watchFile(opts.mirrorConfigFile)
+		if err != nil {
+			log.Printf("watchFile(%q): %v", opts.mirrorConfigFile, err)
+		}
 	}
 
 	var lastCfg []configEntry
 	for {
-		cfg, err := readConfigFile(cfgFile)
+		cfg, err := readConfigURL(opts.mirrorConfigFile)
 		if err != nil {
-			log.Printf("readConfig(%s): %v", cfgFile, err)
+			log.Printf("readConfig(%s): %v", opts.mirrorConfigFile, err)
 		} else {
 			lastCfg = cfg
 		}
@@ -138,27 +138,9 @@ func periodicMirrorFile(repoDir string, cfgFile string, interval time.Duration) 
 
 		select {
 		case <-watcher:
-			log.Printf("mirror config %s changed", cfgFile)
-		case <-t.C:
+			log.Printf("mirror config %s changed", opts.mirrorConfigFile)
+		case <-ticker.C:
 		}
-	}
-}
-
-func periodicMirrorURL(repoDir string, u string, interval time.Duration) {
-	t := time.NewTicker(interval)
-
-	var lastCfg []configEntry
-	for {
-		cfg, err := readConfigURL(u)
-		if err != nil {
-			log.Printf("readConfigURL(%s): %v", u, err)
-		} else {
-			lastCfg = cfg
-		}
-
-		executeMirror(lastCfg, repoDir)
-
-		<-t.C
 	}
 }
 
