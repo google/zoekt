@@ -49,6 +49,8 @@ func normalizedGet(u *url.URL) ([]byte, error) {
 	return c, nil
 }
 
+// getCGitRepos finds repo names from the CGit index page hosted at
+// URL `u`.
 func getCGitRepos(u *url.URL, filter func(string) bool) (map[string]*crawlTarget, error) {
 	c, err := normalizedGet(u)
 	if err != nil {
