@@ -24,7 +24,8 @@ import (
 )
 
 // CloneRepo clones one repository, adding the given config
-// settings. It returns the bare repo directory.
+// settings. It returns the bare repo directory. The `name` argument
+// determines where the repo is stored relative to `destDir`.
 func CloneRepo(destDir, name, cloneURL string, settings map[string]string) error {
 	parent := filepath.Join(destDir, filepath.Dir(name))
 	if err := os.MkdirAll(parent, 0755); err != nil {
