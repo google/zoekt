@@ -194,10 +194,9 @@ func deleteIfStale(repoDir string, fn string) error {
 		return nil
 	}
 
-	repoDir = gitindex.Path(repoDir, repo.Name)
-	_, err = os.Stat(repoDir)
+	_, err = os.Stat(repo.Source)
 	if os.IsNotExist(err) {
-		log.Printf("deleting stale shard %s; dir %q not found", fn, repoDir)
+		log.Printf("deleting stale shard %s; source %q not found", fn, repo.Source)
 		return os.Remove(fn)
 	}
 
