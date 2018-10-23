@@ -95,6 +95,8 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Println(dest)
+		if dest != "" {
+			fmt.Println(dest)
+		}
 	}
 }

@@ -271,7 +271,7 @@ func main() {
 	}
 
 	pendingRepos := make(chan string, 10)
-	go periodicMirrorFile(repoDir, &opts)
+	go periodicMirrorFile(repoDir, &opts, pendingRepos)
 	go deleteLogsLoop(logDir, opts.maxLogAge)
 	go deleteOrphanIndexes(*indexDir, repoDir, opts.fetchInterval)
 	go indexPendingRepos(*indexDir, repoDir, &opts, pendingRepos)

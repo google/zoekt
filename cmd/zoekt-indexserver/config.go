@@ -15,6 +15,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"io/ioutil"
 	"log"
@@ -111,7 +112,7 @@ func watchFile(path string) (<-chan struct{}, error) {
 	return out, nil
 }
 
-func periodicMirrorFile(repoDir string, opts *Options) {
+func periodicMirrorFile(repoDir string, opts *Options, pendingRepos chan<- string) {
 	ticker := time.NewTicker(opts.mirrorInterval)
 
 	var watcher <-chan struct{}
@@ -132,7 +133,7 @@ func periodicMirrorFile(repoDir string, opts *Options) {
 			lastCfg = cfg
 		}
 
-		executeMirror(lastCfg, repoDir)
+		executeMirror(lastCfg, repoDir, pendingRepos)
 
 		select {
 		case <-watcher:
@@ -142,14 +143,15 @@ func periodicMirrorFile(repoDir string, opts *Options) {
 	}
 }
 
-func executeMirror(cfg []configEntry, repoDir string) {
+func executeMirror(cfg []configEntry, repoDir string, pendingRepos chan<- string) {
 	// Randomize the ordering in which we query
 	// things. This is to ensure that quota limits don't
 	// always hit the last one in the list.
 	cfg = randomize(cfg)
 	for _, c := range cfg {
+		var cmd *exec.Cmd
 		if c.GithubUser != "" {
-			cmd := exec.Command("zoekt-mirror-github",
+			cmd = exec.Command("zoekt-mirror-github",
 				"-dest", repoDir)
 			if c.GithubUser != "" {
 				cmd.Args = append(cmd.Args, "-user", c.GithubUser)
@@ -160,24 +162,32 @@ func executeMirror(cfg []configEntry, repoDir string) {
 			if c.Exclude != "" {
 				cmd.Args = append(cmd.Args, "-exclude", c.Exclude)
 			}
-			loggedRun(cmd)
 		} else if c.GitilesURL != "" {
-			cmd := exec.Command("zoekt-mirror-gitiles",
+			cmd = exec.Command("zoekt-mirror-gitiles",
 				"-dest", repoDir, "-name", c.Name)
 			if c.Exclude != "" {
 				cmd.Args = append(cmd.Args, "-exclude", c.Exclude)
 			}
 			cmd.Args = append(cmd.Args, c.GitilesURL)
-			loggedRun(cmd)
 		} else if c.CGitURL != "" {
-			cmd := exec.Command("zoekt-mirror-gitiles",
+			cmd = exec.Command("zoekt-mirror-gitiles",
 				"-type", "cgit",
 				"-dest", repoDir, "-name", c.Name)
 			if c.Exclude != "" {
 				cmd.Args = append(cmd.Args, "-exclude", c.Exclude)
 			}
 			cmd.Args = append(cmd.Args, c.CGitURL)
-			loggedRun(cmd)
 		}
+
+		stdout, _ := loggedRun(cmd)
+
+		for _, fn := range bytes.Split(stdout, []byte{'\n'}) {
+			if len(fn) == 0 {
+				continue
+			}
+
+			pendingRepos <- string(fn)
+		}
+
 	}
 }

@@ -183,7 +183,6 @@ func getOrgRepos(client *github.Client, org string) ([]*github.Repository, error
 		for _, r := range repos {
 			names = append(names, *r.Name)
 		}
-		log.Println(strings.Join(names, " "))
 
 		opt.Page = resp.NextPage
 		allRepos = append(allRepos, repos...)
@@ -210,7 +209,6 @@ func getUserRepos(client *github.Client, user string) ([]*github.Repository, err
 		for _, r := range repos {
 			names = append(names, *r.Name)
 		}
-		log.Println(strings.Join(names, " "))
 
 		opt.Page = resp.NextPage
 		allRepos = append(allRepos, repos...)
@@ -244,7 +242,9 @@ func cloneRepos(destDir string, repos []*github.Repository) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println(dest)
+		if dest != "" {
+			fmt.Println(dest)
+		}
 
 	}
 

@@ -61,5 +61,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("CloneRepo: %v", err)
 	}
-	fmt.Println(destRepo)
+	if destRepo != "" {
+		fmt.Println(destRepo)
+	}
 }
