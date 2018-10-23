@@ -176,7 +176,7 @@ func deleteLogs(logDir string, maxAge time.Duration) {
 }
 
 // Delete the shard if its corresponding git repo can't be found.
-func deleteIfStale(repoDir string, fn string) error {
+func deleteIfOrphan(repoDir string, fn string) error {
 	f, err := os.Open(fn)
 	if err != nil {
 		return nil
@@ -196,14 +196,14 @@ func deleteIfStale(repoDir string, fn string) error {
 
 	_, err = os.Stat(repo.Source)
 	if os.IsNotExist(err) {
-		log.Printf("deleting stale shard %s; source %q not found", fn, repo.Source)
+		log.Printf("deleting orphan shard %s; source %q not found", fn, repo.Source)
 		return os.Remove(fn)
 	}
 
 	return err
 }
 
-func deleteStaleIndexes(indexDir, repoDir string, watchInterval time.Duration) {
+func deleteOrphanIndexes(indexDir, repoDir string, watchInterval time.Duration) {
 	t := time.NewTicker(watchInterval)
 
 	expr := indexDir + "/*"
@@ -214,8 +214,8 @@ func deleteStaleIndexes(indexDir, repoDir string, watchInterval time.Duration) {
 		}
 
 		for _, f := range fs {
-			if err := deleteIfStale(repoDir, f); err != nil {
-				log.Printf("deleteIfStale(%q): %v", f, err)
+			if err := deleteIfOrphan(repoDir, f); err != nil {
+				log.Printf("deleteIfOrphan(%q): %v", f, err)
 			}
 		}
 		<-t.C
@@ -288,7 +288,7 @@ func main() {
 	}
 
 	go deleteLogs(logDir, *maxLogAge)
-	go deleteStaleIndexes(*indexDir, repoDir, *fetchInterval)
+	go deleteOrphanIndexes(*indexDir, repoDir, *fetchInterval)
 
 	refresh(repoDir, *indexDir, *indexConfig, indexFlags, *fetchInterval, *cpuFraction)
 }
