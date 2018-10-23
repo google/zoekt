@@ -16,7 +16,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -25,7 +24,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -182,41 +180,4 @@ func executeMirror(cfg []configEntry, repoDir string) {
 			loggedRun(cmd)
 		}
 	}
-}
-
-type RepoHostConfig struct {
-	BaseURL           string
-	ManifestRepoURL   string
-	ManifestRevPrefix string
-	RevPrefix         string
-	BranchXMLs        []string
-}
-
-type IndexConfig struct {
-	RepoHosts []RepoHostConfig
-}
-
-func readIndexConfig(fn string) (*IndexConfig, error) {
-	c, err := ioutil.ReadFile(fn)
-	if err != nil {
-		return nil, err
-	}
-	var cfg IndexConfig
-	if err := json.Unmarshal(c, &cfg); err != nil {
-		return nil, err
-	}
-	for _, h := range cfg.RepoHosts {
-		if _, err := url.Parse(h.BaseURL); err != nil {
-			return nil, err
-		}
-
-		for _, x := range h.BranchXMLs {
-			fields := strings.SplitN(x, ":", -1)
-			if len(fields) != 2 {
-				return nil, fmt.Errorf("%s: need 2 fields in %s", h.BaseURL, x)
-			}
-		}
-	}
-
-	return &cfg, nil
 }

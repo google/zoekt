@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -61,7 +60,6 @@ type Options struct {
 	mirrorInterval   time.Duration
 	indexFlagsStr    string
 	indexFlags       []string
-	indexConfigFile  string
 	mirrorConfigFile string
 	maxLogAge        time.Duration
 }
@@ -83,9 +81,6 @@ func (o *Options) validate() {
 func (o *Options) defineFlags() {
 	flag.DurationVar(&o.maxLogAge, "max_log_age", 3*day, "recycle index logs after this much time")
 	flag.DurationVar(&o.fetchInterval, "fetch_interval", time.Hour, "run fetches this often")
-	flag.StringVar(&o.indexConfigFile, "index_config",
-		"", "JSON file holding index configuration.")
-
 	flag.StringVar(&o.mirrorConfigFile, "mirror_config",
 		"", "JSON file holding mirror configuration.")
 
@@ -122,46 +117,7 @@ func refresh(repoDir, indexDir string, opts *Options) {
 	}
 }
 
-func repoIndexCommand(indexDir, repoDir string, configs []RepoHostConfig) {
-	for _, cfg := range configs {
-		cmd := exec.Command("zoekt-repo-index",
-			"-parallelism=1",
-			"-repo_cache", repoDir,
-			"-index", indexDir,
-			"-base_url", cfg.BaseURL,
-			"-rev_prefix", cfg.RevPrefix,
-			"-max_sub_projects=5",
-			"-manifest_repo_url", cfg.ManifestRepoURL,
-			"-manifest_rev_prefix", cfg.ManifestRevPrefix)
-
-		cmd.Args = append(cmd.Args, cfg.BranchXMLs...)
-		loggedRun(cmd)
-	}
-}
-
-func repositoryOnRepoHost(repoBaseDir, dir string, repoHosts []RepoHostConfig) bool {
-	for _, rh := range repoHosts {
-		u, _ := url.Parse(rh.BaseURL)
-
-		if strings.HasPrefix(dir, filepath.Join(repoBaseDir, u.Host)) {
-			return true
-		}
-	}
-	return false
-}
-
 func runIndexCommand(indexDir, repoDir string, opts *Options) {
-	var indexConfig *IndexConfig
-	if opts.indexConfigFile != "" {
-		var err error
-		indexConfig, err = readIndexConfig(opts.indexConfigFile)
-		if err != nil {
-			log.Printf("index config: %v", err)
-		}
-
-		repoIndexCommand(indexDir, repoDir, indexConfig.RepoHosts)
-	}
-
 	repos, err := gitindex.FindGitRepos(repoDir)
 	if err != nil {
 		log.Println("FindGitRepos", err)
@@ -169,18 +125,6 @@ func runIndexCommand(indexDir, repoDir string, opts *Options) {
 	}
 
 	for _, dir := range repos {
-		if indexConfig != nil {
-			// Don't want to index the subrepos of a repo
-			// host separately.
-			if repositoryOnRepoHost(repoDir, dir, indexConfig.RepoHosts) {
-				continue
-			}
-
-			// TODO(hanwen): we should have similar
-			// functionality for avoiding to index a
-			// submodule separately too.
-		}
-
 		args := []string{
 			"-require_ctags",
 			fmt.Sprintf("-parallelism=%d", opts.cpuCount),
