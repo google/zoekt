@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"net/url"
 	"os"
@@ -90,8 +91,10 @@ func main() {
 			"zoekt.name":         fullName,
 		}
 
-		if err := gitindex.CloneRepo(*dest, fullName, target.cloneURL, config); err != nil {
+		dest, err := gitindex.CloneRepo(*dest, fullName, target.cloneURL, config)
+		if err != nil {
 			log.Fatal(err)
 		}
+		fmt.Println(dest)
 	}
 }

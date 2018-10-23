@@ -20,6 +20,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"net/url"
 	"os"
@@ -55,7 +56,10 @@ func main() {
 	config := map[string]string{
 		"zoekt.name": name,
 	}
-	if err := gitindex.CloneRepo(destDir, filepath.Base(name), u.String(), config); err != nil {
+
+	destRepo, err := gitindex.CloneRepo(destDir, filepath.Base(name), u.String(), config)
+	if err != nil {
 		log.Fatalf("CloneRepo: %v", err)
 	}
+	fmt.Println(destRepo)
 }

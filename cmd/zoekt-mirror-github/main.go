@@ -240,13 +240,12 @@ func cloneRepos(destDir string, repos []*github.Repository) error {
 			"zoekt.github-subscribers": itoa(r.SubscribersCount),
 			"zoekt.github-forks":       itoa(r.ForksCount),
 		}
-		if err := gitindex.CloneRepo(destDir, *r.FullName, *r.CloneURL, config); err != nil {
+		dest, err := gitindex.CloneRepo(destDir, *r.FullName, *r.CloneURL, config)
+		if err != nil {
 			return err
 		}
+		fmt.Println(dest)
 
-		if err := updateConfig(destDir, r); err != nil {
-			return fmt.Errorf("updateConfig: %v", err)
-		}
 	}
 
 	return nil
