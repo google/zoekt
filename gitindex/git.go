@@ -276,8 +276,8 @@ func SetTemplatesFromOrigin(desc *zoekt.Repository, u *url.URL) error {
 // The Options structs controls details of the indexing process.
 type Options struct {
 	// The repository to be indexed.
-
 	RepoDir string
+
 	// If set, follow submodule links. This requires RepoCacheDir to be set.
 	Submodules bool
 
@@ -355,6 +355,8 @@ func IndexGitRepo(opts Options) error {
 	if opts.RepoDir == "" {
 		return fmt.Errorf("gitindex: must set RepoDir")
 	}
+
+	opts.BuildOptions.RepositoryDescription.Source = opts.RepoDir
 	repo, err := git.PlainOpen(opts.RepoDir)
 	if err != nil {
 		return err

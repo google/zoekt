@@ -74,7 +74,6 @@ func main() {
 		IndexDir:    *indexDir,
 	}
 	opts.SetDefaults()
-
 	if *cpuProfile != "" {
 		f, err := os.Create(*cpuProfile)
 		if err != nil {
@@ -95,6 +94,7 @@ func main() {
 		}
 	}
 	for _, arg := range flag.Args() {
+		opts.RepositoryDescription.Source = arg
 		if err := indexArg(arg, opts, ignoreDirMap); err != nil {
 			log.Fatal(err)
 		}
