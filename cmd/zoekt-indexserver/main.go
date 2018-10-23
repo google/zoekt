@@ -90,10 +90,9 @@ func (o *Options) defineFlags() {
 	flag.StringVar(&o.indexFlagsStr, "git_index_flags", "", "space separated list of flags passed through to zoekt-git-index (e.g. -git_index_flags='-symbols=false -submodules=false'")
 }
 
-func refresh(repoDir, indexDir string, opts *Options) {
-	// Start with indexing something, so we can start the webserver.
-	runIndexCommand(indexDir, repoDir, opts)
-
+// periodicFetch runs git-fetch every once in a while. Results are
+// posted on pendingRepos.
+func periodicFetch(repoDir, indexDir string, opts *Options, pendingRepos chan<- string) {
 	t := time.NewTicker(opts.fetchInterval)
 	for {
 		repos, err := gitindex.FindGitRepos(repoDir)
@@ -105,26 +104,49 @@ func refresh(repoDir, indexDir string, opts *Options) {
 			log.Printf("no repos found under %s", repoDir)
 		}
 
+		// TODO: Randomize to make sure quota throttling hits everyone.
+
+		later := map[string]struct{}{}
 		for _, dir := range repos {
-			cmd := exec.Command("git", "--git-dir", dir, "fetch", "origin")
-			// Prevent prompting
-			cmd.Stdin = &bytes.Buffer{}
-			loggedRun(cmd)
+			if ok := fetchGitRepo(dir); !ok {
+				later[dir] = struct{}{}
+			} else {
+				pendingRepos <- dir
+			}
 		}
 
-		runIndexCommand(indexDir, repoDir, opts)
+		for r := range later {
+			pendingRepos <- r
+		}
+
 		<-t.C
 	}
 }
 
-func runIndexCommand(indexDir, repoDir string, opts *Options) {
-	repos, err := gitindex.FindGitRepos(repoDir)
-	if err != nil {
-		log.Println("FindGitRepos", err)
-		return
-	}
+// fetchGitRepo runs git-fetch, and returns true if there was an
+// update.
+func fetchGitRepo(dir string) bool {
+	cmd := exec.Command("git", "--git-dir", dir, "fetch", "origin")
+	outBuf := &bytes.Buffer{}
+	errBuf := &bytes.Buffer{}
 
-	for _, dir := range repos {
+	// Prevent prompting
+	cmd.Stdin = &bytes.Buffer{}
+	cmd.Stderr = errBuf
+	cmd.Stdout = outBuf
+	if err := cmd.Run(); err != nil {
+		log.Printf("command %s failed: %v\nOUT: %s\nERR: %s",
+			cmd.Args, err, outBuf.String(), errBuf.String())
+	} else {
+		return len(outBuf.Bytes()) != 0
+	}
+	return false
+}
+
+// indexPendingRepos consumes the directories on the repos channel and
+// indexes them, sequentially.
+func indexPendingRepos(indexDir, repoDir string, opts *Options, repos <-chan string) {
+	for dir := range repos {
 		args := []string{
 			"-require_ctags",
 			fmt.Sprintf("-parallelism=%d", opts.cpuCount),
@@ -153,6 +175,7 @@ func deleteLogs(logDir string, maxAge time.Duration) {
 		}
 	}
 }
+
 func deleteLogsLoop(logDir string, maxAge time.Duration) {
 	tick := time.NewTicker(maxAge / 100)
 	for {
@@ -247,9 +270,10 @@ func main() {
 		log.Fatalf("readConfigURL(%s): %v", opts.mirrorConfigFile, err)
 	}
 
+	pendingRepos := make(chan string, 10)
 	go periodicMirrorFile(repoDir, &opts)
 	go deleteLogsLoop(logDir, opts.maxLogAge)
 	go deleteOrphanIndexes(*indexDir, repoDir, opts.fetchInterval)
-
-	refresh(repoDir, *indexDir, &opts)
+	go indexPendingRepos(*indexDir, repoDir, &opts, pendingRepos)
+	periodicFetch(repoDir, *indexDir, &opts, pendingRepos)
 }
