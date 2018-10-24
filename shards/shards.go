@@ -237,6 +237,25 @@ func searchOneShard(ctx context.Context, s zoekt.Searcher, q query.Q, opts *zoek
 	sink <- shardResult{ms, err}
 }
 
+type shardListResult struct {
+	rl  *zoekt.RepoList
+	err error
+}
+
+func listOneShard(ctx context.Context, s zoekt.Searcher, q query.Q, sink chan shardListResult) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("crashed shard: %s: %s, %s", s.String(), r, debug.Stack())
+			sink <- shardListResult{
+				&zoekt.RepoList{Crashes: 1}, nil,
+			}
+		}
+	}()
+
+	ms, err := s.List(ctx, q)
+	sink <- shardListResult{ms, err}
+}
+
 func (ss *shardedSearcher) List(ctx context.Context, r query.Q) (rl *zoekt.RepoList, err error) {
 	tr := trace.New("shardedSearcher.List", "")
 	tr.LazyLog(r, true)
@@ -252,11 +271,6 @@ func (ss *shardedSearcher) List(ctx context.Context, r query.Q) (rl *zoekt.RepoL
 		tr.Finish()
 	}()
 
-	type res struct {
-		rl  *zoekt.RepoList
-		err error
-	}
-
 	if err := ss.rlock(ctx); err != nil {
 		return nil, err
 	}
@@ -265,27 +279,26 @@ func (ss *shardedSearcher) List(ctx context.Context, r query.Q) (rl *zoekt.RepoL
 
 	shards := ss.getShards()
 	shardCount := len(shards)
-	all := make(chan res, shardCount)
+	all := make(chan shardListResult, shardCount)
 	tr.LazyPrintf("shardCount: %d", len(shards))
 
+	feeder := make(chan zoekt.Searcher, len(shards))
 	for _, s := range shards {
-		go func(s zoekt.Searcher) {
-			defer func() {
-				if r := recover(); r != nil {
-					all <- res{
-						&zoekt.RepoList{Crashes: 1}, nil,
-					}
-				}
-			}()
-			ms, err := s.List(ctx, r)
-			all <- res{ms, err}
-		}(s.Searcher)
+		feeder <- s
+	}
+	close(feeder)
+	for i := 0; i < runtime.NumCPU(); i++ {
+		go func() {
+			for s := range feeder {
+				listOneShard(ctx, s, r, all)
+			}
+		}()
 	}
 
 	crashes := 0
 	uniq := map[string]*zoekt.RepoListEntry{}
 
-	for i := 0; i < shardCount; i++ {
+	for range shards {
 		r := <-all
 		if r.err != nil {
 			return nil, r.err
