@@ -404,15 +404,27 @@ func (d *indexData) List(ctx context.Context, q query.Q) (rl *RepoList, err erro
 
 	q = d.simplify(q)
 	tr.LazyLog(q, true)
-	c, ok := q.(*query.Const)
-
-	if !ok {
-		return nil, fmt.Errorf("List should receive Repo-only query.")
+	if c, ok := q.(*query.Const); ok {
+		return d.maybeRepoList(c.Value), nil
 	}
 
+	sr, err := d.Search(ctx, q, &SearchOptions{
+		ShardMaxMatchCount: 1,
+		TotalMaxMatchCount: 1,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return d.maybeRepoList(len(sr.Files) > 0), nil
+}
+
+// maybeRepoList returns a singleton repo list containing the repo for d if
+// include is true. Otherwise it returns an empty list.
+func (d *indexData) maybeRepoList(include bool) *RepoList {
 	l := &RepoList{}
-	if c.Value {
+	if include {
 		l.Repos = append(l.Repos, &d.repoListEntry)
 	}
-	return l, nil
+	return l
 }

@@ -1080,6 +1080,34 @@ func TestListRepos(t *testing.T) {
 	}
 }
 
+func TestListReposByContent(t *testing.T) {
+	content := []byte("bla the needle")
+	// ----------------01234567890123
+	b := testIndexBuilder(t, &Repository{
+		Name: "reponame",
+	},
+		Document{Name: "f1", Content: content},
+		Document{Name: "f2", Content: content})
+
+	searcher := searcherForTest(t, b)
+	q := &query.Substring{Pattern: "needle"}
+	res, err := searcher.List(context.Background(), q)
+	if err != nil {
+		t.Fatalf("List(%v): %v", q, err)
+	}
+	if len(res.Repos) != 1 || res.Repos[0].Repository.Name != "reponame" {
+		t.Fatalf("got %v, want 1 matches", res)
+	}
+	q = &query.Substring{Pattern: "foo"}
+	res, err = searcher.List(context.Background(), q)
+	if err != nil {
+		t.Fatalf("List(%v): %v", q, err)
+	}
+	if len(res.Repos) != 0 {
+		t.Fatalf("got %v, want 0 matches", res)
+	}
+}
+
 func TestMetadata(t *testing.T) {
 	content := []byte("bla the needle")
 	// ----------------01234567890123
