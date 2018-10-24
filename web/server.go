@@ -217,6 +217,10 @@ func (s *Server) serveSearchErr(w http.ResponseWriter, r *http.Request) error {
 		return s.serveListReposErr(q, queryStr, w, r)
 	}
 
+	if qt, ok := q.(*query.Type); ok && qt.Type == query.TypeRepo {
+		return s.serveListReposErr(q, queryStr, w, r)
+	}
+
 	numStr := qvals.Get("num")
 
 	num, err := strconv.Atoi(numStr)

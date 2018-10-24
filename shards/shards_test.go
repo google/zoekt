@@ -179,19 +179,10 @@ func (s *memSeeker) Size() (uint32, error) {
 }
 
 func TestUnloadIndex(t *testing.T) {
-	b, err := zoekt.NewIndexBuilder(nil)
-	if err != nil {
-		t.Fatalf("NewIndexBuilder: %v", err)
-	}
-
-	for i, d := range []zoekt.Document{{
+	b := testIndexBuilder(t, nil, zoekt.Document{
 		Name:    "filename",
 		Content: []byte("needle needle needle"),
-	}} {
-		if err := b.Add(d); err != nil {
-			t.Fatalf("Add %d: %v", i, err)
-		}
-	}
+	})
 
 	var buf bytes.Buffer
 	b.Write(&buf)
@@ -232,4 +223,31 @@ func TestUnloadIndex(t *testing.T) {
 			}
 		}
 	}
+}
+
+func testIndexBuilder(t *testing.T, repo *zoekt.Repository, docs ...zoekt.Document) *zoekt.IndexBuilder {
+	b, err := zoekt.NewIndexBuilder(repo)
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
+
+	for i, d := range docs {
+		if err := b.Add(d); err != nil {
+			t.Fatalf("Add %d: %v", i, err)
+		}
+	}
+	return b
+}
+
+func searcherForTest(t *testing.T, b *zoekt.IndexBuilder) zoekt.Searcher {
+	var buf bytes.Buffer
+	b.Write(&buf)
+	f := &memSeeker{buf.Bytes()}
+
+	searcher, err := zoekt.NewSearcher(f)
+	if err != nil {
+		t.Fatalf("NewSearcher: %v", err)
+	}
+
+	return searcher
 }

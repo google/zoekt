@@ -69,7 +69,7 @@ func NewDirectorySearcher(dir string) (zoekt.Searcher, error) {
 		return nil, err
 	}
 
-	return ss, nil
+	return &typeRepoSearcher{ss}, nil
 }
 
 // throttledLoader tries to load up to throttle shards in parallel.
