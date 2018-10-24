@@ -105,6 +105,10 @@ type notMatchTree struct {
 	child matchTree
 }
 
+type fileNameMatchTree struct {
+	child matchTree
+}
+
 // Don't visit this subtree for collecting matches.
 type noVisitMatchTree struct {
 	matchTree
@@ -169,6 +173,10 @@ func (t *notMatchTree) updateStats(s *Stats) {
 	t.child.updateStats(s)
 }
 
+func (t *fileNameMatchTree) updateStats(s *Stats) {
+	t.child.updateStats(s)
+}
+
 func (t *branchQueryMatchTree) updateStats(s *Stats) {
 }
 
@@ -213,6 +221,10 @@ func (t *orMatchTree) prepare(doc uint32) {
 }
 
 func (t *notMatchTree) prepare(doc uint32) {
+	t.child.prepare(doc)
+}
+
+func (t *fileNameMatchTree) prepare(doc uint32) {
 	t.child.prepare(doc)
 }
 
@@ -269,6 +281,10 @@ func (t *notMatchTree) nextDoc() uint32 {
 	return 0
 }
 
+func (t *fileNameMatchTree) nextDoc() uint32 {
+	return t.child.nextDoc()
+}
+
 func (t *branchQueryMatchTree) nextDoc() uint32 {
 	var start uint32
 	if t.firstDone {
@@ -309,6 +325,10 @@ func (t *notMatchTree) String() string {
 	return fmt.Sprintf("not(%v)", t.child)
 }
 
+func (t *fileNameMatchTree) String() string {
+	return fmt.Sprintf("f(%v)", t.child)
+}
+
 func (t *substrMatchTree) String() string {
 	f := ""
 	if t.fileName {
@@ -337,6 +357,8 @@ func visitMatchTree(t matchTree, f func(matchTree)) {
 		visitMatchTree(s.matchTree, f)
 	case *notMatchTree:
 		visitMatchTree(s.child, f)
+	case *fileNameMatchTree:
+		visitMatchTree(s.child, f)
 	default:
 		f(t)
 	}
@@ -359,6 +381,8 @@ func visitMatches(t matchTree, known map[matchTree]bool, f func(matchTree)) {
 	case *notMatchTree:
 	case *noVisitMatchTree:
 		// don't collect into negative trees.
+	case *fileNameMatchTree:
+		// We will just gather the filename if we do not visit this tree.
 	default:
 		f(s)
 	}
@@ -464,6 +488,10 @@ func (t *notMatchTree) matches(cp *contentProvider, cost int, known map[matchTre
 	return !v, ok
 }
 
+func (t *fileNameMatchTree) matches(cp *contentProvider, cost int, known map[matchTree]bool) (bool, bool) {
+	return evalMatchTree(cp, cost, known, t.child)
+}
+
 func (t *substrMatchTree) matches(cp *contentProvider, cost int, known map[matchTree]bool) (bool, bool) {
 	if len(t.current) == 0 {
 		return false, true
@@ -548,6 +576,20 @@ func (d *indexData) newMatchTree(q query.Q, stats *Stats) (matchTree, error) {
 		return &notMatchTree{
 			child: ct,
 		}, err
+
+	case *query.Type:
+		if s.Type != query.TypeFileName {
+			break
+		}
+
+		ct, err := d.newMatchTree(s.Child, stats)
+		if err != nil {
+			return nil, err
+		}
+
+		return &fileNameMatchTree{
+			child: ct,
+		}, nil
 
 	case *query.Substring:
 		return d.newSubstringMatchTree(s, stats)
