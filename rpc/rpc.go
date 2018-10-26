@@ -120,14 +120,15 @@ var once sync.Once
 func registerGob() {
 	once.Do(func() {
 		gob.Register(&query.And{})
+		gob.Register(&query.Branch{})
+		gob.Register(&query.Const{})
+		gob.Register(&query.Language{})
+		gob.Register(&query.Not{})
 		gob.Register(&query.Or{})
 		gob.Register(&query.Regexp{})
-		gob.Register(&query.Language{})
-		gob.Register(&query.Const{})
-		gob.Register(&query.Repo{})
 		gob.Register(&query.RepoSet{})
+		gob.Register(&query.Repo{})
 		gob.Register(&query.Substring{})
-		gob.Register(&query.Not{})
-		gob.Register(&query.Branch{})
+		gob.Register(&query.Type{})
 	})
 }
