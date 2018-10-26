@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"net/url"
 	"os"
@@ -64,8 +65,7 @@ func main() {
 		log.Fatal("must set --dest")
 	}
 
-	destDir := filepath.Join(*dest, rootURL.Host)
-	if err := os.MkdirAll(destDir, 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(*dest, rootURL.Host, rootURL.Path), 0755); err != nil {
 		log.Fatal(err)
 	}
 
@@ -80,14 +80,23 @@ func main() {
 	}
 
 	for nm, target := range repos {
+		// For git.savannah.gnu.org, this puts an ugly "CGit"
+		// path component into the name. However, it's
+		// possible that there are multiple, different CGit pages
+		// on the host, so we have to keep it.
+		fullName := filepath.Join(rootURL.Host, rootURL.Path, nm)
 		config := map[string]string{
 			"zoekt.web-url":      target.webURL,
 			"zoekt.web-url-type": target.webURLType,
-			"zoekt.name":         filepath.Join(rootURL.Host, rootURL.Path, nm),
+			"zoekt.name":         fullName,
 		}
 
-		if err := gitindex.CloneRepo(destDir, nm, target.cloneURL, config); err != nil {
+		dest, err := gitindex.CloneRepo(*dest, fullName, target.cloneURL, config)
+		if err != nil {
 			log.Fatal(err)
+		}
+		if dest != "" {
+			fmt.Println(dest)
 		}
 	}
 }

@@ -19,6 +19,7 @@ package main
 import (
 	"bytes"
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -137,8 +138,10 @@ func main() {
 			config["zoekt.web-url-type"] = wl.Name
 		}
 
-		if err := gitindex.CloneRepo(*dest, name, cloneURL.String(), config); err != nil {
+		if dest, err := gitindex.CloneRepo(*dest, name, cloneURL.String(), config); err != nil {
 			log.Fatalf("CloneRepo: %v", err)
+		} else {
+			fmt.Println(dest)
 		}
 	}
 }

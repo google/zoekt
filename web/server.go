@@ -167,13 +167,12 @@ func NewMux(s *Server) (*http.ServeMux, error) {
 		mux.HandleFunc("/search", s.serveSearch)
 		mux.HandleFunc("/", s.serveSearchBox)
 		mux.HandleFunc("/about", s.serveAbout)
+		mux.HandleFunc("/print", s.servePrint)
 	}
 	if s.RPC {
 		mux.Handle(rpc.DefaultRPCPath, rpc.Server(s.Searcher)) // /rpc
 	}
-	if s.Print {
-		mux.HandleFunc("/print", s.servePrint)
-	}
+
 	return mux, nil
 }
 
@@ -202,7 +201,6 @@ func (s *Server) serveSearchErr(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("no query found")
 	}
 
-	log.Printf("got query %q", queryStr)
 	q, err := query.Parse(queryStr)
 	if err != nil {
 		return err
@@ -491,10 +489,6 @@ func (s *Server) serveListReposErr(q query.Q, qStr string, w http.ResponseWriter
 }
 
 func (s *Server) servePrintErr(w http.ResponseWriter, r *http.Request) error {
-	if !s.Print {
-		return fmt.Errorf("no printing template defined.")
-	}
-
 	qvals := r.URL.Query()
 	fileStr := qvals.Get("f")
 	repoStr := qvals.Get("r")

@@ -341,6 +341,9 @@ func (b *IndexBuilder) Add(doc Document) error {
 	if doc.SkipReason != "" {
 		doc.Content = []byte(notIndexedMarker + doc.SkipReason)
 		doc.Symbols = nil
+		if doc.Language == "" {
+			doc.Language = "skipped"
+		}
 	}
 
 	sort.Sort(docSectionSlice(doc.Symbols))

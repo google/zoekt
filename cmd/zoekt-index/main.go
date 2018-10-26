@@ -16,6 +16,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -23,13 +24,19 @@ import (
 	"runtime/pprof"
 	"strings"
 
+	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
 )
+
+type fileInfo struct {
+	name string
+	size int64
+}
 
 type fileAggregator struct {
 	ignoreDirs map[string]struct{}
 	sizeMax    int64
-	sink       chan string
+	sink       chan fileInfo
 }
 
 func (a *fileAggregator) add(path string, info os.FileInfo, err error) error {
@@ -44,12 +51,9 @@ func (a *fileAggregator) add(path string, info os.FileInfo, err error) error {
 		}
 	}
 
-	sz := info.Size()
-	if sz > a.sizeMax || !info.Mode().IsRegular() {
-		return nil
+	if info.Mode().IsRegular() {
+		a.sink <- fileInfo{path, info.Size()}
 	}
-
-	a.sink <- path
 	return nil
 }
 
@@ -70,7 +74,6 @@ func main() {
 		IndexDir:    *indexDir,
 	}
 	opts.SetDefaults()
-
 	if *cpuProfile != "" {
 		f, err := os.Create(*cpuProfile)
 		if err != nil {
@@ -90,8 +93,8 @@ func main() {
 			}
 		}
 	}
-
 	for _, arg := range flag.Args() {
+		opts.RepositoryDescription.Source = arg
 		if err := indexArg(arg, opts, ignoreDirMap); err != nil {
 			log.Fatal(err)
 		}
@@ -110,7 +113,7 @@ func indexArg(arg string, opts build.Options, ignore map[string]struct{}) error 
 		return err
 	}
 
-	comm := make(chan string, 100)
+	comm := make(chan fileInfo, 100)
 	agg := fileAggregator{
 		ignoreDirs: ignore,
 		sink:       comm,
@@ -125,13 +128,20 @@ func indexArg(arg string, opts build.Options, ignore map[string]struct{}) error 
 	}()
 
 	for f := range comm {
-		content, err := ioutil.ReadFile(f)
+		displayName := strings.TrimPrefix(f.name, dir+"/")
+		if f.size > int64(opts.SizeMax) {
+			builder.Add(zoekt.Document{
+				Name:       displayName,
+				SkipReason: fmt.Sprintf("document size %d larger than limit %d", f.size, opts.SizeMax),
+			})
+			continue
+		}
+		content, err := ioutil.ReadFile(f.name)
 		if err != nil {
 			return err
 		}
 
-		f = strings.TrimPrefix(f, dir+"/")
-		builder.AddFile(f, content)
+		builder.AddFile(displayName, content)
 	}
 
 	return builder.Finish()

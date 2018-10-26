@@ -15,8 +15,8 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -25,7 +25,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -50,34 +49,29 @@ func randomize(entries []configEntry) []configEntry {
 	return shuffled
 }
 
-func readConfigFile(filename string) ([]configEntry, error) {
-	var result []configEntry
-
-	if filename == "" {
-		return result, nil
-	}
-
-	content, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return nil, err
-	}
-	if err := json.Unmarshal(content, &result); err != nil {
-		return nil, err
-	}
-
-	return result, nil
+func isHTTP(u string) bool {
+	asURL, err := url.Parse(u)
+	return err == nil && (asURL.Scheme == "http" || asURL.Scheme == "https")
 }
 
 func readConfigURL(u string) ([]configEntry, error) {
-	rep, err := http.Get(u)
-	if err != nil {
-		return nil, err
-	}
-	defer rep.Body.Close()
+	var body []byte
+	var readErr error
 
-	body, err := ioutil.ReadAll(rep.Body)
-	if err != nil {
-		return nil, err
+	if isHTTP(u) {
+		rep, err := http.Get(u)
+		if err != nil {
+			return nil, err
+		}
+		defer rep.Body.Close()
+
+		body, readErr = ioutil.ReadAll(rep.Body)
+	} else {
+		body, readErr = ioutil.ReadFile(u)
+	}
+
+	if readErr != nil {
+		return nil, readErr
 	}
 
 	var result []configEntry
@@ -118,58 +112,46 @@ func watchFile(path string) (<-chan struct{}, error) {
 	return out, nil
 }
 
-func periodicMirrorFile(repoDir string, cfgFile string, interval time.Duration) {
-	t := time.NewTicker(interval)
-	watcher, err := watchFile(cfgFile)
-	if err != nil {
-		log.Printf("watchFile(%q): %v", cfgFile, err)
+func periodicMirrorFile(repoDir string, opts *Options, pendingRepos chan<- string) {
+	ticker := time.NewTicker(opts.mirrorInterval)
+
+	var watcher <-chan struct{}
+	if !isHTTP(opts.mirrorConfigFile) {
+		var err error
+		watcher, err = watchFile(opts.mirrorConfigFile)
+		if err != nil {
+			log.Printf("watchFile(%q): %v", opts.mirrorConfigFile, err)
+		}
 	}
 
 	var lastCfg []configEntry
 	for {
-		cfg, err := readConfigFile(cfgFile)
+		cfg, err := readConfigURL(opts.mirrorConfigFile)
 		if err != nil {
-			log.Printf("readConfig(%s): %v", cfgFile, err)
+			log.Printf("readConfig(%s): %v", opts.mirrorConfigFile, err)
 		} else {
 			lastCfg = cfg
 		}
 
-		executeMirror(lastCfg, repoDir)
+		executeMirror(lastCfg, repoDir, pendingRepos)
 
 		select {
 		case <-watcher:
-			log.Printf("mirror config %s changed", cfgFile)
-		case <-t.C:
+			log.Printf("mirror config %s changed", opts.mirrorConfigFile)
+		case <-ticker.C:
 		}
 	}
 }
 
-func periodicMirrorURL(repoDir string, u string, interval time.Duration) {
-	t := time.NewTicker(interval)
-
-	var lastCfg []configEntry
-	for {
-		cfg, err := readConfigURL(u)
-		if err != nil {
-			log.Printf("readConfigURL(%s): %v", u, err)
-		} else {
-			lastCfg = cfg
-		}
-
-		executeMirror(lastCfg, repoDir)
-
-		<-t.C
-	}
-}
-
-func executeMirror(cfg []configEntry, repoDir string) {
+func executeMirror(cfg []configEntry, repoDir string, pendingRepos chan<- string) {
 	// Randomize the ordering in which we query
 	// things. This is to ensure that quota limits don't
 	// always hit the last one in the list.
 	cfg = randomize(cfg)
 	for _, c := range cfg {
+		var cmd *exec.Cmd
 		if c.GithubUser != "" {
-			cmd := exec.Command("zoekt-mirror-github",
+			cmd = exec.Command("zoekt-mirror-github",
 				"-dest", repoDir)
 			if c.GithubUser != "" {
 				cmd.Args = append(cmd.Args, "-user", c.GithubUser)
@@ -180,61 +162,32 @@ func executeMirror(cfg []configEntry, repoDir string) {
 			if c.Exclude != "" {
 				cmd.Args = append(cmd.Args, "-exclude", c.Exclude)
 			}
-			loggedRun(cmd)
 		} else if c.GitilesURL != "" {
-			cmd := exec.Command("zoekt-mirror-gitiles",
+			cmd = exec.Command("zoekt-mirror-gitiles",
 				"-dest", repoDir, "-name", c.Name)
 			if c.Exclude != "" {
 				cmd.Args = append(cmd.Args, "-exclude", c.Exclude)
 			}
 			cmd.Args = append(cmd.Args, c.GitilesURL)
-			loggedRun(cmd)
 		} else if c.CGitURL != "" {
-			cmd := exec.Command("zoekt-mirror-gitiles",
+			cmd = exec.Command("zoekt-mirror-gitiles",
 				"-type", "cgit",
 				"-dest", repoDir, "-name", c.Name)
 			if c.Exclude != "" {
 				cmd.Args = append(cmd.Args, "-exclude", c.Exclude)
 			}
 			cmd.Args = append(cmd.Args, c.CGitURL)
-			loggedRun(cmd)
-		}
-	}
-}
-
-type RepoHostConfig struct {
-	BaseURL           string
-	ManifestRepoURL   string
-	ManifestRevPrefix string
-	RevPrefix         string
-	BranchXMLs        []string
-}
-
-type IndexConfig struct {
-	RepoHosts []RepoHostConfig
-}
-
-func readIndexConfig(fn string) (*IndexConfig, error) {
-	c, err := ioutil.ReadFile(fn)
-	if err != nil {
-		return nil, err
-	}
-	var cfg IndexConfig
-	if err := json.Unmarshal(c, &cfg); err != nil {
-		return nil, err
-	}
-	for _, h := range cfg.RepoHosts {
-		if _, err := url.Parse(h.BaseURL); err != nil {
-			return nil, err
 		}
 
-		for _, x := range h.BranchXMLs {
-			fields := strings.SplitN(x, ":", -1)
-			if len(fields) != 2 {
-				return nil, fmt.Errorf("%s: need 2 fields in %s", h.BaseURL, x)
+		stdout, _ := loggedRun(cmd)
+
+		for _, fn := range bytes.Split(stdout, []byte{'\n'}) {
+			if len(fn) == 0 {
+				continue
 			}
-		}
-	}
 
-	return &cfg, nil
+			pendingRepos <- string(fn)
+		}
+
+	}
 }

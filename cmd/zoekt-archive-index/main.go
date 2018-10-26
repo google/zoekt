@@ -154,11 +154,11 @@ func do(opts Options, bopts build.Options) error {
 	}
 	defer a.Close()
 
+	bopts.RepositoryDescription.Source = opts.Archive
 	builder, err := build.NewBuilder(bopts)
 	if err != nil {
 		return err
 	}
-
 	for {
 		f, err := a.Next()
 		if err == io.EOF {

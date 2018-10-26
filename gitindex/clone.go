@@ -24,16 +24,18 @@ import (
 )
 
 // CloneRepo clones one repository, adding the given config
-// settings. It returns the bare repo directory.
-func CloneRepo(destDir, name, cloneURL string, settings map[string]string) error {
+// settings. It returns the bare repo directory. The `name` argument
+// determines where the repo is stored relative to `destDir`. Returns
+// the directory of the repository.
+func CloneRepo(destDir, name, cloneURL string, settings map[string]string) (string, error) {
 	parent := filepath.Join(destDir, filepath.Dir(name))
 	if err := os.MkdirAll(parent, 0755); err != nil {
-		return err
+		return "", err
 	}
 
 	repoDest := filepath.Join(parent, filepath.Base(name)+".git")
 	if _, err := os.Lstat(repoDest); err == nil {
-		return nil
+		return "", nil
 	}
 
 	var keys []string
@@ -44,7 +46,9 @@ func CloneRepo(destDir, name, cloneURL string, settings map[string]string) error
 
 	var config []string
 	for _, k := range keys {
-		config = append(config, "--config", k+"="+settings[k])
+		if settings[k] != "" {
+			config = append(config, "--config", k+"="+settings[k])
+		}
 	}
 
 	cmd := exec.Command(
@@ -58,7 +62,7 @@ func CloneRepo(destDir, name, cloneURL string, settings map[string]string) error
 	cmd.Stdin = &bytes.Buffer{}
 	log.Println("running:", cmd.Args)
 	if err := cmd.Run(); err != nil {
-		return err
+		return "", err
 	}
-	return nil
+	return repoDest, nil
 }

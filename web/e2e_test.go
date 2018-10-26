@@ -118,30 +118,8 @@ func TestBasic(t *testing.T) {
 			`value=magic`,
 		},
 	} {
-		res, err := http.Get(ts.URL + req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		resultBytes, err := ioutil.ReadAll(res.Body)
-		res.Body.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		result := string(resultBytes)
-		for _, want := range needles {
-			if !strings.Contains(result, want) {
-				t.Errorf("query %q: result did not have %q: %s", req, want, result)
-			}
-		}
-		if notWant := "crashed"; strings.Contains(result, notWant) {
-			t.Errorf("result has %q: %s", notWant, result)
-		}
-		if notWant := "bytes skipped)..."; strings.Contains(result, notWant) {
-			t.Errorf("result has %q: %s", notWant, result)
-		}
+		checkNeedles(t, ts, req, needles)
 	}
-
 }
 
 func TestPrint(t *testing.T) {
@@ -193,28 +171,72 @@ func TestPrint(t *testing.T) {
 			`pre id="l1" class="inline-pre"><span class="noselect"><a href="#l1">`,
 		},
 	} {
-		res, err := http.Get(ts.URL + req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		resultBytes, err := ioutil.ReadAll(res.Body)
-		res.Body.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
+		checkNeedles(t, ts, req, needles)
+	}
+}
 
-		result := string(resultBytes)
-		for _, want := range needles {
-			if !strings.Contains(result, want) {
-				t.Errorf("query %q: result did not have %q: %s", req, want, result)
-			}
+func TestPrintDefault(t *testing.T) {
+	b, err := zoekt.NewIndexBuilder(&zoekt.Repository{
+		Name:     "name",
+		URL:      "repo-url",
+		Branches: []zoekt.RepositoryBranch{{Name: "master", Version: "1234"}},
+	})
+	if err != nil {
+		t.Fatalf("NewIndexBuilder: %v", err)
+	}
+	if err := b.Add(zoekt.Document{
+		Name:     "f2",
+		Content:  []byte("to carry water in the no later bla"),
+		Branches: []string{"master"},
+	}); err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+	s := searcherForTest(t, b)
+	srv := Server{
+		Searcher: s,
+		Top:      Top,
+		HTML:     true,
+	}
+
+	mux, err := NewMux(&srv)
+	if err != nil {
+		t.Fatalf("NewMux: %v", err)
+	}
+
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+
+	for req, needles := range map[string][]string{
+		"/search?q=water": []string{
+			`href="print?`,
+		},
+	} {
+		checkNeedles(t, ts, req, needles)
+	}
+}
+
+func checkNeedles(t *testing.T, ts *httptest.Server, req string, needles []string) {
+	res, err := http.Get(ts.URL + req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resultBytes, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	result := string(resultBytes)
+	for _, want := range needles {
+		if !strings.Contains(result, want) {
+			t.Errorf("query %q: result did not have %q: %s", req, want, result)
 		}
-		if notWant := "crashed"; strings.Contains(result, notWant) {
-			t.Errorf("result has %q: %s", notWant, result)
-		}
-		if notWant := "bytes skipped)..."; strings.Contains(result, notWant) {
-			t.Errorf("result has %q: %s", notWant, result)
-		}
+	}
+	if notWant := "crashed"; strings.Contains(result, notWant) {
+		t.Errorf("result has %q: %s", notWant, result)
+	}
+	if notWant := "bytes skipped)..."; strings.Contains(result, notWant) {
+		t.Errorf("result has %q: %s", notWant, result)
 	}
 }
 
