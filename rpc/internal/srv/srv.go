@@ -2,7 +2,6 @@ package srv
 
 import (
 	"context"
-	"log"
 	"time"
 
 	"github.com/google/zoekt"
@@ -33,7 +32,6 @@ type Searcher struct {
 func (s *Searcher) Search(ctx context.Context, args *SearchArgs, reply *SearchReply) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	log.Printf("got rpc query %q", args.Q)
 	r, err := s.Searcher.Search(ctx, args.Q, args.Opts)
 	if err != nil {
 		return err

@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"html/template"
+	"io/ioutil"
 	"log"
 	"math"
 	"net/http"
@@ -41,10 +42,9 @@ type Server struct {
 	// CPUCount is the amount of parallelism to use when indexing a
 	// repository.
 	CPUCount int
-
-	// Debug when true will output extra debug logs.
-	Debug bool
 }
+
+var debug = log.New(ioutil.Discard, "", log.LstdFlags)
 
 func (s *Server) loggedRun(tr trace.Trace, cmd *exec.Cmd) error {
 	out := &bytes.Buffer{}
@@ -64,9 +64,7 @@ func (s *Server) loggedRun(tr trace.Trace, cmd *exec.Cmd) error {
 			cmd.Args, err, outS, errS)
 	}
 	tr.LazyPrintf("success")
-	if s.Debug {
-		log.Printf("ran successfully %s", cmd.Args)
-	}
+	debug.Printf("ran successfully %s", cmd.Args)
 	return nil
 }
 
@@ -85,7 +83,7 @@ func (s *Server) Run() {
 				continue
 			}
 
-			log.Printf("updating index queue with %d repositories", len(repos))
+			debug.Printf("updating index queue with %d repositories", len(repos))
 
 			// ResolveRevision is IO bound on the gitserver service. So we do
 			// them concurrently.
@@ -317,7 +315,7 @@ func deleteIfStale(exists map[string]bool, fn string) error {
 	}
 
 	if !exists[repo.Name] {
-		log.Printf("%s no longer exists, deleting %s", repo.Name, fn)
+		debug.Printf("%s no longer exists, deleting %s", repo.Name, fn)
 		return os.Remove(fn)
 	}
 
@@ -331,7 +329,7 @@ func main() {
 	listen := flag.String("listen", "", "listen on this address.")
 	cpuFraction := flag.Float64("cpu_fraction", 0.25,
 		"use this fraction of the cores for indexing.")
-	debug := flag.Bool("debug", false,
+	dbg := flag.Bool("debug", false,
 		"turn on more verbose logging.")
 	flag.Parse()
 
@@ -361,6 +359,10 @@ func main() {
 		}
 	}
 
+	if *dbg {
+		debug = log.New(os.Stderr, "", log.LstdFlags)
+	}
+
 	cpuCount := int(math.Round(float64(runtime.NumCPU()) * (*cpuFraction)))
 	if cpuCount < 1 {
 		cpuCount = 1
@@ -370,7 +372,6 @@ func main() {
 		IndexDir: *index,
 		Interval: *interval,
 		CPUCount: cpuCount,
-		Debug:    *debug,
 	}
 
 	if *listen != "" {
@@ -378,7 +379,7 @@ func main() {
 			trace.AuthRequest = func(req *http.Request) (any, sensitive bool) {
 				return true, true
 			}
-			log.Printf("serving HTTP on %s", *listen)
+			debug.Printf("serving HTTP on %s", *listen)
 			log.Fatal(http.ListenAndServe(*listen, s))
 		}()
 	}

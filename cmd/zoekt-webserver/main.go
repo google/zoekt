@@ -207,10 +207,8 @@ func main() {
 	go watchdog(30*time.Second, watchdogAddr)
 
 	if *sslCert != "" || *sslKey != "" {
-		log.Printf("serving HTTPS on %s", *listen)
 		err = http.ListenAndServeTLS(*listen, *sslCert, *sslKey, handler)
 	} else {
-		log.Printf("serving HTTP on %s", *listen)
 		err = http.ListenAndServe(*listen, handler)
 	}
 	log.Printf("ListenAndServe: %v", err)
