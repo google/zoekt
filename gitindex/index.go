@@ -121,27 +121,28 @@ func setTemplates(repo *zoekt.Repository, u *url.URL, typ string) error {
 		repo.CommitURLTemplate = u.String() + "/commit/{{.Version}}"
 		repo.FileURLTemplate = u.String() + "/blob/{{.Version}}/{{.Path}}"
 		repo.LineFragmentTemplate = "#L{{.LineNumber}}"
-
 	case "cgit":
-
 		// http://git.savannah.gnu.org/cgit/lilypond.git/tree/elisp/lilypond-mode.el?h=dev/philh&id=b2ca0fefe3018477aaca23b6f672c7199ba5238e#n100
-
 		repo.CommitURLTemplate = u.String() + "/commit/?id={{.Version}}"
 		repo.FileURLTemplate = u.String() + "/tree/{{.Path}}/?id={{.Version}}"
 		repo.LineFragmentTemplate = "#n{{.LineNumber}}"
-
 	case "gitweb":
 		// https://gerrit.libreoffice.org/gitweb?p=online.git;a=blob;f=Makefile.am;h=cfcfd7c36fbae10e269653dc57a9b68c92d4c10b;hb=848145503bf7b98ce4a4aa0a858a0d71dd0dbb26#l10
 		repo.FileURLTemplate = u.String() + ";a=blob;f={{.Path}};hb={{.Version}}"
 		repo.CommitURLTemplate = u.String() + ";a=commit;h={{.Version}}"
 		repo.LineFragmentTemplate = "#l{{.LineNumber}}"
-
 	case "source.bazel.build":
 		// https://source.bazel.build/bazel/+/57bc201346e61c62a921c1cbf32ad24f185c10c9
 		// https://source.bazel.build/bazel/+/57bc201346e61c62a921c1cbf32ad24f185c10c9:tools/cpp/BUILD.empty;l=10
 		repo.CommitURLTemplate = u.String() + "/+/{{.Version}}"
 		repo.FileURLTemplate = u.String() + "/+/{{.Version}}:{{.Path}}"
 		repo.LineFragmentTemplate = ";l={{.LineNumber}}"
+	case "bitbucket-server":
+		// https://<bitbucketserver-host>/projects/<project>/repos/<repo>/commits/5be7ca73b898bf17a08e607918accfdeafe1e0bc
+		// https://<bitbucketserver-host>/projects/<project>/repos/<repo>/browse/<file>?at=5be7ca73b898bf17a08e607918accfdeafe1e0bc
+		repo.CommitURLTemplate = u.String() + "/commits/{{.Version}}"
+		repo.FileURLTemplate = u.String() + "/{{.Path}}?at={{.Version}}"
+		repo.LineFragmentTemplate = "#{{.LineNumber}}"
 	default:
 		return fmt.Errorf("URL scheme type %q unknown", typ)
 	}
