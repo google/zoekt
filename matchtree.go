@@ -24,19 +24,19 @@ import (
 	"github.com/google/zoekt/query"
 )
 
-// A docIterator iterates over documents in order.
-type docIterator interface {
+// A DocIterator iterates over documents in order.
+type DocIterator interface {
 	// provide the next document where we can may find something
 	// interesting.
-	nextDoc() uint32
+	NextDoc() uint32
 
 	// clears any per-document state of the docIterator, and
 	// prepares for evaluating the given doc. The argument is
 	// strictly increasing over time.
-	prepare(nextDoc uint32)
+	Prepare(nextDoc uint32)
 
 	// collects statistics.
-	updateStats(stats *Stats)
+	UpdateStats(stats *Stats)
 }
 
 const costConst = 0
@@ -44,8 +44,8 @@ const costMemory = 1
 const costContent = 2
 const costRegexp = 3
 
-const costMin = costConst
-const costMax = costRegexp
+const CostMin = costConst
+const CostMax = costRegexp
 
 // An expression tree coupled with matches. The matchtree has two
 // functions:
@@ -59,7 +59,7 @@ const costMax = costRegexp
 //
 // The general process for a given (shard, query) is
 //
-// - construct matchTree for the query
+// - construct MatchTree for the query
 //
 // - find all different leaf matchTrees (substring, regexp, etc.)
 //
@@ -74,11 +74,11 @@ const costMax = costRegexp
 //   - if the complete tree returns (matches() == true) for the document,
 //     collect all text matches by looking at leaf matchTrees
 //
-type matchTree interface {
-	docIterator
+type MatchTree interface {
+	DocIterator
 
-	// returns whether this matches, and if we are sure.
-	matches(cp *contentProvider, cost int, known map[matchTree]bool) (match bool, sure bool)
+	// returns whether this Matches, and if we are sure.
+	Matches(cp *contentProvider, cost int, known map[MatchTree]bool) (match bool, sure bool)
 }
 
 type docMatchTree struct {
@@ -94,24 +94,24 @@ type bruteForceMatchTree struct {
 }
 
 type andMatchTree struct {
-	children []matchTree
+	children []MatchTree
 }
 
 type orMatchTree struct {
-	children []matchTree
+	children []MatchTree
 }
 
 type notMatchTree struct {
-	child matchTree
+	child MatchTree
 }
 
 type fileNameMatchTree struct {
-	child matchTree
+	child MatchTree
 }
 
 // Don't visit this subtree for collecting matches.
 type noVisitMatchTree struct {
-	matchTree
+	MatchTree
 }
 
 type regexpMatchTree struct {
@@ -148,49 +148,49 @@ type branchQueryMatchTree struct {
 	docID     uint32
 }
 
-func (t *noMatchTree) updateStats(s *Stats) {
+func (t *noMatchTree) UpdateStats(s *Stats) {
 }
 
-func (t *bruteForceMatchTree) updateStats(s *Stats) {
+func (t *bruteForceMatchTree) UpdateStats(s *Stats) {
 }
 
-func (t *docMatchTree) updateStats(s *Stats) {
+func (t *docMatchTree) UpdateStats(s *Stats) {
 }
 
-func (t *andMatchTree) updateStats(s *Stats) {
+func (t *andMatchTree) UpdateStats(s *Stats) {
 	for _, c := range t.children {
-		c.updateStats(s)
+		c.UpdateStats(s)
 	}
 }
 
-func (t *orMatchTree) updateStats(s *Stats) {
+func (t *orMatchTree) UpdateStats(s *Stats) {
 	for _, c := range t.children {
-		c.updateStats(s)
+		c.UpdateStats(s)
 	}
 }
 
-func (t *notMatchTree) updateStats(s *Stats) {
-	t.child.updateStats(s)
+func (t *notMatchTree) UpdateStats(s *Stats) {
+	t.child.UpdateStats(s)
 }
 
-func (t *fileNameMatchTree) updateStats(s *Stats) {
-	t.child.updateStats(s)
+func (t *fileNameMatchTree) UpdateStats(s *Stats) {
+	t.child.UpdateStats(s)
 }
 
-func (t *branchQueryMatchTree) updateStats(s *Stats) {
+func (t *branchQueryMatchTree) UpdateStats(s *Stats) {
 }
 
-func (t *regexpMatchTree) updateStats(s *Stats) {
+func (t *regexpMatchTree) UpdateStats(s *Stats) {
 }
 
 // all prepare methods
 
-func (t *bruteForceMatchTree) prepare(doc uint32) {
+func (t *bruteForceMatchTree) Prepare(doc uint32) {
 	t.docID = doc
 	t.firstDone = true
 }
 
-func (t *docMatchTree) prepare(doc uint32) {
+func (t *docMatchTree) Prepare(doc uint32) {
 	for len(t.docs) > 0 && t.docs[0] < doc {
 		t.docs = t.docs[1:]
 	}
@@ -202,63 +202,63 @@ func (t *docMatchTree) prepare(doc uint32) {
 	t.docs = t.docs[i:]
 }
 
-func (t *andMatchTree) prepare(doc uint32) {
+func (t *andMatchTree) Prepare(doc uint32) {
 	for _, c := range t.children {
-		c.prepare(doc)
+		c.Prepare(doc)
 	}
 }
 
-func (t *regexpMatchTree) prepare(doc uint32) {
+func (t *regexpMatchTree) Prepare(doc uint32) {
 	t.found = t.found[:0]
 	t.reEvaluated = false
-	t.bruteForceMatchTree.prepare(doc)
+	t.bruteForceMatchTree.Prepare(doc)
 }
 
-func (t *orMatchTree) prepare(doc uint32) {
+func (t *orMatchTree) Prepare(doc uint32) {
 	for _, c := range t.children {
-		c.prepare(doc)
+		c.Prepare(doc)
 	}
 }
 
-func (t *notMatchTree) prepare(doc uint32) {
-	t.child.prepare(doc)
+func (t *notMatchTree) Prepare(doc uint32) {
+	t.child.Prepare(doc)
 }
 
-func (t *fileNameMatchTree) prepare(doc uint32) {
-	t.child.prepare(doc)
+func (t *fileNameMatchTree) Prepare(doc uint32) {
+	t.child.Prepare(doc)
 }
 
-func (t *substrMatchTree) prepare(nextDoc uint32) {
-	t.matchIterator.prepare(nextDoc)
+func (t *substrMatchTree) Prepare(nextDoc uint32) {
+	t.matchIterator.Prepare(nextDoc)
 	t.current = t.matchIterator.candidates()
 	t.contEvaluated = false
 }
 
-func (t *branchQueryMatchTree) prepare(doc uint32) {
+func (t *branchQueryMatchTree) Prepare(doc uint32) {
 	t.firstDone = true
 	t.docID = doc
 }
 
 // nextDoc
 
-func (t *docMatchTree) nextDoc() uint32 {
+func (t *docMatchTree) NextDoc() uint32 {
 	if len(t.docs) == 0 {
 		return maxUInt32
 	}
 	return t.docs[0]
 }
 
-func (t *bruteForceMatchTree) nextDoc() uint32 {
+func (t *bruteForceMatchTree) NextDoc() uint32 {
 	if !t.firstDone {
 		return 0
 	}
 	return t.docID + 1
 }
 
-func (t *andMatchTree) nextDoc() uint32 {
+func (t *andMatchTree) NextDoc() uint32 {
 	var max uint32
 	for _, c := range t.children {
-		m := c.nextDoc()
+		m := c.NextDoc()
 		if m > max {
 			max = m
 		}
@@ -266,10 +266,10 @@ func (t *andMatchTree) nextDoc() uint32 {
 	return max
 }
 
-func (t *orMatchTree) nextDoc() uint32 {
+func (t *orMatchTree) NextDoc() uint32 {
 	min := uint32(maxUInt32)
 	for _, c := range t.children {
-		m := c.nextDoc()
+		m := c.NextDoc()
 		if m < min {
 			min = m
 		}
@@ -277,15 +277,15 @@ func (t *orMatchTree) nextDoc() uint32 {
 	return min
 }
 
-func (t *notMatchTree) nextDoc() uint32 {
+func (t *notMatchTree) NextDoc() uint32 {
 	return 0
 }
 
-func (t *fileNameMatchTree) nextDoc() uint32 {
-	return t.child.nextDoc()
+func (t *fileNameMatchTree) NextDoc() uint32 {
+	return t.child.NextDoc()
 }
 
-func (t *branchQueryMatchTree) nextDoc() uint32 {
+func (t *branchQueryMatchTree) NextDoc() uint32 {
 	var start uint32
 	if t.firstDone {
 		start = t.docID + 1
@@ -343,39 +343,39 @@ func (t *branchQueryMatchTree) String() string {
 }
 
 // Visit the matchTree. Skips noVisitMatchTree
-func visitMatchTree(t matchTree, f func(matchTree)) {
+func VisitMatchTree(t MatchTree, f func(MatchTree)) {
 	switch s := t.(type) {
 	case *andMatchTree:
 		for _, ch := range s.children {
-			visitMatchTree(ch, f)
+			VisitMatchTree(ch, f)
 		}
 	case *orMatchTree:
 		for _, ch := range s.children {
-			visitMatchTree(ch, f)
+			VisitMatchTree(ch, f)
 		}
 	case *noVisitMatchTree:
-		visitMatchTree(s.matchTree, f)
+		VisitMatchTree(s.MatchTree, f)
 	case *notMatchTree:
-		visitMatchTree(s.child, f)
+		VisitMatchTree(s.child, f)
 	case *fileNameMatchTree:
-		visitMatchTree(s.child, f)
+		VisitMatchTree(s.child, f)
 	default:
 		f(t)
 	}
 }
 
-func visitMatches(t matchTree, known map[matchTree]bool, f func(matchTree)) {
+func VisitMatches(t MatchTree, known map[MatchTree]bool, f func(MatchTree)) {
 	switch s := t.(type) {
 	case *andMatchTree:
 		for _, ch := range s.children {
 			if known[ch] {
-				visitMatches(ch, known, f)
+				VisitMatches(ch, known, f)
 			}
 		}
 	case *orMatchTree:
 		for _, ch := range s.children {
 			if known[ch] {
-				visitMatches(ch, known, f)
+				VisitMatches(ch, known, f)
 			}
 		}
 	case *notMatchTree:
@@ -388,8 +388,8 @@ func visitMatches(t matchTree, known map[matchTree]bool, f func(matchTree)) {
 	}
 }
 
-func visitSubtreeMatches(t matchTree, known map[matchTree]bool, f func(*substrMatchTree)) {
-	visitMatches(t, known, func(mt matchTree) {
+func visitSubtreeMatches(t MatchTree, known map[MatchTree]bool, f func(*substrMatchTree)) {
+	VisitMatches(t, known, func(mt MatchTree) {
 		st, ok := mt.(*substrMatchTree)
 		if ok {
 			f(st)
@@ -397,8 +397,8 @@ func visitSubtreeMatches(t matchTree, known map[matchTree]bool, f func(*substrMa
 	})
 }
 
-func visitRegexMatches(t matchTree, known map[matchTree]bool, f func(*regexpMatchTree)) {
-	visitMatches(t, known, func(mt matchTree) {
+func visitRegexMatches(t MatchTree, known map[MatchTree]bool, f func(*regexpMatchTree)) {
+	VisitMatches(t, known, func(mt MatchTree) {
 		st, ok := mt.(*regexpMatchTree)
 		if ok {
 			f(st)
@@ -408,19 +408,19 @@ func visitRegexMatches(t matchTree, known map[matchTree]bool, f func(*regexpMatc
 
 // all matches() methods.
 
-func (t *docMatchTree) matches(cp *contentProvider, cost int, known map[matchTree]bool) (bool, bool) {
+func (t *docMatchTree) Matches(cp *contentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
 	return len(t.current) > 0, true
 }
 
-func (t *bruteForceMatchTree) matches(cp *contentProvider, cost int, known map[matchTree]bool) (bool, bool) {
+func (t *bruteForceMatchTree) Matches(cp *contentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
 	return true, true
 }
 
-func (t *andMatchTree) matches(cp *contentProvider, cost int, known map[matchTree]bool) (bool, bool) {
+func (t *andMatchTree) Matches(cp *contentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
 	sure := true
 
 	for _, ch := range t.children {
-		v, ok := evalMatchTree(cp, cost, known, ch)
+		v, ok := EvalMatchTree(cp, cost, known, ch)
 		if ok && !v {
 			return false, true
 		}
@@ -431,11 +431,11 @@ func (t *andMatchTree) matches(cp *contentProvider, cost int, known map[matchTre
 	return true, sure
 }
 
-func (t *orMatchTree) matches(cp *contentProvider, cost int, known map[matchTree]bool) (bool, bool) {
+func (t *orMatchTree) Matches(cp *contentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
 	matches := false
 	sure := true
 	for _, ch := range t.children {
-		v, ok := evalMatchTree(cp, cost, known, ch)
+		v, ok := EvalMatchTree(cp, cost, known, ch)
 		if ok {
 			// we could short-circuit, but we want to use
 			// the other possibilities as a ranking
@@ -448,11 +448,11 @@ func (t *orMatchTree) matches(cp *contentProvider, cost int, known map[matchTree
 	return matches, sure
 }
 
-func (t *branchQueryMatchTree) matches(cp *contentProvider, cost int, known map[matchTree]bool) (bool, bool) {
+func (t *branchQueryMatchTree) Matches(cp *contentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
 	return t.fileMasks[t.docID]&t.mask != 0, true
 }
 
-func (t *regexpMatchTree) matches(cp *contentProvider, cost int, known map[matchTree]bool) (bool, bool) {
+func (t *regexpMatchTree) Matches(cp *contentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
 	if cost < costRegexp {
 		return false, false
 	}
@@ -470,12 +470,12 @@ func (t *regexpMatchTree) matches(cp *contentProvider, cost int, known map[match
 	return len(t.found) > 0, true
 }
 
-func evalMatchTree(cp *contentProvider, cost int, known map[matchTree]bool, mt matchTree) (bool, bool) {
+func EvalMatchTree(cp *contentProvider, cost int, known map[MatchTree]bool, mt MatchTree) (bool, bool) {
 	if v, ok := known[mt]; ok {
 		return v, true
 	}
 
-	v, ok := mt.matches(cp, cost, known)
+	v, ok := mt.Matches(cp, cost, known)
 	if ok {
 		known[mt] = v
 	}
@@ -483,16 +483,16 @@ func evalMatchTree(cp *contentProvider, cost int, known map[matchTree]bool, mt m
 	return v, ok
 }
 
-func (t *notMatchTree) matches(cp *contentProvider, cost int, known map[matchTree]bool) (bool, bool) {
-	v, ok := evalMatchTree(cp, cost, known, t.child)
+func (t *notMatchTree) Matches(cp *contentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
+	v, ok := EvalMatchTree(cp, cost, known, t.child)
 	return !v, ok
 }
 
-func (t *fileNameMatchTree) matches(cp *contentProvider, cost int, known map[matchTree]bool) (bool, bool) {
-	return evalMatchTree(cp, cost, known, t.child)
+func (t *fileNameMatchTree) Matches(cp *contentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
+	return EvalMatchTree(cp, cost, known, t.child)
 }
 
-func (t *substrMatchTree) matches(cp *contentProvider, cost int, known map[matchTree]bool) (bool, bool) {
+func (t *substrMatchTree) Matches(cp *contentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
 	if len(t.current) == 0 {
 		return false, true
 	}
@@ -519,7 +519,7 @@ func (t *substrMatchTree) matches(cp *contentProvider, cost int, known map[match
 	return len(t.current) > 0, true
 }
 
-func (d *indexData) newMatchTree(q query.Q, stats *Stats) (matchTree, error) {
+func (d *indexData) newMatchTree(q query.Q, stats *Stats) (MatchTree, error) {
 	switch s := q.(type) {
 	case *query.Regexp:
 		subQ := query.RegexpToQuery(s.Regexp, ngramSize)
@@ -547,12 +547,12 @@ func (d *indexData) newMatchTree(q query.Q, stats *Stats) (matchTree, error) {
 		}
 
 		return &andMatchTree{
-			children: []matchTree{
+			children: []MatchTree{
 				tr, &noVisitMatchTree{subMT},
 			},
 		}, nil
 	case *query.And:
-		var r []matchTree
+		var r []MatchTree
 		for _, ch := range s.Children {
 			ct, err := d.newMatchTree(ch, stats)
 			if err != nil {
@@ -562,7 +562,7 @@ func (d *indexData) newMatchTree(q query.Q, stats *Stats) (matchTree, error) {
 		}
 		return &andMatchTree{r}, nil
 	case *query.Or:
-		var r []matchTree
+		var r []MatchTree
 		for _, ch := range s.Children {
 			ct, err := d.newMatchTree(ch, stats)
 			if err != nil {
@@ -651,7 +651,7 @@ func (d *indexData) newMatchTree(q query.Q, stats *Stats) (matchTree, error) {
 	return nil, nil
 }
 
-func (d *indexData) newSubstringMatchTree(s *query.Substring, stats *Stats) (matchTree, error) {
+func (d *indexData) newSubstringMatchTree(s *query.Substring, stats *Stats) (MatchTree, error) {
 	st := &substrMatchTree{
 		query:         s,
 		caseSensitive: s.CaseSensitive,
