@@ -265,7 +265,11 @@ nextFileMatch:
 		addRepo(&res, v)
 	}
 
-	mt.updateStats(&res.Stats)
+	visitMatchTree(mt, func(mt matchTree) {
+		if atom, ok := mt.(interface{ updateStats(*Stats) }); ok {
+			atom.updateStats(&res.Stats)
+		}
+	})
 	return &res, nil
 }
 

@@ -88,6 +88,7 @@ type matchIterator interface {
 	docIterator
 
 	candidates() []*candidateMatch
+	updateStats(*Stats)
 }
 
 // noMatchTree is both matchIterator and matchTree that matches nothing.
@@ -112,6 +113,8 @@ func (t *noMatchTree) prepare(uint32) {}
 func (t *noMatchTree) matches(cp *contentProvider, cost int, known map[matchTree]bool) (bool, bool) {
 	return false, true
 }
+
+func (t *noMatchTree) updateStats(*Stats) {}
 
 func (m *candidateMatch) String() string {
 	return fmt.Sprintf("%d:%d", m.file, m.runeOffset)
