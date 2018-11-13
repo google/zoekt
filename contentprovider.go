@@ -23,6 +23,12 @@ import (
 
 var _ = log.Println
 
+// ContentProvider is an abstraction to treat matches for names and content
+// with the same code.
+type ContentProvider interface {
+	Data(fileName bool) []byte
+}
+
 // contentProvider is an abstraction to treat matches for names and
 // content with the same code.
 type contentProvider struct {
@@ -74,7 +80,7 @@ func (p *contentProvider) newlines() []uint32 {
 	return p._nl
 }
 
-func (p *contentProvider) data(fileName bool) []byte {
+func (p *contentProvider) Data(fileName bool) []byte {
 	if fileName {
 		return p.id.fileNameContent[p.id.fileNameIndex[p.idx]:p.id.fileNameIndex[p.idx+1]]
 	}
@@ -192,7 +198,7 @@ func (p *contentProvider) fillContentMatches(ms []*candidateMatch) []LineMatch {
 				m.byteOffset)
 		}
 
-		data := p.data(false)
+		data := p.Data(false)
 
 		// Due to merging matches, we may have a match that
 		// crosses a line boundary. Prevent confusion by
@@ -212,7 +218,7 @@ func (p *contentProvider) fillContentMatches(ms []*candidateMatch) []LineMatch {
 			LineEnd:    lineEnd,
 			LineNumber: num,
 		}
-		finalMatch.Line = p.data(false)[lineStart:lineEnd]
+		finalMatch.Line = p.Data(false)[lineStart:lineEnd]
 
 		for _, m := range lineCands {
 			fragment := LineFragmentMatch{
