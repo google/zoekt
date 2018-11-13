@@ -88,6 +88,7 @@ type matchIterator interface {
 	DocIterator
 
 	candidates() []*candidateMatch
+	updateStats(*Stats)
 }
 
 // noMatchTree is both matchIterator and matchTree that matches nothing.
@@ -108,6 +109,8 @@ func (t *noMatchTree) NextDoc() uint32 {
 }
 
 func (t *noMatchTree) Prepare(uint32) {}
+
+func (t *noMatchTree) updateStats(*Stats) {}
 
 func (t *noMatchTree) Matches(cp ContentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
 	return false, true
@@ -169,7 +172,7 @@ func (i *ngramDocIterator) Prepare(nextDoc uint32) {
 	i.fileIdx = nextDoc
 }
 
-func (i *ngramDocIterator) UpdateStats(s *Stats) {
+func (i *ngramDocIterator) updateStats(s *Stats) {
 	i.iter.updateStats(s)
 	s.NgramMatches += i.matchCount
 }
