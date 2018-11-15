@@ -94,7 +94,7 @@ type matchIterator interface {
 
 // noMatchTree is both matchIterator and matchTree that matches nothing.
 type noMatchTree struct {
-	matchtree.NoMatchTree
+	matchtree.None
 }
 
 func (t *noMatchTree) candidates() []*candidateMatch {

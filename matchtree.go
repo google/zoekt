@@ -41,7 +41,7 @@ type regexpMatchTree struct {
 	found       []*candidateMatch
 
 	// nextDoc, prepare.
-	matchtree.BruteForceMatchTree
+	matchtree.All
 }
 
 type substrMatchTree struct {
@@ -82,7 +82,7 @@ func (t *docMatchTree) Prepare(doc uint32) {
 func (t *regexpMatchTree) Prepare(doc uint32) {
 	t.found = t.found[:0]
 	t.reEvaluated = false
-	t.BruteForceMatchTree.Prepare(doc)
+	t.All.Prepare(doc)
 }
 
 func (t *substrMatchTree) Prepare(nextDoc uint32) {
@@ -225,11 +225,7 @@ func (d *indexData) newMatchTree(q query.Q) (matchtree.MatchTree, error) {
 				fileName: s.FileName,
 			}
 
-			return &matchtree.AndMatchTree{
-				Children: []matchtree.MatchTree{
-					tr, &matchtree.NoVisitMatchTree{subMT},
-				},
-			}, nil
+			return matchtree.And(tr, &matchtree.NoVisit{subMT}), nil
 
 		case *query.Substring:
 			return d.newSubstringMatchTree(s)
@@ -252,7 +248,7 @@ func (d *indexData) newMatchTree(q query.Q) (matchtree.MatchTree, error) {
 		case *query.Language:
 			code, ok := d.metaData.LanguageMap[s.Language]
 			if !ok {
-				return &matchtree.NoMatchTree{"lang"}, nil
+				return &matchtree.None{"lang"}, nil
 			}
 			docs := make([]uint32, 0, len(d.languages))
 			for d, l := range d.languages {
