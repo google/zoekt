@@ -19,6 +19,7 @@ import (
 	"hash/crc64"
 	"unicode/utf8"
 
+	"github.com/google/zoekt/matchtree"
 	"github.com/google/zoekt/query"
 )
 
@@ -211,9 +212,9 @@ func (d *indexData) iterateNgrams(query *query.Substring) (*ngramIterationResult
 
 		if freq == 0 {
 			return &ngramIterationResults{
-				matchIterator: &noMatchTree{
+				matchIterator: &noMatchTree{matchtree.NoMatchTree{
 					Why: "freq=0",
-				},
+				}},
 			}, nil
 		}
 

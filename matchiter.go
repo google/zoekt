@@ -20,6 +20,7 @@ import (
 	"sort"
 	"unicode/utf8"
 
+	"github.com/google/zoekt/matchtree"
 	"github.com/google/zoekt/query"
 )
 
@@ -85,7 +86,7 @@ func (m *candidateMatch) line(newlines []uint32, fileSize uint32) (lineNum, line
 
 // matchIterator is a docIterator that produces candidateMatches for a given document
 type matchIterator interface {
-	DocIterator
+	matchtree.DocIterator
 
 	candidates() []*candidateMatch
 	updateStats(*Stats)
@@ -93,28 +94,14 @@ type matchIterator interface {
 
 // noMatchTree is both matchIterator and matchTree that matches nothing.
 type noMatchTree struct {
-	Why string
-}
-
-func (t *noMatchTree) String() string {
-	return fmt.Sprintf("not(%q)", t.Why)
+	matchtree.NoMatchTree
 }
 
 func (t *noMatchTree) candidates() []*candidateMatch {
 	return nil
 }
 
-func (t *noMatchTree) NextDoc() uint32 {
-	return maxUInt32
-}
-
-func (t *noMatchTree) Prepare(uint32) {}
-
 func (t *noMatchTree) updateStats(*Stats) {}
-
-func (t *noMatchTree) Matches(cp ContentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
-	return false, true
-}
 
 func (m *candidateMatch) String() string {
 	return fmt.Sprintf("%d:%d", m.file, m.runeOffset)
