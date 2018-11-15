@@ -103,15 +103,15 @@ type and struct {
 	children []MatchTree
 }
 
-type orMatchTree struct {
+type or struct {
 	children []MatchTree
 }
 
-type notMatchTree struct {
+type not struct {
 	child MatchTree
 }
 
-type fileNameMatchTree struct {
+type typeFile struct {
 	child MatchTree
 }
 
@@ -135,17 +135,17 @@ func (t *and) Prepare(doc uint32) {
 	}
 }
 
-func (t *orMatchTree) Prepare(doc uint32) {
+func (t *or) Prepare(doc uint32) {
 	for _, c := range t.children {
 		c.Prepare(doc)
 	}
 }
 
-func (t *notMatchTree) Prepare(doc uint32) {
+func (t *not) Prepare(doc uint32) {
 	t.child.Prepare(doc)
 }
 
-func (t *fileNameMatchTree) Prepare(doc uint32) {
+func (t *typeFile) Prepare(doc uint32) {
 	t.child.Prepare(doc)
 }
 
@@ -175,7 +175,7 @@ func (t *and) NextDoc() uint32 {
 
 const maxUInt32 = 0xffffffff
 
-func (t *orMatchTree) NextDoc() uint32 {
+func (t *or) NextDoc() uint32 {
 	min := uint32(maxUInt32)
 	for _, c := range t.children {
 		m := c.NextDoc()
@@ -186,11 +186,11 @@ func (t *orMatchTree) NextDoc() uint32 {
 	return min
 }
 
-func (t *notMatchTree) NextDoc() uint32 {
+func (t *not) NextDoc() uint32 {
 	return 0
 }
 
-func (t *fileNameMatchTree) NextDoc() uint32 {
+func (t *typeFile) NextDoc() uint32 {
 	return t.child.NextDoc()
 }
 
@@ -208,15 +208,15 @@ func (t *and) String() string {
 	return fmt.Sprintf("and%v", t.children)
 }
 
-func (t *orMatchTree) String() string {
+func (t *or) String() string {
 	return fmt.Sprintf("or%v", t.children)
 }
 
-func (t *notMatchTree) String() string {
+func (t *not) String() string {
 	return fmt.Sprintf("not(%v)", t.child)
 }
 
-func (t *fileNameMatchTree) String() string {
+func (t *typeFile) String() string {
 	return fmt.Sprintf("f(%v)", t.child)
 }
 
@@ -227,15 +227,15 @@ func VisitMatchTree(t MatchTree, f func(MatchTree)) {
 		for _, ch := range s.children {
 			VisitMatchTree(ch, f)
 		}
-	case *orMatchTree:
+	case *or:
 		for _, ch := range s.children {
 			VisitMatchTree(ch, f)
 		}
 	case *NoVisit:
 		VisitMatchTree(s.MatchTree, f)
-	case *notMatchTree:
+	case *not:
 		VisitMatchTree(s.child, f)
-	case *fileNameMatchTree:
+	case *typeFile:
 		VisitMatchTree(s.child, f)
 	default:
 		f(t)
@@ -252,16 +252,16 @@ func VisitMatches(t MatchTree, known map[MatchTree]bool, f func(MatchTree)) {
 				VisitMatches(ch, known, f)
 			}
 		}
-	case *orMatchTree:
+	case *or:
 		for _, ch := range s.children {
 			if known[ch] {
 				VisitMatches(ch, known, f)
 			}
 		}
-	case *notMatchTree:
+	case *not:
 	case *NoVisit:
 		// don't collect into negative trees.
-	case *fileNameMatchTree:
+	case *typeFile:
 		// We will just gather the filename if we do not visit this tree.
 	default:
 		f(s)
@@ -306,7 +306,7 @@ func (t *and) Matches(cp ContentProvider, cost int, known map[MatchTree]bool) (b
 	return true, sure
 }
 
-func (t *orMatchTree) Matches(cp ContentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
+func (t *or) Matches(cp ContentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
 	matches := false
 	sure := true
 	for _, ch := range t.children {
@@ -323,12 +323,12 @@ func (t *orMatchTree) Matches(cp ContentProvider, cost int, known map[MatchTree]
 	return matches, sure
 }
 
-func (t *notMatchTree) Matches(cp ContentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
+func (t *not) Matches(cp ContentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
 	v, ok := EvalMatchTree(cp, cost, known, t.child)
 	return !v, ok
 }
 
-func (t *fileNameMatchTree) Matches(cp ContentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
+func (t *typeFile) Matches(cp ContentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
 	return EvalMatchTree(cp, cost, known, t.child)
 }
 
@@ -353,10 +353,10 @@ func NewMatchTree(q query.Q, atom func(q query.Q) (MatchTree, error)) (MatchTree
 			}
 			r = append(r, ct)
 		}
-		return &orMatchTree{r}, nil
+		return &or{r}, nil
 	case *query.Not:
 		ct, err := NewMatchTree(s.Child, atom)
-		return &notMatchTree{
+		return &not{
 			child: ct,
 		}, err
 
@@ -370,7 +370,7 @@ func NewMatchTree(q query.Q, atom func(q query.Q) (MatchTree, error)) (MatchTree
 			return nil, err
 		}
 
-		return &fileNameMatchTree{
+		return &typeFile{
 			child: ct,
 		}, nil
 
