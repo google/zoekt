@@ -31,8 +31,6 @@ import (
 	"github.com/google/zoekt/build"
 	"github.com/google/zoekt/query"
 	"github.com/google/zoekt/shards"
-
-	"gopkg.in/src-d/go-git.v4/plumbing"
 )
 
 func createSubmoduleRepo(dir string) error {
@@ -98,6 +96,9 @@ func TestFindGitRepos(t *testing.T) {
 		t.Error("createSubmoduleRepo", err)
 	}
 	repos, err := FindGitRepos(dir)
+	if err != nil {
+		t.Error("FindGitRepos", err)
+	}
 
 	got := map[string]bool{}
 	for _, r := range repos {
@@ -158,12 +159,11 @@ func TestTreeToFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TreeToFiles: %v", err)
 	}
-	var bnameHash plumbing.Hash
 
-	bnameHash = versions["bname"]
+	bnameHash := versions["bname"]
 	if entry, err := tree.FindEntry("bname"); err != nil {
 		t.Fatalf("FindEntry %v", err)
-	} else if bytes.Compare(bnameHash[:], entry.Hash[:]) != 0 {
+	} else if !bytes.Equal(bnameHash[:], entry.Hash[:]) {
 		t.Fatalf("got 'bname' versions %v, want %v", bnameHash, entry.Hash)
 	}
 

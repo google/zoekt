@@ -42,7 +42,7 @@ type candidateMatch struct {
 // Matches content against the substring, and populates byteMatchSz on success
 func (m *candidateMatch) matchContent(content []byte) bool {
 	if m.caseSensitive {
-		comp := bytes.Compare(m.substrBytes, content[m.byteOffset:m.byteOffset+uint32(len(m.substrBytes))]) == 0
+		comp := bytes.Equal(m.substrBytes, content[m.byteOffset:m.byteOffset+uint32(len(m.substrBytes))])
 
 		m.byteMatchSz = uint32(len(m.substrBytes))
 		return comp

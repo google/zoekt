@@ -72,7 +72,7 @@ func main() {
 			&oauth2.Token{
 				AccessToken: strings.TrimSpace(string(content)),
 			})
-		tc := oauth2.NewClient(oauth2.NoContext, ts)
+		tc := oauth2.NewClient(context.Background(), ts)
 		client = github.NewClient(tc)
 	}
 
@@ -179,10 +179,6 @@ func getOrgRepos(client *github.Client, org string) ([]*github.Repository, error
 		if len(repos) == 0 {
 			break
 		}
-		var names []string
-		for _, r := range repos {
-			names = append(names, *r.Name)
-		}
 
 		opt.Page = resp.NextPage
 		allRepos = append(allRepos, repos...)
@@ -203,11 +199,6 @@ func getUserRepos(client *github.Client, user string) ([]*github.Repository, err
 		}
 		if len(repos) == 0 {
 			break
-		}
-
-		var names []string
-		for _, r := range repos {
-			names = append(names, *r.Name)
 		}
 
 		opt.Page = resp.NextPage

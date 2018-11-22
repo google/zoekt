@@ -206,15 +206,15 @@ func TestUnloadIndex(t *testing.T) {
 	}
 
 	for _, f := range res.Files {
-		if bytes.Index(f.Content, []byte{forbidden}) >= 0 {
+		if bytes.Contains(f.Content, []byte{forbidden}) {
 			t.Errorf("found %d in content %q", forbidden, f.Content)
 		}
-		if bytes.Index(f.Checksum, []byte{forbidden}) >= 0 {
+		if bytes.Contains(f.Checksum, []byte{forbidden}) {
 			t.Errorf("found %d in checksum %q", forbidden, f.Checksum)
 		}
 
 		for _, l := range f.LineMatches {
-			if bytes.Index(l.Line, []byte{forbidden}) >= 0 {
+			if bytes.Contains(l.Line, []byte{forbidden}) {
 				t.Errorf("found %d in line %q", forbidden, l.Line)
 			}
 		}
