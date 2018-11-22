@@ -94,7 +94,7 @@ Zoekt comes with a small service management program:
 
     cat << EOF > config.json
     [{"GithubUser": "username"},
-     {"GitilesURL": "https://gerrit.googlesource.com", Name: "zoekt" }
+     {"GitilesURL": "https://gerrit.googlesource.com", "Name": "zoekt" }
     ]
     EOF
 
