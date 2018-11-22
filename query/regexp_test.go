@@ -15,7 +15,6 @@
 package query
 
 import (
-	"log"
 	"reflect"
 	"regexp/syntax"
 	"strings"
@@ -44,10 +43,10 @@ var opnames = map[syntax.Op]string{
 	syntax.OpAlternate:      "OpAlternate",
 }
 
-func printRegexp(r *syntax.Regexp, lvl int) {
-	log.Printf("%s%s ch: %d", strings.Repeat(" ", lvl), opnames[r.Op], len(r.Sub))
+func printRegexp(t *testing.T, r *syntax.Regexp, lvl int) {
+	t.Logf("%s%s ch: %d", strings.Repeat(" ", lvl), opnames[r.Op], len(r.Sub))
 	for _, s := range r.Sub {
-		printRegexp(s, lvl+1)
+		printRegexp(t, s, lvl+1)
 	}
 }
 
@@ -84,6 +83,7 @@ func TestRegexpParse(t *testing.T) {
 
 		got := RegexpToQuery(r, 3)
 		if !reflect.DeepEqual(c.want, got) {
+			printRegexp(t, r, 0)
 			t.Errorf("regexpToQuery(%q): got %v, want %v", c.in, got, c.want)
 		}
 	}
@@ -96,6 +96,8 @@ func TestLowerRegexp(t *testing.T) {
 	got := LowerRegexp(re)
 	want := "[a-za-z]foobar"
 	if got.String() != want {
+		printRegexp(t, re, 0)
+		printRegexp(t, got, 0)
 		t.Errorf("got %s, want %s", got, want)
 	}
 
