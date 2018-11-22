@@ -1306,7 +1306,6 @@ func TestUnicodeNonCoverContent(t *testing.T) {
 }
 
 const kelvinCodePoint = 8490
-const kelvinUTFSize = 3
 
 func TestUnicodeVariableLength(t *testing.T) {
 	lower := 'k'

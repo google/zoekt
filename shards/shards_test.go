@@ -28,19 +28,6 @@ import (
 	"github.com/google/zoekt/query"
 )
 
-type testLoader struct {
-	searchers []zoekt.Searcher
-}
-
-func (l *testLoader) Close() {}
-func (l *testLoader) getShards() []zoekt.Searcher {
-	return l.searchers
-}
-
-func (l *testLoader) rlock()         {}
-func (l *testLoader) runlock()       {}
-func (l *testLoader) String() string { return "test" }
-
 type crashSearcher struct{}
 
 func (s *crashSearcher) Search(ctx context.Context, q query.Q, opts *zoekt.SearchOptions) (*zoekt.SearchResult, error) {

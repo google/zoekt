@@ -42,7 +42,6 @@ type repoWalker struct {
 
 	// Path => commit SHA1
 	subRepoVersions map[string]plumbing.Hash
-	err             error
 	repoCache       *RepoCache
 
 	// If set, don't gasp on missing submodules.

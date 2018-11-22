@@ -29,8 +29,6 @@ import (
 	"github.com/google/zoekt/shards"
 )
 
-const CONTEXT = 20
-
 func displayMatches(files []zoekt.FileMatch, pat string) {
 	for _, f := range files {
 		for _, m := range f.LineMatches {

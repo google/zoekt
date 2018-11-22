@@ -364,24 +364,6 @@ func visitMatches(t matchTree, known map[matchTree]bool, f func(matchTree)) {
 	}
 }
 
-func visitSubtreeMatches(t matchTree, known map[matchTree]bool, f func(*substrMatchTree)) {
-	visitMatches(t, known, func(mt matchTree) {
-		st, ok := mt.(*substrMatchTree)
-		if ok {
-			f(st)
-		}
-	})
-}
-
-func visitRegexMatches(t matchTree, known map[matchTree]bool, f func(*regexpMatchTree)) {
-	visitMatches(t, known, func(mt matchTree) {
-		st, ok := mt.(*regexpMatchTree)
-		if ok {
-			f(st)
-		}
-	})
-}
-
 // all matches() methods.
 
 func (t *docMatchTree) matches(cp *contentProvider, cost int, known map[matchTree]bool) (bool, bool) {

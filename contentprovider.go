@@ -30,16 +30,14 @@ type contentProvider struct {
 	stats *Stats
 
 	// mutable
-	err          error
-	idx          uint32
-	_data        []byte
-	_nl          []uint32
-	_nlBuf       []uint32
-	_runeOffsets []uint32
-	_sects       []DocumentSection
-	_sectBuf     []DocumentSection
-	fileSize     uint32
-	bytesRead    uint32
+	err      error
+	idx      uint32
+	_data    []byte
+	_nl      []uint32
+	_nlBuf   []uint32
+	_sects   []DocumentSection
+	_sectBuf []DocumentSection
+	fileSize uint32
 }
 
 // setDocument skips to the given document.

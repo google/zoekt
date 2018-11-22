@@ -159,7 +159,3 @@ func (s *compoundSection) relativeIndex() []uint32 {
 	}
 	return ri
 }
-
-func (s *compoundSection) readBlob(r *indexData, i uint32) ([]byte, error) {
-	return r.readSectionBlob(simpleSection{s.offsets[i], s.offsets[i+1] - s.offsets[i]})
-}

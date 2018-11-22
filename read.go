@@ -95,10 +95,6 @@ func (r *indexData) readSectionBlob(sec simpleSection) ([]byte, error) {
 	return r.file.Read(sec.off, sec.sz)
 }
 
-func (r *indexData) readSectionU32(sec simpleSection) ([]uint32, error) {
-	return readSectionU32(r.file, sec)
-}
-
 func readSectionU32(f IndexFile, sec simpleSection) ([]uint32, error) {
 	if sec.sz%4 != 0 {
 		return nil, fmt.Errorf("barf: section size %% 4 != 0: sz %d ", sec.sz)
