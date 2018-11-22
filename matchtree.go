@@ -322,7 +322,8 @@ func (t *branchQueryMatchTree) String() string {
 	return fmt.Sprintf("branch(%x)", t.mask)
 }
 
-// Visit the matchTree. Skips noVisitMatchTree
+// visitMatches visits all atoms in matchTree. Note: This visits
+// noVisitMatchTree. For collecting matches use visitMatches.
 func visitMatchTree(t matchTree, f func(matchTree)) {
 	switch s := t.(type) {
 	case *andMatchTree:
@@ -342,6 +343,8 @@ func visitMatchTree(t matchTree, f func(matchTree)) {
 	}
 }
 
+// visitMatches visits all atoms which can contribute matches. Note: This
+// skips noVisitMatchTree.
 func visitMatches(t matchTree, known map[matchTree]bool, f func(matchTree)) {
 	switch s := t.(type) {
 	case *andMatchTree:
