@@ -405,7 +405,7 @@ func (d *indexData) List(ctx context.Context, q query.Q) (rl *RepoList, err erro
 	c, ok := q.(*query.Const)
 
 	if !ok {
-		return nil, fmt.Errorf("List should receive Repo-only query.")
+		return nil, fmt.Errorf("List should receive Repo-only query")
 	}
 
 	l := &RepoList{}

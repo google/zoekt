@@ -51,7 +51,7 @@ type repoWalker struct {
 // subURL returns the URL for a submodule.
 func (w *repoWalker) subURL(relURL string) (*url.URL, error) {
 	if w.repoURL == nil {
-		return nil, fmt.Errorf("no URL for base repo.")
+		return nil, fmt.Errorf("no URL for base repo")
 	}
 	if strings.HasPrefix(relURL, "../") {
 		u := *w.repoURL

@@ -209,7 +209,7 @@ func NewIndexBuilder(r *Repository) (*IndexBuilder, error) {
 
 func (b *IndexBuilder) setRepository(desc *Repository) error {
 	if len(b.contentStrings) > 0 {
-		return fmt.Errorf("AddSubRepository called after adding files.")
+		return fmt.Errorf("setRepository called after adding files")
 	}
 	if err := desc.verify(); err != nil {
 		return err
@@ -225,7 +225,7 @@ func (b *IndexBuilder) setRepository(desc *Repository) error {
 	}
 
 	if len(desc.Branches) > 64 {
-		return fmt.Errorf("too many branches.")
+		return fmt.Errorf("too many branches")
 	}
 
 	b.repo = *desc

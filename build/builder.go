@@ -193,7 +193,7 @@ func NewBuilder(opts Options) (*Builder, error) {
 	}
 
 	if b.opts.CTags == "" && b.opts.CTagsMustSucceed {
-		return nil, fmt.Errorf("ctags binary not found, but CTagsMustSucceed set.")
+		return nil, fmt.Errorf("ctags binary not found, but CTagsMustSucceed set")
 	}
 
 	if strings.Contains(opts.CTags, "universal-ctags") {

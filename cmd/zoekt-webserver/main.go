@@ -80,7 +80,7 @@ func loadTemplates(tpl *template.Template, dir string) error {
 		base := filepath.Base(fn)
 		base = strings.TrimSuffix(base, templateExtension)
 		if _, err := tpl.New(base).Parse(string(content)); err != nil {
-			return fmt.Errorf("Parse(%s): %v", fn, err)
+			return fmt.Errorf("template.Parse(%s): %v", fn, err)
 		}
 	}
 	return nil
