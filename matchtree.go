@@ -477,7 +477,7 @@ func (t *substrMatchTree) matches(cp *contentProvider, cost int, known map[match
 	return len(t.current) > 0, true
 }
 
-func (d *indexData) newMatchTree(q query.Q, stats *Stats) (matchTree, error) {
+func (d *indexData) newMatchTree(q query.Q) (matchTree, error) {
 	switch s := q.(type) {
 	case *query.Regexp:
 		subQ := query.RegexpToQuery(s.Regexp, ngramSize)
@@ -489,7 +489,7 @@ func (d *indexData) newMatchTree(q query.Q, stats *Stats) (matchTree, error) {
 			return q
 		})
 
-		subMT, err := d.newMatchTree(subQ, stats)
+		subMT, err := d.newMatchTree(subQ)
 		if err != nil {
 			return nil, err
 		}
@@ -512,7 +512,7 @@ func (d *indexData) newMatchTree(q query.Q, stats *Stats) (matchTree, error) {
 	case *query.And:
 		var r []matchTree
 		for _, ch := range s.Children {
-			ct, err := d.newMatchTree(ch, stats)
+			ct, err := d.newMatchTree(ch)
 			if err != nil {
 				return nil, err
 			}
@@ -522,7 +522,7 @@ func (d *indexData) newMatchTree(q query.Q, stats *Stats) (matchTree, error) {
 	case *query.Or:
 		var r []matchTree
 		for _, ch := range s.Children {
-			ct, err := d.newMatchTree(ch, stats)
+			ct, err := d.newMatchTree(ch)
 			if err != nil {
 				return nil, err
 			}
@@ -530,13 +530,13 @@ func (d *indexData) newMatchTree(q query.Q, stats *Stats) (matchTree, error) {
 		}
 		return &orMatchTree{r}, nil
 	case *query.Not:
-		ct, err := d.newMatchTree(s.Child, stats)
+		ct, err := d.newMatchTree(s.Child)
 		return &notMatchTree{
 			child: ct,
 		}, err
 
 	case *query.Substring:
-		return d.newSubstringMatchTree(s, stats)
+		return d.newSubstringMatchTree(s)
 
 	case *query.Branch:
 		mask := uint64(0)
@@ -575,7 +575,7 @@ func (d *indexData) newMatchTree(q query.Q, stats *Stats) (matchTree, error) {
 		}, nil
 
 	case *query.Symbol:
-		mt, err := d.newSubstringMatchTree(s.Atom, stats)
+		mt, err := d.newSubstringMatchTree(s.Atom)
 		if err != nil {
 			return nil, err
 		}
@@ -595,7 +595,7 @@ func (d *indexData) newMatchTree(q query.Q, stats *Stats) (matchTree, error) {
 	return nil, nil
 }
 
-func (d *indexData) newSubstringMatchTree(s *query.Substring, stats *Stats) (matchTree, error) {
+func (d *indexData) newSubstringMatchTree(s *query.Substring) (matchTree, error) {
 	st := &substrMatchTree{
 		query:         s,
 		caseSensitive: s.CaseSensitive,
