@@ -73,6 +73,9 @@ type Options struct {
 
 	// Write memory profiles to this file.
 	MemProfile string
+
+	// continue indexing and skip malformed documents
+	ContinueOnError bool
 }
 
 // Builder manages (parallel) creation of uniformly sized shards.
@@ -435,6 +438,10 @@ func (b *Builder) buildShard(todo []*zoekt.Document, nextShardNum int) (*finishe
 	sortDocuments(todo)
 	for _, t := range todo {
 		if err := shardBuilder.Add(*t); err != nil {
+			if b.opts.ContinueOnError {
+				log.Printf("%s failed to add document %s: %s", name, t.Name, err)
+				continue
+			}
 			return nil, err
 		}
 	}
