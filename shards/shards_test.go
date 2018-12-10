@@ -123,6 +123,12 @@ func TestOrderByShard(t *testing.T) {
 			})
 	}
 
+	if res, err := ss.Search(context.Background(), &query.Substring{Pattern: "bla"}, &zoekt.SearchOptions{}); err != nil {
+		t.Errorf("Search: %v", err)
+	} else if len(res.Files) != n {
+		t.Fatalf("empty options: got %d results, want %d", len(res.Files), n)
+	}
+
 	opts := zoekt.SearchOptions{
 		TotalMaxMatchCount: 3,
 	}

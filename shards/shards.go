@@ -189,7 +189,7 @@ func (ss *shardedSearcher) Search(ctx context.Context, q query.Q, opts *zoekt.Se
 			}
 		}
 
-		if cancel != nil && aggregate.Stats.MatchCount > opts.TotalMaxMatchCount {
+		if cancel != nil && opts.TotalMaxMatchCount > 0 && aggregate.Stats.MatchCount > opts.TotalMaxMatchCount {
 			cancel()
 			cancel = nil
 		}
