@@ -414,6 +414,10 @@ func (t *branchQueryMatchTree) matches(cp *contentProvider, cost int, known map[
 }
 
 func (t *regexpMatchTree) matches(cp *contentProvider, cost int, known map[matchTree]bool) (bool, bool) {
+	if t.reEvaluated {
+		return len(t.found) > 0, true
+	}
+
 	if cost < costRegexp {
 		return false, false
 	}
@@ -428,6 +432,7 @@ func (t *regexpMatchTree) matches(cp *contentProvider, cost int, known map[match
 		})
 	}
 	t.found = found
+	t.reEvaluated = true
 
 	return len(t.found) > 0, true
 }
@@ -451,6 +456,10 @@ func (t *notMatchTree) matches(cp *contentProvider, cost int, known map[matchTre
 }
 
 func (t *substrMatchTree) matches(cp *contentProvider, cost int, known map[matchTree]bool) (bool, bool) {
+	if t.contEvaluated {
+		return len(t.current) > 0, true
+	}
+
 	if len(t.current) == 0 {
 		return false, true
 	}
@@ -473,6 +482,7 @@ func (t *substrMatchTree) matches(cp *contentProvider, cost int, known map[match
 		}
 	}
 	t.current = pruned
+	t.contEvaluated = true
 
 	return len(t.current) > 0, true
 }
