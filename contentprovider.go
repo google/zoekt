@@ -23,6 +23,12 @@ import (
 
 var _ = log.Println
 
+// ContentProvider is an abstraction to treat matches for names and content
+// with the same code.
+type ContentProvider interface {
+	Data(fileName bool) []byte
+}
+
 // contentProvider is an abstraction to treat matches for names and
 // content with the same code.
 type contentProvider struct {
