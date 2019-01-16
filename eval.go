@@ -253,7 +253,7 @@ nextFileMatch:
 		fileMatch.Branches = d.gatherBranches(nextDoc, mt, known)
 		sortMatchesByScore(fileMatch.LineMatches)
 		if opts.Whole {
-			fileMatch.Content = cp.Data(false)
+			fileMatch.Content = cp.data(false)
 		}
 
 		res.Files = append(res.Files, fileMatch)

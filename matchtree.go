@@ -78,7 +78,7 @@ type MatchTree interface {
 	DocIterator
 
 	// returns whether this Matches, and if we are sure.
-	Matches(cp ContentProvider, cost int, known map[MatchTree]bool) (match bool, sure bool)
+	Matches(cp *contentProvider, cost int, known map[MatchTree]bool) (match bool, sure bool)
 }
 
 type docMatchTree struct {
@@ -408,15 +408,15 @@ func visitRegexMatches(t MatchTree, known map[MatchTree]bool, f func(*regexpMatc
 
 // all matches() methods.
 
-func (t *docMatchTree) Matches(cp ContentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
+func (t *docMatchTree) Matches(cp *contentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
 	return len(t.current) > 0, true
 }
 
-func (t *bruteForceMatchTree) Matches(cp ContentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
+func (t *bruteForceMatchTree) Matches(cp *contentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
 	return true, true
 }
 
-func (t *andMatchTree) Matches(cp ContentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
+func (t *andMatchTree) Matches(cp *contentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
 	sure := true
 
 	for _, ch := range t.children {
@@ -431,7 +431,7 @@ func (t *andMatchTree) Matches(cp ContentProvider, cost int, known map[MatchTree
 	return true, sure
 }
 
-func (t *orMatchTree) Matches(cp ContentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
+func (t *orMatchTree) Matches(cp *contentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
 	matches := false
 	sure := true
 	for _, ch := range t.children {
@@ -448,16 +448,16 @@ func (t *orMatchTree) Matches(cp ContentProvider, cost int, known map[MatchTree]
 	return matches, sure
 }
 
-func (t *branchQueryMatchTree) Matches(cp ContentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
+func (t *branchQueryMatchTree) Matches(cp *contentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
 	return t.fileMasks[t.docID]&t.mask != 0, true
 }
 
-func (t *regexpMatchTree) Matches(cp ContentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
+func (t *regexpMatchTree) Matches(cp *contentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
 	if cost < costRegexp {
 		return false, false
 	}
 
-	idxs := t.regexp.FindAllIndex(cp.Data(t.fileName), -1)
+	idxs := t.regexp.FindAllIndex(cp.data(t.fileName), -1)
 	t.found = make([]*candidateMatch, 0, len(idxs))
 	for _, idx := range idxs {
 		t.found = append(t.found, &candidateMatch{
@@ -470,7 +470,7 @@ func (t *regexpMatchTree) Matches(cp ContentProvider, cost int, known map[MatchT
 	return len(t.found) > 0, true
 }
 
-func EvalMatchTree(cp ContentProvider, cost int, known map[MatchTree]bool, mt MatchTree) (bool, bool) {
+func EvalMatchTree(cp *contentProvider, cost int, known map[MatchTree]bool, mt MatchTree) (bool, bool) {
 	if v, ok := known[mt]; ok {
 		return v, true
 	}
@@ -483,16 +483,16 @@ func EvalMatchTree(cp ContentProvider, cost int, known map[MatchTree]bool, mt Ma
 	return v, ok
 }
 
-func (t *notMatchTree) Matches(cp ContentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
+func (t *notMatchTree) Matches(cp *contentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
 	v, ok := EvalMatchTree(cp, cost, known, t.child)
 	return !v, ok
 }
 
-func (t *fileNameMatchTree) Matches(cp ContentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
+func (t *fileNameMatchTree) Matches(cp *contentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
 	return EvalMatchTree(cp, cost, known, t.child)
 }
 
-func (t *substrMatchTree) Matches(cp ContentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
+func (t *substrMatchTree) Matches(cp *contentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
 	if len(t.current) == 0 {
 		return false, true
 	}
@@ -508,9 +508,9 @@ func (t *substrMatchTree) Matches(cp ContentProvider, cost int, known map[MatchT
 	pruned := t.current[:0]
 	for _, m := range t.current {
 		if m.byteOffset == 0 && m.runeOffset > 0 {
-			m.byteOffset = cp.(*contentProvider).findOffset(m.fileName, m.runeOffset)
+			m.byteOffset = cp.findOffset(m.fileName, m.runeOffset)
 		}
-		if m.matchContent(cp.Data(m.fileName)) {
+		if m.matchContent(cp.data(m.fileName)) {
 			pruned = append(pruned, m)
 		}
 	}

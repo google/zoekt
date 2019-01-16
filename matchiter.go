@@ -109,7 +109,7 @@ func (t *noMatchTree) NextDoc() uint32 {
 
 func (t *noMatchTree) Prepare(uint32) {}
 
-func (t *noMatchTree) Matches(cp ContentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
+func (t *noMatchTree) Matches(cp *contentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
 	return false, true
 }
 
