@@ -519,12 +519,42 @@ func (t *substrMatchTree) Matches(cp ContentProvider, cost int, known map[MatchT
 	return len(t.current) > 0, true
 }
 
-func NewMatchTree(q query.Q, atom func(q query.Q) (MatchTree, error)) (MatchTree, error) {
+func (d *indexData) newMatchTree(q query.Q) (MatchTree, error) {
 	switch s := q.(type) {
+	case *query.Regexp:
+		subQ := query.RegexpToQuery(s.Regexp, ngramSize)
+		subQ = query.Map(subQ, func(q query.Q) query.Q {
+			if sub, ok := q.(*query.Substring); ok {
+				sub.FileName = s.FileName
+				sub.CaseSensitive = s.CaseSensitive
+			}
+			return q
+		})
+
+		subMT, err := d.newMatchTree(subQ)
+		if err != nil {
+			return nil, err
+		}
+
+		prefix := ""
+		if !s.CaseSensitive {
+			prefix = "(?i)"
+		}
+
+		tr := &regexpMatchTree{
+			regexp:   regexp.MustCompile(prefix + s.Regexp.String()),
+			fileName: s.FileName,
+		}
+
+		return &AndMatchTree{
+			Children: []MatchTree{
+				tr, &NoVisitMatchTree{subMT},
+			},
+		}, nil
 	case *query.And:
 		var r []MatchTree
 		for _, ch := range s.Children {
-			ct, err := NewMatchTree(ch, atom)
+			ct, err := d.newMatchTree(ch)
 			if err != nil {
 				return nil, err
 			}
@@ -534,7 +564,7 @@ func NewMatchTree(q query.Q, atom func(q query.Q) (MatchTree, error)) (MatchTree
 	case *query.Or:
 		var r []MatchTree
 		for _, ch := range s.Children {
-			ct, err := NewMatchTree(ch, atom)
+			ct, err := d.newMatchTree(ch)
 			if err != nil {
 				return nil, err
 			}
@@ -542,7 +572,7 @@ func NewMatchTree(q query.Q, atom func(q query.Q) (MatchTree, error)) (MatchTree
 		}
 		return &orMatchTree{r}, nil
 	case *query.Not:
-		ct, err := NewMatchTree(s.Child, atom)
+		ct, err := d.newMatchTree(s.Child)
 		return &notMatchTree{
 			child: ct,
 		}, err
@@ -552,7 +582,7 @@ func NewMatchTree(q query.Q, atom func(q query.Q) (MatchTree, error)) (MatchTree
 			break
 		}
 
-		ct, err := NewMatchTree(s.Child, atom)
+		ct, err := d.newMatchTree(s.Child)
 		if err != nil {
 			return nil, err
 		}
@@ -561,113 +591,64 @@ func NewMatchTree(q query.Q, atom func(q query.Q) (MatchTree, error)) (MatchTree
 			child: ct,
 		}, nil
 
+	case *query.Substring:
+		return d.newSubstringMatchTree(s)
+
+	case *query.Branch:
+		mask := uint64(0)
+		if s.Pattern == "HEAD" {
+			mask = 1
+		} else {
+			for nm, m := range d.branchIDs {
+				if strings.Contains(nm, s.Pattern) {
+					mask |= uint64(m)
+				}
+			}
+		}
+		return &branchQueryMatchTree{
+			mask:      mask,
+			fileMasks: d.fileBranchMasks,
+		}, nil
 	case *query.Const:
 		if s.Value {
 			return &bruteForceMatchTree{}, nil
 		} else {
 			return &noMatchTree{"const"}, nil
 		}
-	}
-
-	ct, err := atom(q)
-	if err != nil {
-		return nil, err
-	}
-	if ct == nil {
-		log.Panicf("type %T", q)
-	}
-	return ct, err
-}
-
-func (d *indexData) newMatchTree(q query.Q) (MatchTree, error) {
-	atom := func(q query.Q) (MatchTree, error) {
-		switch s := q.(type) {
-		case *query.Regexp:
-			subQ := query.RegexpToQuery(s.Regexp, ngramSize)
-			subQ = query.Map(subQ, func(q query.Q) query.Q {
-				if sub, ok := q.(*query.Substring); ok {
-					sub.FileName = s.FileName
-					sub.CaseSensitive = s.CaseSensitive
-				}
-				return q
-			})
-
-			subMT, err := d.newMatchTree(subQ)
-			if err != nil {
-				return nil, err
-			}
-
-			prefix := ""
-			if !s.CaseSensitive {
-				prefix = "(?i)"
-			}
-
-			tr := &regexpMatchTree{
-				regexp:   regexp.MustCompile(prefix + s.Regexp.String()),
-				fileName: s.FileName,
-			}
-
-			return &AndMatchTree{
-				Children: []MatchTree{
-					tr, &NoVisitMatchTree{subMT},
-				},
-			}, nil
-
-		case *query.Substring:
-			return d.newSubstringMatchTree(s)
-
-		case *query.Branch:
-			mask := uint64(0)
-			if s.Pattern == "HEAD" {
-				mask = 1
-			} else {
-				for nm, m := range d.branchIDs {
-					if strings.Contains(nm, s.Pattern) {
-						mask |= uint64(m)
-					}
-				}
-			}
-			return &branchQueryMatchTree{
-				mask:      mask,
-				fileMasks: d.fileBranchMasks,
-			}, nil
-		case *query.Language:
-			code, ok := d.metaData.LanguageMap[s.Language]
-			if !ok {
-				return &noMatchTree{"lang"}, nil
-			}
-			docs := make([]uint32, 0, len(d.languages))
-			for d, l := range d.languages {
-				if l == code {
-					docs = append(docs, uint32(d))
-				}
-			}
-			return &docMatchTree{
-				docs: docs,
-			}, nil
-
-		case *query.Symbol:
-			mt, err := d.newSubstringMatchTree(s.Atom)
-			if err != nil {
-				return nil, err
-			}
-
-			if _, ok := mt.(*regexpMatchTree); ok {
-				return nil, fmt.Errorf("regexps and short queries not implemented for symbol search")
-			}
-			subMT, ok := mt.(*substrMatchTree)
-			if !ok {
-				return nil, fmt.Errorf("found %T inside query.Symbol", mt)
-			}
-
-			subMT.matchIterator = d.newTrimByDocSectionIter(s.Atom, subMT.matchIterator)
-			return subMT, nil
+	case *query.Language:
+		code, ok := d.metaData.LanguageMap[s.Language]
+		if !ok {
+			return &noMatchTree{"lang"}, nil
 		}
-		log.Panicf("type %T", q)
-		return nil, nil
-	}
+		docs := make([]uint32, 0, len(d.languages))
+		for d, l := range d.languages {
+			if l == code {
+				docs = append(docs, uint32(d))
+			}
+		}
+		return &docMatchTree{
+			docs: docs,
+		}, nil
 
-	return NewMatchTree(q, atom)
+	case *query.Symbol:
+		mt, err := d.newSubstringMatchTree(s.Atom)
+		if err != nil {
+			return nil, err
+		}
+
+		if _, ok := mt.(*regexpMatchTree); ok {
+			return nil, fmt.Errorf("regexps and short queries not implemented for symbol search")
+		}
+		subMT, ok := mt.(*substrMatchTree)
+		if !ok {
+			return nil, fmt.Errorf("found %T inside query.Symbol", mt)
+		}
+
+		subMT.matchIterator = d.newTrimByDocSectionIter(s.Atom, subMT.matchIterator)
+		return subMT, nil
+	}
+	log.Panicf("type %T", q)
+	return nil, nil
 }
 
 func (d *indexData) newSubstringMatchTree(s *query.Substring) (MatchTree, error) {
