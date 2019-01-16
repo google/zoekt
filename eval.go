@@ -125,7 +125,7 @@ func (d *indexData) Search(ctx context.Context, q query.Q, opts *SearchOptions) 
 	}
 
 	totalAtomCount := 0
-	VisitMatchTree(mt, func(t MatchTree) {
+	visitMatchTree(mt, func(t matchTree) {
 		totalAtomCount++
 	})
 
@@ -146,7 +146,7 @@ nextFileMatch:
 		default:
 		}
 
-		nextDoc := mt.NextDoc()
+		nextDoc := mt.nextDoc()
 		if int(nextDoc) <= lastDoc {
 			nextDoc = uint32(lastDoc + 1)
 		}
@@ -162,18 +162,18 @@ nextFileMatch:
 		}
 
 		res.Stats.FilesConsidered++
-		mt.Prepare(nextDoc)
+		mt.prepare(nextDoc)
 
 		cp.setDocument(nextDoc)
 
-		known := make(map[MatchTree]bool)
-		for cost := CostMin; cost <= CostMax; cost++ {
-			v, ok := mt.Matches(cp, cost, known)
+		known := make(map[matchTree]bool)
+		for cost := costMin; cost <= costMax; cost++ {
+			v, ok := mt.matches(cp, cost, known)
 			if ok && !v {
 				continue nextFileMatch
 			}
 
-			if cost == CostMax && !ok {
+			if cost == costMax && !ok {
 				log.Panicf("did not decide. Repo %s, doc %d, known %v",
 					d.repoMetaData.Name, nextDoc, known)
 			}
@@ -205,7 +205,7 @@ nextFileMatch:
 		}
 
 		atomMatchCount := 0
-		VisitMatches(mt, known, func(mt MatchTree) {
+		visitMatches(mt, known, func(mt matchTree) {
 			atomMatchCount++
 		})
 		finalCands := gatherMatches(mt, known)
@@ -267,7 +267,7 @@ nextFileMatch:
 		addRepo(&res, v)
 	}
 
-	mt.UpdateStats(&res.Stats)
+	mt.updateStats(&res.Stats)
 	return &res, nil
 }
 
@@ -295,9 +295,9 @@ func (m sortByOffsetSlice) Less(i, j int) bool {
 // filename/content matches: if there are content matches, all
 // filename matches are trimmed from the result. The matches are
 // returned in document order and are non-overlapping.
-func gatherMatches(mt MatchTree, known map[MatchTree]bool) []*candidateMatch {
+func gatherMatches(mt matchTree, known map[matchTree]bool) []*candidateMatch {
 	var cands []*candidateMatch
-	VisitMatches(mt, known, func(mt MatchTree) {
+	visitMatches(mt, known, func(mt matchTree) {
 		if smt, ok := mt.(*substrMatchTree); ok {
 			cands = append(cands, smt.current...)
 		}
@@ -361,11 +361,11 @@ func (d *indexData) branchIndex(docID uint32) int {
 }
 
 // gatherBranches returns a list of branch names.
-func (d *indexData) gatherBranches(docID uint32, mt MatchTree, known map[MatchTree]bool) []string {
+func (d *indexData) gatherBranches(docID uint32, mt matchTree, known map[matchTree]bool) []string {
 	foundBranchQuery := false
 	var branches []string
 
-	VisitMatches(mt, known, func(mt MatchTree) {
+	visitMatches(mt, known, func(mt matchTree) {
 		bq, ok := mt.(*branchQueryMatchTree)
 		if ok {
 			foundBranchQuery = true

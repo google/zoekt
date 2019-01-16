@@ -85,7 +85,7 @@ func (m *candidateMatch) line(newlines []uint32, fileSize uint32) (lineNum, line
 
 // matchIterator is a docIterator that produces candidateMatches for a given document
 type matchIterator interface {
-	DocIterator
+	docIterator
 
 	candidates() []*candidateMatch
 }
@@ -103,13 +103,13 @@ func (t *noMatchTree) candidates() []*candidateMatch {
 	return nil
 }
 
-func (t *noMatchTree) NextDoc() uint32 {
+func (t *noMatchTree) nextDoc() uint32 {
 	return maxUInt32
 }
 
-func (t *noMatchTree) Prepare(uint32) {}
+func (t *noMatchTree) prepare(uint32) {}
 
-func (t *noMatchTree) Matches(cp *contentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
+func (t *noMatchTree) matches(cp *contentProvider, cost int, known map[matchTree]bool) (bool, bool) {
 	return false, true
 }
 
@@ -146,7 +146,7 @@ func nextFileIndex(offset, f uint32, ends []uint32) uint32 {
 	return f
 }
 
-func (i *ngramDocIterator) NextDoc() uint32 {
+func (i *ngramDocIterator) nextDoc() uint32 {
 	i.fileIdx = nextFileIndex(i.iter.first(), i.fileIdx, i.ends)
 	if i.fileIdx >= uint32(len(i.ends)) {
 		return maxUInt32
@@ -158,7 +158,7 @@ func (i *ngramDocIterator) String() string {
 	return fmt.Sprintf("ngram(L=%d,R=%d,%v)", i.leftPad, i.rightPad, i.iter)
 }
 
-func (i *ngramDocIterator) Prepare(nextDoc uint32) {
+func (i *ngramDocIterator) prepare(nextDoc uint32) {
 	var start uint32
 	if nextDoc > 0 {
 		start = i.ends[nextDoc-1]
@@ -169,7 +169,7 @@ func (i *ngramDocIterator) Prepare(nextDoc uint32) {
 	i.fileIdx = nextDoc
 }
 
-func (i *ngramDocIterator) UpdateStats(s *Stats) {
+func (i *ngramDocIterator) updateStats(s *Stats) {
 	i.iter.updateStats(s)
 	s.NgramMatches += i.matchCount
 }
@@ -230,8 +230,8 @@ func (d *indexData) newTrimByDocSectionIter(q *query.Substring, iter matchIterat
 	}
 }
 
-func (i *trimBySectionMatchIter) Prepare(doc uint32) {
-	i.matchIterator.Prepare(doc)
+func (i *trimBySectionMatchIter) prepare(doc uint32) {
+	i.matchIterator.prepare(doc)
 	i.doc = doc
 
 	var fileStart uint32
