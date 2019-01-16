@@ -29,8 +29,6 @@ import (
 	"github.com/google/zoekt/shards"
 )
 
-const CONTEXT = 20
-
 func displayMatches(files []zoekt.FileMatch, pat string) {
 	for _, f := range files {
 		for _, m := range f.LineMatches {
@@ -119,8 +117,8 @@ func main() {
 		t := time.Now()
 		pprof.StartCPUProfile(f)
 		for {
-			sres, err = searcher.Search(context.Background(), query, &sOpts)
-			if time.Now().Sub(t) > *profileTime {
+			sres, _ = searcher.Search(context.Background(), query, &sOpts)
+			if time.Since(t) > *profileTime {
 				break
 			}
 		}

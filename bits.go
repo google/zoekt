@@ -53,36 +53,6 @@ func toLower(in []byte) []byte {
 	return out
 }
 
-func isASCII(in []byte) bool {
-	for len(in) > 0 {
-		_, sz := utf8.DecodeRune(in)
-		if sz > 1 {
-			return false
-		}
-		in = in[sz:]
-	}
-	return true
-}
-
-// compare 'lower' and 'mixed', where 'lower' is thought to be the
-// needle.
-func caseFoldingEqualsASCII(lower, mixed []byte) bool {
-	if len(lower) > len(mixed) {
-		return false
-	}
-	for i, c := range lower {
-		d := mixed[i]
-		if d >= 'A' && d <= 'Z' {
-			d = d - 'A' + 'a'
-		}
-
-		if d != c {
-			return false
-		}
-	}
-	return true
-}
-
 // compare 'lower' and 'mixed', where lower is the needle. 'mixed' may
 // be larger than 'lower'. Returns whether there was a match, and if
 // yes, the byte size of the match.
@@ -139,10 +109,6 @@ type runeNgramOff struct {
 	byteSize uint32 // size of ngram
 	byteOff  uint32
 	runeOff  uint32
-}
-
-func (r runeNgramOff) byteEnd() uint32 {
-	return r.byteOff + r.byteSize
 }
 
 func splitNGrams(str []byte) []runeNgramOff {

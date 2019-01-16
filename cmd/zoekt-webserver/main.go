@@ -80,7 +80,7 @@ func loadTemplates(tpl *template.Template, dir string) error {
 		base := filepath.Base(fn)
 		base = strings.TrimSuffix(base, templateExtension)
 		if _, err := tpl.New(base).Parse(string(content)); err != nil {
-			return fmt.Errorf("Parse(%s): %v", fn, err)
+			return fmt.Errorf("template.Parse(%s): %v", fn, err)
 		}
 	}
 	return nil
@@ -253,7 +253,7 @@ func watchdog(dt time.Duration, addr string) {
 	}
 	tick := time.NewTicker(dt)
 
-	for _ = range tick.C {
+	for range tick.C {
 		err := watchdogOnce(context.Background(), client, addr)
 		if err != nil {
 			log.Panicf("watchdog: %v", err)

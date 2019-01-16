@@ -160,7 +160,6 @@ func TestUpdate(t *testing.T) {
 		if err := os.Remove(fn); err != nil {
 			t.Fatalf("Remove(%s): %v", fn, err)
 		}
-		break
 	}
 
 	time.Sleep(100 * time.Millisecond)

@@ -352,9 +352,9 @@ func flatten(q Q) (Q, bool) {
 }
 
 func mapQueryList(qs []Q, f func(Q) Q) []Q {
-	var neg []Q
-	for _, sub := range qs {
-		neg = append(neg, Map(sub, f))
+	neg := make([]Q, len(qs))
+	for i, sub := range qs {
+		neg[i] = Map(sub, f)
 	}
 	return neg
 }

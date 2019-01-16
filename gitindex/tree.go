@@ -42,7 +42,6 @@ type repoWalker struct {
 
 	// Path => commit SHA1
 	subRepoVersions map[string]plumbing.Hash
-	err             error
 	repoCache       *RepoCache
 
 	// If set, don't gasp on missing submodules.
@@ -52,7 +51,7 @@ type repoWalker struct {
 // subURL returns the URL for a submodule.
 func (w *repoWalker) subURL(relURL string) (*url.URL, error) {
 	if w.repoURL == nil {
-		return nil, fmt.Errorf("no URL for base repo.")
+		return nil, fmt.Errorf("no URL for base repo")
 	}
 	if strings.HasPrefix(relURL, "../") {
 		u := *w.repoURL

@@ -275,9 +275,7 @@ func main() {
 			SubRepositoryPath: k.SubRepoPath,
 		}
 
-		for _, br := range branches {
-			doc.Branches = append(doc.Branches, br)
-		}
+		doc.Branches = append(doc.Branches, branches...)
 		if err := builder.Add(doc); err != nil {
 			log.Fatalf("Add(%s): %v", doc.Name, err)
 		}
@@ -319,7 +317,7 @@ func getManifest(repo *git.Repository, branch, path string) (*manifest.Manifest,
 	}
 	defer r.Close()
 
-	content, err := ioutil.ReadAll(r)
+	content, _ := ioutil.ReadAll(r)
 	return manifest.Parse(content)
 }
 

@@ -137,7 +137,7 @@ func (ss *shardedSearcher) Search(ctx context.Context, q query.Q, opts *zoekt.Se
 	}
 	defer ss.runlock()
 	tr.LazyPrintf("acquired lock")
-	aggregate.Wait = time.Now().Sub(start)
+	aggregate.Wait = time.Since(start)
 	start = time.Now()
 
 	// TODO - allow for canceling the query.
@@ -189,7 +189,7 @@ func (ss *shardedSearcher) Search(ctx context.Context, q query.Q, opts *zoekt.Se
 			}
 		}
 
-		if cancel != nil && aggregate.Stats.MatchCount > opts.TotalMaxMatchCount {
+		if cancel != nil && opts.TotalMaxMatchCount > 0 && aggregate.Stats.MatchCount > opts.TotalMaxMatchCount {
 			cancel()
 			cancel = nil
 		}
@@ -207,7 +207,7 @@ func (ss *shardedSearcher) Search(ctx context.Context, q query.Q, opts *zoekt.Se
 		}
 	}
 
-	aggregate.Duration = time.Now().Sub(start)
+	aggregate.Duration = time.Since(start)
 	return aggregate, nil
 }
 

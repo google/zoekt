@@ -307,7 +307,7 @@ const statsStaleNess = 30 * time.Second
 func (s *Server) fetchStats(ctx context.Context) (*zoekt.RepoStats, error) {
 	s.lastStatsMu.Lock()
 	stats := s.lastStats
-	if time.Now().Sub(s.lastStatsTS) > statsStaleNess {
+	if time.Since(s.lastStatsTS) > statsStaleNess {
 		stats = nil
 	}
 	s.lastStatsMu.Unlock()
@@ -349,7 +349,7 @@ func (s *Server) serveSearchBoxErr(w http.ResponseWriter, r *http.Request) error
 		},
 		Stats:   stats,
 		Version: s.Version,
-		Uptime:  time.Now().Sub(s.startTime),
+		Uptime:  time.Since(s.startTime),
 	}
 
 	d.Last.Query = r.URL.Query().Get("q")
@@ -388,7 +388,7 @@ func (s *Server) serveAboutErr(w http.ResponseWriter, r *http.Request) error {
 	d := SearchBoxInput{
 		Stats:   stats,
 		Version: s.Version,
-		Uptime:  time.Now().Sub(s.startTime),
+		Uptime:  time.Since(s.startTime),
 	}
 
 	var buf bytes.Buffer

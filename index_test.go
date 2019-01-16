@@ -1225,7 +1225,7 @@ func TestMatchNewline(t *testing.T) {
 	sres := searchForTest(t, b, &query.Regexp{Regexp: re, CaseSensitive: true})
 	if len(sres.Files) != 1 {
 		t.Errorf("got %v, wanted 1 matches", sres.Files)
-	} else if l := sres.Files[0].LineMatches[0].Line; bytes.Compare(l, content) != 0 {
+	} else if l := sres.Files[0].LineMatches[0].Line; !bytes.Equal(l, content) {
 		t.Errorf("got match line %q, want %q", l, content)
 	}
 }
@@ -1334,7 +1334,6 @@ func TestUnicodeNonCoverContent(t *testing.T) {
 }
 
 const kelvinCodePoint = 8490
-const kelvinUTFSize = 3
 
 func TestUnicodeVariableLength(t *testing.T) {
 	lower := 'k'

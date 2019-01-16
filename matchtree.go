@@ -34,9 +34,6 @@ type docIterator interface {
 	// prepares for evaluating the given doc. The argument is
 	// strictly increasing over time.
 	prepare(nextDoc uint32)
-
-	// collects statistics.
-	updateStats(stats *Stats)
 }
 
 const costConst = 0
@@ -146,41 +143,6 @@ type branchQueryMatchTree struct {
 	// mutable
 	firstDone bool
 	docID     uint32
-}
-
-func (t *noMatchTree) updateStats(s *Stats) {
-}
-
-func (t *bruteForceMatchTree) updateStats(s *Stats) {
-}
-
-func (t *docMatchTree) updateStats(s *Stats) {
-}
-
-func (t *andMatchTree) updateStats(s *Stats) {
-	for _, c := range t.children {
-		c.updateStats(s)
-	}
-}
-
-func (t *orMatchTree) updateStats(s *Stats) {
-	for _, c := range t.children {
-		c.updateStats(s)
-	}
-}
-
-func (t *notMatchTree) updateStats(s *Stats) {
-	t.child.updateStats(s)
-}
-
-func (t *fileNameMatchTree) updateStats(s *Stats) {
-	t.child.updateStats(s)
-}
-
-func (t *branchQueryMatchTree) updateStats(s *Stats) {
-}
-
-func (t *regexpMatchTree) updateStats(s *Stats) {
 }
 
 // all prepare methods
@@ -342,7 +304,8 @@ func (t *branchQueryMatchTree) String() string {
 	return fmt.Sprintf("branch(%x)", t.mask)
 }
 
-// Visit the matchTree. Skips noVisitMatchTree
+// visitMatches visits all atoms in matchTree. Note: This visits
+// noVisitMatchTree. For collecting matches use visitMatches.
 func visitMatchTree(t matchTree, f func(matchTree)) {
 	switch s := t.(type) {
 	case *andMatchTree:
@@ -364,6 +327,8 @@ func visitMatchTree(t matchTree, f func(matchTree)) {
 	}
 }
 
+// visitMatches visits all atoms which can contribute matches. Note: This
+// skips noVisitMatchTree.
 func visitMatches(t matchTree, known map[matchTree]bool, f func(matchTree)) {
 	switch s := t.(type) {
 	case *andMatchTree:
@@ -386,24 +351,6 @@ func visitMatches(t matchTree, known map[matchTree]bool, f func(matchTree)) {
 	default:
 		f(s)
 	}
-}
-
-func visitSubtreeMatches(t matchTree, known map[matchTree]bool, f func(*substrMatchTree)) {
-	visitMatches(t, known, func(mt matchTree) {
-		st, ok := mt.(*substrMatchTree)
-		if ok {
-			f(st)
-		}
-	})
-}
-
-func visitRegexMatches(t matchTree, known map[matchTree]bool, f func(*regexpMatchTree)) {
-	visitMatches(t, known, func(mt matchTree) {
-		st, ok := mt.(*regexpMatchTree)
-		if ok {
-			f(st)
-		}
-	})
 }
 
 // all matches() methods.
@@ -453,19 +400,25 @@ func (t *branchQueryMatchTree) matches(cp *contentProvider, cost int, known map[
 }
 
 func (t *regexpMatchTree) matches(cp *contentProvider, cost int, known map[matchTree]bool) (bool, bool) {
+	if t.reEvaluated {
+		return len(t.found) > 0, true
+	}
+
 	if cost < costRegexp {
 		return false, false
 	}
 
 	idxs := t.regexp.FindAllIndex(cp.data(t.fileName), -1)
-	t.found = make([]*candidateMatch, 0, len(idxs))
+	found := t.found[:0]
 	for _, idx := range idxs {
-		t.found = append(t.found, &candidateMatch{
+		found = append(found, &candidateMatch{
 			byteOffset:  uint32(idx[0]),
 			byteMatchSz: uint32(idx[1] - idx[0]),
 			fileName:    t.fileName,
 		})
 	}
+	t.found = found
+	t.reEvaluated = true
 
 	return len(t.found) > 0, true
 }
@@ -493,6 +446,10 @@ func (t *fileNameMatchTree) matches(cp *contentProvider, cost int, known map[mat
 }
 
 func (t *substrMatchTree) matches(cp *contentProvider, cost int, known map[matchTree]bool) (bool, bool) {
+	if t.contEvaluated {
+		return len(t.current) > 0, true
+	}
+
 	if len(t.current) == 0 {
 		return false, true
 	}
@@ -515,11 +472,12 @@ func (t *substrMatchTree) matches(cp *contentProvider, cost int, known map[match
 		}
 	}
 	t.current = pruned
+	t.contEvaluated = true
 
 	return len(t.current) > 0, true
 }
 
-func (d *indexData) newMatchTree(q query.Q, stats *Stats) (matchTree, error) {
+func (d *indexData) newMatchTree(q query.Q) (matchTree, error) {
 	switch s := q.(type) {
 	case *query.Regexp:
 		subQ := query.RegexpToQuery(s.Regexp, ngramSize)
@@ -531,7 +489,7 @@ func (d *indexData) newMatchTree(q query.Q, stats *Stats) (matchTree, error) {
 			return q
 		})
 
-		subMT, err := d.newMatchTree(subQ, stats)
+		subMT, err := d.newMatchTree(subQ)
 		if err != nil {
 			return nil, err
 		}
@@ -554,7 +512,7 @@ func (d *indexData) newMatchTree(q query.Q, stats *Stats) (matchTree, error) {
 	case *query.And:
 		var r []matchTree
 		for _, ch := range s.Children {
-			ct, err := d.newMatchTree(ch, stats)
+			ct, err := d.newMatchTree(ch)
 			if err != nil {
 				return nil, err
 			}
@@ -564,7 +522,7 @@ func (d *indexData) newMatchTree(q query.Q, stats *Stats) (matchTree, error) {
 	case *query.Or:
 		var r []matchTree
 		for _, ch := range s.Children {
-			ct, err := d.newMatchTree(ch, stats)
+			ct, err := d.newMatchTree(ch)
 			if err != nil {
 				return nil, err
 			}
@@ -572,7 +530,7 @@ func (d *indexData) newMatchTree(q query.Q, stats *Stats) (matchTree, error) {
 		}
 		return &orMatchTree{r}, nil
 	case *query.Not:
-		ct, err := d.newMatchTree(s.Child, stats)
+		ct, err := d.newMatchTree(s.Child)
 		return &notMatchTree{
 			child: ct,
 		}, err
@@ -582,7 +540,7 @@ func (d *indexData) newMatchTree(q query.Q, stats *Stats) (matchTree, error) {
 			break
 		}
 
-		ct, err := d.newMatchTree(s.Child, stats)
+		ct, err := d.newMatchTree(s.Child)
 		if err != nil {
 			return nil, err
 		}
@@ -592,7 +550,7 @@ func (d *indexData) newMatchTree(q query.Q, stats *Stats) (matchTree, error) {
 		}, nil
 
 	case *query.Substring:
-		return d.newSubstringMatchTree(s, stats)
+		return d.newSubstringMatchTree(s)
 
 	case *query.Branch:
 		mask := uint64(0)
@@ -631,7 +589,7 @@ func (d *indexData) newMatchTree(q query.Q, stats *Stats) (matchTree, error) {
 		}, nil
 
 	case *query.Symbol:
-		mt, err := d.newSubstringMatchTree(s.Atom, stats)
+		mt, err := d.newSubstringMatchTree(s.Atom)
 		if err != nil {
 			return nil, err
 		}
@@ -651,7 +609,7 @@ func (d *indexData) newMatchTree(q query.Q, stats *Stats) (matchTree, error) {
 	return nil, nil
 }
 
-func (d *indexData) newSubstringMatchTree(s *query.Substring, stats *Stats) (matchTree, error) {
+func (d *indexData) newSubstringMatchTree(s *query.Substring) (matchTree, error) {
 	st := &substrMatchTree{
 		query:         s,
 		caseSensitive: s.CaseSensitive,

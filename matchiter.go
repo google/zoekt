@@ -42,7 +42,7 @@ type candidateMatch struct {
 // Matches content against the substring, and populates byteMatchSz on success
 func (m *candidateMatch) matchContent(content []byte) bool {
 	if m.caseSensitive {
-		comp := bytes.Compare(m.substrBytes, content[m.byteOffset:m.byteOffset+uint32(len(m.substrBytes))]) == 0
+		comp := bytes.Equal(m.substrBytes, content[m.byteOffset:m.byteOffset+uint32(len(m.substrBytes))])
 
 		m.byteMatchSz = uint32(len(m.substrBytes))
 		return comp
@@ -88,6 +88,7 @@ type matchIterator interface {
 	docIterator
 
 	candidates() []*candidateMatch
+	updateStats(*Stats)
 }
 
 // noMatchTree is both matchIterator and matchTree that matches nothing.
@@ -112,6 +113,8 @@ func (t *noMatchTree) prepare(uint32) {}
 func (t *noMatchTree) matches(cp *contentProvider, cost int, known map[matchTree]bool) (bool, bool) {
 	return false, true
 }
+
+func (t *noMatchTree) updateStats(*Stats) {}
 
 func (m *candidateMatch) String() string {
 	return fmt.Sprintf("%d:%d", m.file, m.runeOffset)
