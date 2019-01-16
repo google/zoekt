@@ -3,10 +3,10 @@ language: go
 sudo: false
 
 go:
-    - 1.6
-    - 1.7
-    - 1.8
-    - 1.9
+  - "1.11.x"
+  - "1.10.x"
+  - "1.9.x"
+  - "1.8.x"
 
 before_install:
   - make deps

@@ -26,6 +26,8 @@ go-gerrit is a [Go(lang)](https://golang.org/) client library for accessing the 
 
 ## Installation
 
+go-gerrit requires Go version 1.8 or greater.
+
 It is go gettable ...
 
 ```sh
@@ -45,8 +47,8 @@ $ go test -v
 
 ```sh
 $ cd $GOPATH/src/github.com/andygrunwald/go-gerrit
-$ make 
-``` 
+$ make
+```
 
 ## API / Usage
 
