@@ -34,6 +34,9 @@ type DocIterator interface {
 	// prepares for evaluating the given doc. The argument is
 	// strictly increasing over time.
 	Prepare(nextDoc uint32)
+
+	// collects statistics.
+	UpdateStats(stats *Stats)
 }
 
 const costConst = 0
@@ -143,6 +146,41 @@ type branchQueryMatchTree struct {
 	// mutable
 	firstDone bool
 	docID     uint32
+}
+
+func (t *noMatchTree) UpdateStats(s *Stats) {
+}
+
+func (t *bruteForceMatchTree) UpdateStats(s *Stats) {
+}
+
+func (t *docMatchTree) UpdateStats(s *Stats) {
+}
+
+func (t *AndMatchTree) UpdateStats(s *Stats) {
+	for _, c := range t.Children {
+		c.UpdateStats(s)
+	}
+}
+
+func (t *orMatchTree) UpdateStats(s *Stats) {
+	for _, c := range t.children {
+		c.UpdateStats(s)
+	}
+}
+
+func (t *notMatchTree) UpdateStats(s *Stats) {
+	t.child.UpdateStats(s)
+}
+
+func (t *fileNameMatchTree) UpdateStats(s *Stats) {
+	t.child.UpdateStats(s)
+}
+
+func (t *branchQueryMatchTree) UpdateStats(s *Stats) {
+}
+
+func (t *regexpMatchTree) UpdateStats(s *Stats) {
 }
 
 // all prepare methods
