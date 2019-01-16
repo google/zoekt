@@ -7,6 +7,7 @@ require (
 	github.com/google/go-github v17.0.0+incompatible
 	github.com/google/go-querystring v1.0.0 // indirect
 	github.com/google/slothfs v0.0.0-20170112234537-ecdd255f653d
+	github.com/hashicorp/go-retryablehttp v0.5.1
 	github.com/keegancsmith/rpc v1.1.0
 	github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348
 	github.com/mitchellh/mapstructure v1.1.2 // indirect

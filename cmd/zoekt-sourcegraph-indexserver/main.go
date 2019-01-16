@@ -24,6 +24,7 @@ import (
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
+	"github.com/hashicorp/go-retryablehttp"
 )
 
 // Server is the main functionality of zoekt-sourcegraph-indexserver. It
@@ -241,8 +242,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func listRepos(root *url.URL) ([]string, error) {
+	c := retryablehttp.NewClient()
+	c.Logger = debug
+
 	u := root.ResolveReference(&url.URL{Path: "/.internal/repos/list"})
-	resp, err := http.Post(u.String(), "application/json; charset=utf8", bytes.NewReader([]byte(`{"Enabled": true, "Index": true}`)))
+	resp, err := c.Post(u.String(), "application/json; charset=utf8", bytes.NewReader([]byte(`{"Enabled": true, "Index": true}`)))
 	if err != nil {
 		return nil, err
 	}
