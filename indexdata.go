@@ -212,7 +212,7 @@ func (d *indexData) iterateNgrams(query *query.Substring) (*ngramIterationResult
 
 		if freq == 0 {
 			return &ngramIterationResults{
-				matchIterator: &noMatchTree{matchtree.None{
+				matchIterator: &noMatchTree{matchtree.NoMatchTree{
 					Why: "freq=0",
 				}},
 			}, nil

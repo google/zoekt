@@ -81,26 +81,19 @@ type MatchTree interface {
 	Matches(cp ContentProvider, cost int, known map[MatchTree]bool) (match bool, sure bool)
 }
 
-// All is a MatchTree which matches every document.
-type All struct {
+type BruteForceMatchTree struct {
 	// mutable
 	firstDone bool
 	docID     uint32
 }
 
-// None is a MatchTree that matches nothing.
-type None struct {
+// NoMatchTree is a MatchTree that matches nothing.
+type NoMatchTree struct {
 	Why string
 }
 
-// And returns a MatchTree that matches a document only if all the children
-// do.
-func And(children ...MatchTree) MatchTree {
-	return &and{children: children}
-}
-
-type and struct {
-	children []MatchTree
+type AndMatchTree struct {
+	Children []MatchTree
 }
 
 type orMatchTree struct {
@@ -115,22 +108,22 @@ type fileNameMatchTree struct {
 	child MatchTree
 }
 
-// NoVisit doesn't get visited when collecting matches.
-type NoVisit struct {
+// Don't visit this subtree for collecting matches.
+type NoVisitMatchTree struct {
 	MatchTree
 }
 
 // all prepare methods
 
-func (t *All) Prepare(doc uint32) {
+func (t *BruteForceMatchTree) Prepare(doc uint32) {
 	t.docID = doc
 	t.firstDone = true
 }
 
-func (t *None) Prepare(uint32) {}
+func (t *NoMatchTree) Prepare(uint32) {}
 
-func (t *and) Prepare(doc uint32) {
-	for _, c := range t.children {
+func (t *AndMatchTree) Prepare(doc uint32) {
+	for _, c := range t.Children {
 		c.Prepare(doc)
 	}
 }
@@ -151,20 +144,20 @@ func (t *fileNameMatchTree) Prepare(doc uint32) {
 
 // nextDoc
 
-func (t *All) NextDoc() uint32 {
+func (t *BruteForceMatchTree) NextDoc() uint32 {
 	if !t.firstDone {
 		return 0
 	}
 	return t.docID + 1
 }
 
-func (t *None) NextDoc() uint32 {
+func (t *NoMatchTree) NextDoc() uint32 {
 	return maxUInt32
 }
 
-func (t *and) NextDoc() uint32 {
+func (t *AndMatchTree) NextDoc() uint32 {
 	var max uint32
-	for _, c := range t.children {
+	for _, c := range t.Children {
 		m := c.NextDoc()
 		if m > max {
 			max = m
@@ -196,16 +189,16 @@ func (t *fileNameMatchTree) NextDoc() uint32 {
 
 // all String methods
 
-func (t *All) String() string {
+func (t *BruteForceMatchTree) String() string {
 	return "all"
 }
 
-func (t *None) String() string {
+func (t *NoMatchTree) String() string {
 	return fmt.Sprintf("not(%q)", t.Why)
 }
 
-func (t *and) String() string {
-	return fmt.Sprintf("and%v", t.children)
+func (t *AndMatchTree) String() string {
+	return fmt.Sprintf("and%v", t.Children)
 }
 
 func (t *orMatchTree) String() string {
@@ -220,18 +213,18 @@ func (t *fileNameMatchTree) String() string {
 	return fmt.Sprintf("f(%v)", t.child)
 }
 
-// VisitMatchTree visits all atoms.
+// Visit the matchTree. Skips noVisitMatchTree
 func VisitMatchTree(t MatchTree, f func(MatchTree)) {
 	switch s := t.(type) {
-	case *and:
-		for _, ch := range s.children {
+	case *AndMatchTree:
+		for _, ch := range s.Children {
 			VisitMatchTree(ch, f)
 		}
 	case *orMatchTree:
 		for _, ch := range s.children {
 			VisitMatchTree(ch, f)
 		}
-	case *NoVisit:
+	case *NoVisitMatchTree:
 		VisitMatchTree(s.MatchTree, f)
 	case *notMatchTree:
 		VisitMatchTree(s.child, f)
@@ -242,12 +235,10 @@ func VisitMatchTree(t MatchTree, f func(MatchTree)) {
 	}
 }
 
-// VisitMatches visits atoms which contains matches for collection. Does not
-// visit NoVisit.
 func VisitMatches(t MatchTree, known map[MatchTree]bool, f func(MatchTree)) {
 	switch s := t.(type) {
-	case *and:
-		for _, ch := range s.children {
+	case *AndMatchTree:
+		for _, ch := range s.Children {
 			if known[ch] {
 				VisitMatches(ch, known, f)
 			}
@@ -259,7 +250,7 @@ func VisitMatches(t MatchTree, known map[MatchTree]bool, f func(MatchTree)) {
 			}
 		}
 	case *notMatchTree:
-	case *NoVisit:
+	case *NoVisitMatchTree:
 		// don't collect into negative trees.
 	case *fileNameMatchTree:
 		// We will just gather the filename if we do not visit this tree.
@@ -283,18 +274,18 @@ func EvalMatchTree(cp ContentProvider, cost int, known map[MatchTree]bool, mt Ma
 
 // all matches() methods.
 
-func (t *All) Matches(cp ContentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
+func (t *BruteForceMatchTree) Matches(cp ContentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
 	return true, true
 }
 
-func (t *None) Matches(cp ContentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
+func (t *NoMatchTree) Matches(cp ContentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
 	return false, true
 }
 
-func (t *and) Matches(cp ContentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
+func (t *AndMatchTree) Matches(cp ContentProvider, cost int, known map[MatchTree]bool) (bool, bool) {
 	sure := true
 
-	for _, ch := range t.children {
+	for _, ch := range t.Children {
 		v, ok := EvalMatchTree(cp, cost, known, ch)
 		if ok && !v {
 			return false, true
@@ -343,7 +334,7 @@ func NewMatchTree(q query.Q, atom func(q query.Q) (MatchTree, error)) (MatchTree
 			}
 			r = append(r, ct)
 		}
-		return &and{r}, nil
+		return &AndMatchTree{r}, nil
 	case *query.Or:
 		var r []MatchTree
 		for _, ch := range s.Children {
@@ -376,9 +367,9 @@ func NewMatchTree(q query.Q, atom func(q query.Q) (MatchTree, error)) (MatchTree
 
 	case *query.Const:
 		if s.Value {
-			return &All{}, nil
+			return &BruteForceMatchTree{}, nil
 		} else {
-			return &None{"const"}, nil
+			return &NoMatchTree{"const"}, nil
 		}
 	}
 
