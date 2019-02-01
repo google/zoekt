@@ -75,7 +75,9 @@ type Options struct {
 	MemProfile string
 }
 
-// Builder manages (parallel) creation of uniformly sized shards.
+// Builder manages (parallel) creation of uniformly sized shards. The
+// builder buffers up documents until it collects enough documents and
+// then builds a shard and writes.
 type Builder struct {
 	opts     Options
 	throttle chan int
@@ -211,6 +213,7 @@ func NewBuilder(opts Options) (*Builder, error) {
 	return b, nil
 }
 
+// AddFile is a convenience wrapper for the Add method
 func (b *Builder) AddFile(name string, content []byte) error {
 	return b.Add(zoekt.Document{Name: name, Content: content})
 }
@@ -236,6 +239,8 @@ func (b *Builder) Add(doc zoekt.Document) error {
 	return nil
 }
 
+// Finish creates a last shard from the buffered documents, and clears
+// stale shards from previous runs
 func (b *Builder) Finish() error {
 	b.flush()
 	b.building.Wait()
@@ -487,4 +492,5 @@ func (b *Builder) writeShard(fn string, ib *zoekt.IndexBuilder) (*finishedShard,
 	return &finishedShard{f.Name(), fn}, nil
 }
 
+// umask holds the Umask of the current process
 var umask os.FileMode
