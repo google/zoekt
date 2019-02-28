@@ -68,14 +68,15 @@ Zoekt comes with a small service management program:
 
     cat << EOF > config.json
     [{"GithubUser": "username"},
+     {"GithubOrg": "org"},
      {"GitilesURL": "https://gerrit.googlesource.com", "Name": "zoekt" }
     ]
     EOF
 
     $GOPATH/bin/zoekt-server -mirror_config config.json
 
-This will mirror all repos under 'github.com/username' as well as the
-'zoekt' repository. It will index the repositories.
+This will mirror all repos under 'github.com/username', 'github.com/org', as
+well as the 'zoekt' repository. It will index the repositories.
 
 It takes care of fetching and indexing new data and cleaning up logfiles.
 
