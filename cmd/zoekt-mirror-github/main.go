@@ -161,10 +161,11 @@ func deleteStaleRepos(destDir string, filter *gitindex.Filter, repos []*github.R
 	} else {
 		return nil
 	}
-	u, err := url.Parse(baseURL + user)
+	u, err := url.Parse(baseURL)
 	if err != nil {
 		return err
 	}
+	u.Path = user
 
 	paths, err := gitindex.ListRepos(destDir, u)
 	if err != nil {
