@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Command zoekt-webserver responds to search queries, using an index generated
+// by another program such as zoekt-indexserver.
+
 package main
 
 import (
