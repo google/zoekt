@@ -200,6 +200,12 @@ var TemplateText = map[string]string{
 <html>
 {{template "head"}}
 <title>Results for {{.QueryStr}}</title>
+<script>
+  function zoektAddQ(atom) {
+      window.location.href = "/search?q=" + escape("{{.QueryStr}}" + " " + atom) +
+	  "&" + "num=" + {{.Last.Num}};
+  }
+</script>
 <body id="results">
   {{template "navbar" .Last}}
   <div class="container-fluid container-results">
@@ -220,7 +226,9 @@ var TemplateText = map[string]string{
             <small>
               {{.Repo}}:{{.FileName}}</a>:
               <span style="font-weight: normal">[ {{if .Branches}}{{range .Branches}}<span class="label label-default">{{.}}</span>,{{end}}{{end}} ]</span>
-              {{if .Language}}<span class="label label-primary">{{.Language}}</span>{{end}}
+              {{if .Language}}<button
+                   title="restrict search to files written in {{.Language}}"
+                   onclick="zoektAddQ('lang:{{.Language}}')" class="label label-primary">language {{.Language}}</button></span>{{end}}
               {{if .DuplicateID}}<a class="label label-dup" href="#{{.DuplicateID}}">Duplicate result</a>{{end}}
             </small>
           </th>
