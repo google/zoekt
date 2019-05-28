@@ -158,7 +158,7 @@ func executeMirror(cfg []ConfigEntry, repoDir string, pendingRepos chan<- string
 		var cmd *exec.Cmd
 		if c.GithubUser != "" || c.GithubOrg != "" {
 			cmd = exec.Command("zoekt-mirror-github",
-				"-dest", repoDir)
+				"-dest", repoDir, "-delete")
 			if c.GitHubURL != "" {
 				cmd.Args = append(cmd.Args, "-url", c.GitHubURL)
 			}
