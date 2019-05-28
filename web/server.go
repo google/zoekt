@@ -443,6 +443,19 @@ func (s *Server) serveListReposErr(q query.Q, qStr string, w http.ResponseWriter
 		Stats: aggregate,
 	}
 
+	numStr := qvals.Get("num")
+	num, err := strconv.Atoi(numStr)
+	if err != nil || num <= 0 {
+		num = 0
+	}
+	if num > 0 {
+		if num > len(repos.Repos) {
+			num = len(repos.Repos)
+		}
+
+		repos.Repos = repos.Repos[:num]
+	}
+
 	for _, r := range repos.Repos {
 		t := s.getTemplate(r.Repository.CommitURLTemplate)
 
