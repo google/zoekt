@@ -181,10 +181,9 @@ func deleteStaleRepos(destDir string, filter *gitindex.Filter, repos []*github.R
 
 		names[filepath.Join(u.Host, u.Path+".git")] = true
 	}
-
 	var toDelete []string
 	for _, p := range paths {
-		if filter.Include(p) && !names[p] {
+		if filter.Include(filepath.Base(p)) && !names[p] {
 			toDelete = append(toDelete, p)
 		}
 	}
