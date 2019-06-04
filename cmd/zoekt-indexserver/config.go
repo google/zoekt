@@ -30,8 +30,9 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-type configEntry struct {
+type ConfigEntry struct {
 	GithubUser             string
+	GithubOrg              string
 	BitBucketServerProject string
 	GitHubURL              string
 	GitilesURL             string
@@ -40,12 +41,13 @@ type configEntry struct {
 	ProjectType            string
 	Name                   string
 	Exclude                string
+	GitLabURL              string
 }
 
-func randomize(entries []configEntry) []configEntry {
+func randomize(entries []ConfigEntry) []ConfigEntry {
 	perm := rand.Perm(len(entries))
 
-	var shuffled []configEntry
+	var shuffled []ConfigEntry
 	for _, i := range perm {
 		shuffled = append(shuffled, entries[i])
 	}
@@ -58,7 +60,7 @@ func isHTTP(u string) bool {
 	return err == nil && (asURL.Scheme == "http" || asURL.Scheme == "https")
 }
 
-func readConfigURL(u string) ([]configEntry, error) {
+func readConfigURL(u string) ([]ConfigEntry, error) {
 	var body []byte
 	var readErr error
 
@@ -78,7 +80,7 @@ func readConfigURL(u string) ([]configEntry, error) {
 		return nil, readErr
 	}
 
-	var result []configEntry
+	var result []ConfigEntry
 	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, err
 	}
@@ -128,7 +130,7 @@ func periodicMirrorFile(repoDir string, opts *Options, pendingRepos chan<- strin
 		}
 	}
 
-	var lastCfg []configEntry
+	var lastCfg []ConfigEntry
 	for {
 		cfg, err := readConfigURL(opts.mirrorConfigFile)
 		if err != nil {
@@ -147,21 +149,23 @@ func periodicMirrorFile(repoDir string, opts *Options, pendingRepos chan<- strin
 	}
 }
 
-func executeMirror(cfg []configEntry, repoDir string, pendingRepos chan<- string) {
+func executeMirror(cfg []ConfigEntry, repoDir string, pendingRepos chan<- string) {
 	// Randomize the ordering in which we query
 	// things. This is to ensure that quota limits don't
 	// always hit the last one in the list.
 	cfg = randomize(cfg)
 	for _, c := range cfg {
 		var cmd *exec.Cmd
-		if c.GithubUser != "" {
+		if c.GithubUser != "" || c.GithubOrg != "" {
 			cmd = exec.Command("zoekt-mirror-github",
-				"-dest", repoDir)
+				"-dest", repoDir, "-delete")
 			if c.GitHubURL != "" {
 				cmd.Args = append(cmd.Args, "-url", c.GitHubURL)
 			}
 			if c.GithubUser != "" {
 				cmd.Args = append(cmd.Args, "-user", c.GithubUser)
+			} else if c.GithubOrg != "" {
+				cmd.Args = append(cmd.Args, "-org", c.GithubOrg)
 			}
 			if c.Name != "" {
 				cmd.Args = append(cmd.Args, "-name", c.Name)
@@ -193,6 +197,15 @@ func executeMirror(cfg []configEntry, repoDir string, pendingRepos chan<- string
 			if c.ProjectType != "" {
 				cmd.Args = append(cmd.Args, "-type", c.ProjectType)
 			}
+			if c.Name != "" {
+				cmd.Args = append(cmd.Args, "-name", c.Name)
+			}
+			if c.Exclude != "" {
+				cmd.Args = append(cmd.Args, "-exclude", c.Exclude)
+			}
+		} else if c.GitLabURL != "" {
+			cmd = exec.Command("zoekt-mirror-gitlab",
+				"-dest", repoDir, "-url", c.GitLabURL)
 			if c.Name != "" {
 				cmd.Args = append(cmd.Args, "-name", c.Name)
 			}

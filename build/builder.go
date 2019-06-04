@@ -163,22 +163,20 @@ func hashString(s string) string {
 }
 
 // ShardName returns the name the given index shard.
-func (o *Options) shardName(n int) (string, error) {
+func (o *Options) shardName(n int) string {
 	abs := url.QueryEscape(o.RepositoryDescription.Name)
 	if len(abs) > 200 {
 		abs = abs[:200] + hashString(abs)[:8]
 	}
 	return filepath.Join(o.IndexDir,
-		fmt.Sprintf("%s_v%d.%05d.zoekt", abs, zoekt.IndexFormatVersion, n)), nil
+		fmt.Sprintf("%s_v%d.%05d.zoekt", abs, zoekt.IndexFormatVersion, n))
 }
 
 // IndexVersions returns the versions as present in the index, for
 // implementing incremental indexing.
 func (o *Options) IndexVersions() []zoekt.RepositoryBranch {
-	fn, err := o.shardName(0)
-	if err != nil {
-		return nil
-	}
+	fn := o.shardName(0)
+
 	f, err := os.Open(fn)
 	if err != nil {
 		return nil
@@ -251,6 +249,7 @@ func NewBuilder(opts Options) (*Builder, error) {
 	return b, nil
 }
 
+// AddFile is a convenience wrapper for the Add method
 func (b *Builder) AddFile(name string, content []byte) error {
 	return b.Add(zoekt.Document{Name: name, Content: content})
 }
@@ -276,6 +275,8 @@ func (b *Builder) Add(doc zoekt.Document) error {
 	return nil
 }
 
+// Finish creates a last shard from the buffered documents, and clears
+// stale shards from previous runs
 func (b *Builder) Finish() error {
 	b.flush()
 	b.building.Wait()
@@ -304,12 +305,7 @@ func (b *Builder) deleteRemainingShards() {
 	for {
 		shard := b.nextShardNum
 		b.nextShardNum++
-		name, err := b.opts.shardName(shard)
-		if err != nil {
-			break
-		}
-
-		log.Printf("Builder.deleteRemainingShards %s", name)
+		name := b.opts.shardName(shard)
 		if err := os.Remove(name); os.IsNotExist(err) {
 			break
 		}
@@ -465,10 +461,7 @@ func (b *Builder) buildShard(todo []*zoekt.Document, nextShardNum int) (*finishe
 		}
 	}
 
-	name, err := b.opts.shardName(nextShardNum)
-	if err != nil {
-		return nil, err
-	}
+	name := b.opts.shardName(nextShardNum)
 
 	shardBuilder, err := b.newShardBuilder()
 	if err != nil {
@@ -530,4 +523,5 @@ func (b *Builder) writeShard(fn string, ib *zoekt.IndexBuilder) (*finishedShard,
 	return &finishedShard{f.Name(), fn}, nil
 }
 
+// umask holds the Umask of the current process
 var umask os.FileMode
