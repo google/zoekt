@@ -176,6 +176,45 @@ func TestNewlines(t *testing.T) {
 	}
 }
 
+func TestQueryNewlines(t *testing.T) {
+	b := testIndexBuilder(t, nil,
+		Document{Name: "filename", Content: []byte("line1\nline2\nbla")})
+
+	sres := searchForTest(t, b, &query.Substring{Pattern: "ine2\nbla"})
+
+	matches := sres.Files
+	want := []FileMatch{{
+		FileName: "filename",
+		LineMatches: []LineMatch{
+			{
+				LineFragments: []LineFragmentMatch{{
+					Offset:      7,
+					LineOffset:  1,
+					MatchLength: 4,
+				}},
+				Line:       []byte("line2"),
+				LineStart:  6,
+				LineEnd:    11,
+				LineNumber: 2,
+			},
+			{
+				LineFragments: []LineFragmentMatch{{
+					Offset:      13,
+					LineOffset:  0,
+					MatchLength: 3,
+				}},
+				Line:       []byte("bla"),
+				LineStart:  13,
+				LineEnd:    16,
+				LineNumber: 3,
+			},
+		}}}
+
+	if !reflect.DeepEqual(matches, want) {
+		t.Errorf("got %v, want %v", matches, want)
+	}
+}
+
 func searchForTest(t *testing.T, b *IndexBuilder, q query.Q, o ...SearchOptions) *SearchResult {
 	searcher := searcherForTest(t, b)
 	var opts SearchOptions
