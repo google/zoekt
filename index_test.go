@@ -176,6 +176,48 @@ func TestNewlines(t *testing.T) {
 	}
 }
 
+// A result spanning multiple lines should have LineMatches that only cover
+// single lines.
+func TestQueryNewlines(t *testing.T) {
+	text := "line1\nline2\nbla"
+	b := testIndexBuilder(t, nil,
+		Document{Name: "filename", Content: []byte(text)})
+
+	sres := searchForTest(t, b, &query.Substring{Pattern: "ine2\nbla"})
+
+	matches := sres.Files
+	want := []FileMatch{{
+		FileName: "filename",
+		LineMatches: []LineMatch{
+			{
+				LineFragments: []LineFragmentMatch{{
+					Offset:      12,
+					LineOffset:  0,
+					MatchLength: 3,
+				}},
+				Line:       []byte("bla"),
+				LineStart:  12,
+				LineEnd:    15,
+				LineNumber: 3,
+			},
+			{
+				LineFragments: []LineFragmentMatch{{
+					Offset:      7,
+					LineOffset:  1,
+					MatchLength: 4,
+				}},
+				Line:       []byte("line2"),
+				LineStart:  6,
+				LineEnd:    11,
+				LineNumber: 2,
+			},
+		}}}
+
+	if !reflect.DeepEqual(matches, want) {
+		t.Errorf("\ngot  %+v,\nwant %+v", matches, want)
+	}
+}
+
 func searchForTest(t *testing.T, b *IndexBuilder, q query.Q, o ...SearchOptions) *SearchResult {
 	searcher := searcherForTest(t, b)
 	var opts SearchOptions
@@ -1225,7 +1267,7 @@ func TestMatchNewline(t *testing.T) {
 	sres := searchForTest(t, b, &query.Regexp{Regexp: re, CaseSensitive: true})
 	if len(sres.Files) != 1 {
 		t.Errorf("got %v, wanted 1 matches", sres.Files)
-	} else if l := sres.Files[0].LineMatches[0].Line; !bytes.Equal(l, content) {
+	} else if l := sres.Files[0].LineMatches[0].Line; !bytes.Equal(l, content[len("pqr\n"):]) {
 		t.Errorf("got match line %q, want %q", l, content)
 	}
 }
