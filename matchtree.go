@@ -411,13 +411,11 @@ func (t *regexpMatchTree) matches(cp *contentProvider, cost int, known map[match
 	idxs := t.regexp.FindAllIndex(cp.data(t.fileName), -1)
 	found := t.found[:0]
 	for _, idx := range idxs {
-		cm := &candidateMatch{
+		found = append(found, &candidateMatch{
 			byteOffset:  uint32(idx[0]),
 			byteMatchSz: uint32(idx[1] - idx[0]),
 			fileName:    t.fileName,
-		}
-
-		found = append(found, cm)
+		})
 	}
 	t.found = found
 	t.reEvaluated = true
