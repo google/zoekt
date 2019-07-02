@@ -391,16 +391,53 @@ func (t *regexpMatchTree) matches(cp *contentProvider, cost int, known map[match
 	idxs := t.regexp.FindAllIndex(cp.data(t.fileName), -1)
 	found := t.found[:0]
 	for _, idx := range idxs {
-		found = append(found, &candidateMatch{
+		cm := &candidateMatch{
 			byteOffset:  uint32(idx[0]),
 			byteMatchSz: uint32(idx[1] - idx[0]),
 			fileName:    t.fileName,
-		})
+		}
+
+		found = append(found, cm)
 	}
 	t.found = found
 	t.reEvaluated = true
 
 	return len(t.found) > 0, true
+}
+
+// breakMatchesOnNewlines returns matches resulting from breaking each element
+// of cms on newlines within text.
+func breakMatchesOnNewlines(cms []*candidateMatch, text []byte) []*candidateMatch {
+	var lineCMs []*candidateMatch
+	for _, cm := range cms {
+		lineCMs = append(lineCMs, breakOnNewlines(cm, text)...)
+	}
+	return lineCMs
+}
+
+// breakOnNewlines returns matches resulting from breaking cm on newlines
+// within text.
+func breakOnNewlines(cm *candidateMatch, text []byte) []*candidateMatch {
+	var cms []*candidateMatch
+	addMe := &candidateMatch{}
+	*addMe = *cm
+	for i := uint32(cm.byteOffset); i < cm.byteOffset+cm.byteMatchSz; i++ {
+		if text[i] == '\n' {
+			addMe.byteMatchSz = i - addMe.byteOffset
+			if addMe.byteMatchSz != 0 {
+				cms = append(cms, addMe)
+			}
+
+			addMe = &candidateMatch{}
+			*addMe = *cm
+			addMe.byteOffset = i + 1
+		}
+	}
+	addMe.byteMatchSz = cm.byteOffset + cm.byteMatchSz - addMe.byteOffset
+	if addMe.byteMatchSz != 0 {
+		cms = append(cms, addMe)
+	}
+	return cms
 }
 
 func evalMatchTree(cp *contentProvider, cost int, known map[matchTree]bool, mt matchTree) (bool, bool) {
