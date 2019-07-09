@@ -15,9 +15,15 @@
 package zoekt
 
 import (
+	"encoding/binary"
 	"log"
+	"math/rand"
 	"reflect"
+	"sort"
 	"testing"
+	"testing/quick"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 var _ = log.Println
@@ -28,6 +34,31 @@ func TestNgram(t *testing.T) {
 	if n.String() != "abc" {
 		t.Errorf("got %q, want %q", n, "abc")
 	}
+
+	f := func(b ngramRunes) bool {
+		n := runesToNGram(b)
+		got := ngramRunes(ngramToRunes(n))
+		if !reflect.DeepEqual(b, got) {
+			t.Log(cmp.Diff(b, got))
+			return false
+		}
+		return true
+	}
+	if err := quick.Check(f, nil); err != nil {
+		t.Error(err)
+	}
+}
+
+type ngramRunes [ngramSize]rune
+
+func (ngramRunes) Generate(rand *rand.Rand, size int) reflect.Value {
+	// Same implementation used by testing/quick to generate strings. But we
+	// force it to ngramSize runes.
+	var b ngramRunes
+	for i := range b {
+		b[i] = rune(rand.Intn(0x10ffff))
+	}
+	return reflect.ValueOf(b)
 }
 
 func TestDocSection(t *testing.T) {
@@ -75,4 +106,93 @@ func TestNextFileIndex(t *testing.T) {
 			t.Errorf("%v: got %d, want %d", tc, got, tc.want)
 		}
 	}
+}
+
+func TestSizedDeltas(t *testing.T) {
+	encode := func(nums []uint32) []byte {
+		return toSizedDeltas(nums)
+	}
+	decode := func(data []byte) []uint32 {
+		if len(data) == 0 {
+			return nil
+		}
+		return fromSizedDeltas(data, nil)
+	}
+	testIncreasingIntCoder(t, encode, decode)
+}
+
+func TestFromDeltas(t *testing.T) {
+	decode := func(data []byte) []uint32 {
+		if len(data) == 0 {
+			return nil
+		}
+		return fromDeltas(data, nil)
+	}
+	testIncreasingIntCoder(t, toDeltas, decode)
+}
+
+func TestCompressedPostingIterator(t *testing.T) {
+	decode := func(data []byte) []uint32 {
+		if len(data) == 0 {
+			return nil
+		}
+
+		var nums []uint32
+		i := newCompressedPostingIterator(data, stringToNGram("abc"))
+		for i.first() != maxUInt32 {
+			nums = append(nums, i.first())
+			i.next(i.first())
+		}
+		return nums
+	}
+	testIncreasingIntCoder(t, toDeltas, decode)
+}
+
+func toDeltas(offsets []uint32) []byte {
+	var enc [8]byte
+
+	deltas := make([]byte, 0, len(offsets)*2)
+
+	var last uint32
+	for _, p := range offsets {
+		delta := p - last
+		last = p
+
+		m := binary.PutUvarint(enc[:], uint64(delta))
+		deltas = append(deltas, enc[:m]...)
+	}
+	return deltas
+}
+
+func testIncreasingIntCoder(t *testing.T, encode func([]uint32) []byte, decode func([]byte) []uint32) {
+	f := func(nums []uint32) bool {
+		nums = sortedUnique(nums)
+		b := encode(nums)
+		got := decode(b)
+		if len(nums) == len(got) && len(nums) == 0 {
+			return true
+		}
+		if !reflect.DeepEqual(got, nums) {
+			t.Log(cmp.Diff(nums, got))
+			return false
+		}
+		return true
+	}
+	if err := quick.Check(f, nil); err != nil {
+		t.Error(err)
+	}
+}
+
+func sortedUnique(nums []uint32) []uint32 {
+	if len(nums) == 0 {
+		return nums
+	}
+	sort.Slice(nums, func(i, j int) bool { return nums[i] < nums[j] })
+	filtered := nums[:1]
+	for _, n := range nums[1:] {
+		if filtered[len(filtered)-1] != n {
+			filtered = append(filtered, n)
+		}
+	}
+	return filtered
 }
