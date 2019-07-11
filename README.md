@@ -9,7 +9,8 @@ code. (Pronunciation: roughly as you would pronounce "zooked" in English)
 **Note:** This is a [Sourcegraph](https://github.com/sourcegraph/zoekt) fork
 of [github.com/google/zoekt](https://github.com/google/zoekt). It contains
 some changes that do not make sense to upstream and or have not yet been
-upstreamed. Differences:
+upstreamed. We track zoekt upstream, so any changes in our fork must be
+minimal to avoid difficult merge conflicts. Differences:
 
 - [zoekt-sourcegraph-indexserver](cmd/zoekt-sourcegraph-indexserver/main.go)
   is a Sourcegraph specific command which indexes all enabled repositories on
