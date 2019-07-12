@@ -38,6 +38,9 @@ import (
 	"github.com/google/zoekt/build"
 	"github.com/google/zoekt/shards"
 	"github.com/google/zoekt/web"
+
+	// Tune GOMAXPROCS to match Linux container CPU quota.
+	_ "go.uber.org/automaxprocs"
 )
 
 const logFormat = "2006-01-02T15-04-05.999999999Z07"

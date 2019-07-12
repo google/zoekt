@@ -11,6 +11,7 @@ require (
 	github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348
 	github.com/mitchellh/mapstructure v1.1.2 // indirect
 	github.com/xanzy/go-gitlab v0.13.0
+	go.uber.org/automaxprocs v1.2.0
 	golang.org/x/net v0.0.0-20181114220301-adae6a3d119a
 	golang.org/x/oauth2 v0.0.0-20181120190819-8f65e3013eba
 	golang.org/x/sync v0.0.0-20181108010431-42b317875d0f

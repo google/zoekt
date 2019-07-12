@@ -23,6 +23,9 @@ import (
 
 	"github.com/google/zoekt/cmd"
 	"github.com/google/zoekt/gitindex"
+
+	// Tune GOMAXPROCS to match Linux container CPU quota.
+	_ "go.uber.org/automaxprocs"
 )
 
 func main() {
