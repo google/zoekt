@@ -286,7 +286,7 @@ func (ss *shardedSearcher) List(ctx context.Context, r query.Q) (rl *zoekt.RepoL
 		feeder <- s
 	}
 	close(feeder)
-	for i := 0; i < runtime.NumCPU(); i++ {
+	for i := 0; i < runtime.GOMAXPROCS(0); i++ {
 		go func() {
 			for s := range feeder {
 				listOneShard(ctx, s, r, all)

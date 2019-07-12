@@ -25,6 +25,9 @@ import (
 
 	"github.com/google/zoekt/build"
 	"github.com/hashicorp/go-retryablehttp"
+
+	// Tune GOMAXPROCS to match Linux container CPU quota.
+	_ "go.uber.org/automaxprocs"
 )
 
 // Server is the main functionality of zoekt-sourcegraph-indexserver. It
@@ -378,7 +381,7 @@ func main() {
 		debug = log.New(os.Stderr, "", log.LstdFlags)
 	}
 
-	cpuCount := int(math.Round(float64(runtime.NumCPU()) * (*cpuFraction)))
+	cpuCount := int(math.Round(float64(runtime.GOMAXPROCS(0)) * (*cpuFraction)))
 	if cpuCount < 1 {
 		cpuCount = 1
 	}
