@@ -48,6 +48,9 @@ import (
 
 	git "gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing"
+
+	// Tune GOMAXPROCS to match Linux container CPU quota.
+	_ "go.uber.org/automaxprocs"
 )
 
 var _ = log.Println
