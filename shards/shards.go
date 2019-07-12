@@ -59,10 +59,10 @@ func newShardedSearcher(n int64) *shardedSearcher {
 // NewDirectorySearcher returns a searcher instance that loads all
 // shards corresponding to a glob into memory.
 func NewDirectorySearcher(dir string) (zoekt.Searcher, error) {
-	ss := newShardedSearcher(int64(runtime.NumCPU()))
+	ss := newShardedSearcher(int64(runtime.GOMAXPROCS(0)))
 	tl := &throttledLoader{
 		ss:       ss,
-		throttle: make(chan struct{}, runtime.NumCPU()),
+		throttle: make(chan struct{}, runtime.GOMAXPROCS(0)),
 	}
 	_, err := NewDirectoryWatcher(dir, tl)
 	if err != nil {
@@ -163,7 +163,7 @@ func (ss *shardedSearcher) Search(ctx context.Context, q query.Q, opts *zoekt.Se
 		feeder <- s
 	}
 	close(feeder)
-	for i := 0; i < runtime.NumCPU(); i++ {
+	for i := 0; i < runtime.GOMAXPROCS(0); i++ {
 		go func() {
 			for s := range feeder {
 				searchOneShard(childCtx, s, q, opts, all)
