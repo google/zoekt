@@ -115,7 +115,7 @@ func (s *rankSearcher) List(ctx context.Context, q query.Q) (*zoekt.RepoList, er
 func TestOrderByShard(t *testing.T) {
 	ss := newShardedSearcher(1)
 
-	n := 10 * runtime.NumCPU()
+	n := 10 * runtime.GOMAXPROCS(0)
 	for i := 0; i < n; i++ {
 		ss.replace(fmt.Sprintf("shard%d", i),
 			&rankSearcher{
