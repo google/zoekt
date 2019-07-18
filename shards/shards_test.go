@@ -72,6 +72,7 @@ func TestCrashResilience(t *testing.T) {
 
 type rankSearcher struct {
 	rank uint16
+	repo *zoekt.Repository
 }
 
 func (s *rankSearcher) Close() {
@@ -112,6 +113,8 @@ func (s *rankSearcher) List(ctx context.Context, q query.Q) (*zoekt.RepoList, er
 	}, nil
 }
 
+func (s *rankSearcher) Repository() *zoekt.Repository { return s.repo }
+
 func TestOrderByShard(t *testing.T) {
 	ss := newShardedSearcher(1)
 
@@ -151,6 +154,46 @@ func TestOrderByShard(t *testing.T) {
 		if got != want {
 			t.Logf("%d: got %q, want %q", i, got, want)
 		}
+	}
+}
+
+func TestFilteringShardsByRepoSet(t *testing.T) {
+	ss := newShardedSearcher(1)
+
+	repoSetNames := []string{}
+	n := 10 * runtime.GOMAXPROCS(0)
+	for i := 0; i < n; i++ {
+		shardName := fmt.Sprintf("shard%d", i)
+		repoName := fmt.Sprintf("repository%d", i)
+
+		if i%2 == 0 {
+			repoSetNames = append(repoSetNames, repoName)
+		}
+
+		ss.replace(shardName, &rankSearcher{
+			repo: &zoekt.Repository{Name: repoName},
+			rank: uint16(i),
+		})
+	}
+
+	res, err := ss.Search(context.Background(), &query.Substring{Pattern: "bla"}, &zoekt.SearchOptions{})
+	if err != nil {
+		t.Errorf("Search: %v", err)
+	}
+	if len(res.Files) != n {
+		t.Fatalf("no reposet: got %d results, want %d", len(res.Files), n)
+	}
+
+	set := query.NewRepoSet(repoSetNames...)
+	sub := &query.Substring{Pattern: "bla"}
+	res, err = ss.Search(context.Background(), query.NewAnd(set, sub), &zoekt.SearchOptions{})
+	if err != nil {
+		t.Errorf("Search: %v", err)
+	}
+	// Note: Assertion is based on fact that `rankSearcher` always returns a
+	// result and using repoSet will half the number of results
+	if len(res.Files) != len(repoSetNames) {
+		t.Fatalf("with reposet: got %d results, want %d", len(res.Files), len(repoSetNames))
 	}
 }
 
