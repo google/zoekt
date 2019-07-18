@@ -319,4 +319,14 @@ func BenchmarkShardedSearch(b *testing.B) {
 			search(b, q, len(repoSetNames)*filesPerRepo)
 		}
 	})
+
+	b.Run("substring no results and repo set", func(b *testing.B) {
+		q := query.NewAnd(set, &query.Substring{Pattern: "helloworld"})
+
+		b.ReportAllocs()
+
+		for n := 0; n < b.N; n++ {
+			search(b, q, 0)
+		}
+	})
 }
