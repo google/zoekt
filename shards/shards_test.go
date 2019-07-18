@@ -300,10 +300,15 @@ func reposForTest(n int) (result []*zoekt.Repository) {
 func testSearcherForRepo(b testing.TB, r *zoekt.Repository, numFiles int) zoekt.Searcher {
 	builder := testIndexBuilder(b, r)
 
-	for i := 0; i < numFiles; i++ {
+	builder.Add(zoekt.Document{
+		Name:    fmt.Sprintf("%s/filename-%d.go", r.Name, 0),
+		Content: []byte("needle needle needle haystack"),
+	})
+
+	for i := 1; i < numFiles; i++ {
 		builder.Add(zoekt.Document{
 			Name:    fmt.Sprintf("%s/filename-%d.go", r.Name, i),
-			Content: []byte("needle needle needle"),
+			Content: []byte("haystack haystack haystack"),
 		})
 	}
 
@@ -329,7 +334,9 @@ func BenchmarkShardedSearch(b *testing.B) {
 	opts := &zoekt.SearchOptions{}
 
 	set := query.NewRepoSet(repoSetNames...)
-	sub := &query.Substring{Pattern: "needle"}
+	needleSub := &query.Substring{Pattern: "needle"}
+	haystackSub := &query.Substring{Pattern: "haystack"}
+	helloworldSub := &query.Substring{Pattern: "helloworld"}
 
 	search := func(b *testing.B, q query.Q, wantFiles int) {
 		b.Helper()
@@ -343,33 +350,30 @@ func BenchmarkShardedSearch(b *testing.B) {
 		}
 	}
 
-	b.Run("substring", func(b *testing.B) {
-		q := sub
+	benchmarks := []struct {
+		name      string
+		q         query.Q
+		wantFiles int
+	}{
+		{"substring all results", haystackSub, len(repos) * filesPerRepo},
+		{"substring no results", helloworldSub, 0},
+		{"substring some results", needleSub, len(repos)},
 
-		b.ReportAllocs()
+		{"substring all results and repo set", query.NewAnd(set, haystackSub), len(repoSetNames) * filesPerRepo},
+		{"substring some results and repo set", query.NewAnd(set, needleSub), len(repoSetNames)},
+		{"substring no results and repo set", query.NewAnd(set, helloworldSub), 0},
+	}
 
-		for n := 0; n < b.N; n++ {
-			search(b, q, len(repos)*filesPerRepo)
-		}
-	})
+	for _, bb := range benchmarks {
+		b.Run(bb.name, func(b *testing.B) {
+			q := bb.q
 
-	b.Run("substring and repo set", func(b *testing.B) {
-		q := query.NewAnd(set, sub)
+			b.ReportAllocs()
 
-		b.ReportAllocs()
+			for n := 0; n < b.N; n++ {
+				search(b, q, bb.wantFiles)
+			}
+		})
+	}
 
-		for n := 0; n < b.N; n++ {
-			search(b, q, len(repoSetNames)*filesPerRepo)
-		}
-	})
-
-	b.Run("substring no results and repo set", func(b *testing.B) {
-		q := query.NewAnd(set, &query.Substring{Pattern: "helloworld"})
-
-		b.ReportAllocs()
-
-		for n := 0; n < b.N; n++ {
-			search(b, q, 0)
-		}
-	})
 }
