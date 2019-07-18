@@ -209,15 +209,14 @@ func (i *compressedPostingIterator) next(limit uint32) {
 		return
 	}
 
-	if i._first <= limit && len(i.blob) == 0 {
-		i._first = maxUInt32
-		return
-	}
-
 	for i._first <= limit && len(i.blob) > 0 {
 		delta, sz := binary.Uvarint(i.blob)
 		i._first += uint32(delta)
 		i.blob = i.blob[sz:]
+	}
+
+	if i._first <= limit && len(i.blob) == 0 {
+		i._first = maxUInt32
 	}
 }
 
