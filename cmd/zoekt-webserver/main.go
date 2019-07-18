@@ -29,15 +29,12 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/net/trace"
-
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
 	"github.com/google/zoekt/shards"
 	"github.com/google/zoekt/web"
-
-	// Tune GOMAXPROCS to match Linux container CPU quota.
-	_ "go.uber.org/automaxprocs"
+	"go.uber.org/automaxprocs/maxprocs"
+	"golang.org/x/net/trace"
 )
 
 const logFormat = "2006-01-02T15-04-05.999999999Z07"
@@ -143,6 +140,13 @@ func main() {
 		// stderr, but it is simpler and more portable for the
 		// caller to divert stderr output if necessary.
 		go divertLogs(*logDir, *logRefresh)
+	}
+
+	// Tune GOMAXPROCS to match Linux container CPU quota.
+	maxprocs.Set()
+
+	if err := os.MkdirAll(*index, 0755); err != nil {
+		log.Fatal(err)
 	}
 
 	searcher, err := shards.NewDirectorySearcher(*index)

@@ -22,9 +22,7 @@ import (
 	"github.com/google/zoekt/build"
 	"github.com/google/zoekt/cmd"
 	"github.com/google/zoekt/gitindex"
-
-	// Tune GOMAXPROCS to match Linux container CPU quota.
-	_ "go.uber.org/automaxprocs"
+	"go.uber.org/automaxprocs/maxprocs"
 )
 
 // stripComponents removes the specified number of leading path
@@ -209,6 +207,9 @@ func main() {
 		strip  = flag.Int("strip_components", 0, "Remove the specified number of leading path elements. Pathnames with fewer elements will be silently skipped.")
 	)
 	flag.Parse()
+
+	// Tune GOMAXPROCS to match Linux container CPU quota.
+	maxprocs.Set()
 
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
