@@ -218,7 +218,7 @@ func TestUnloadIndex(t *testing.T) {
 	}
 }
 
-func testIndexBuilder(t *testing.T, repo *zoekt.Repository, docs ...zoekt.Document) *zoekt.IndexBuilder {
+func testIndexBuilder(t testing.TB, repo *zoekt.Repository, docs ...zoekt.Document) *zoekt.IndexBuilder {
 	b, err := zoekt.NewIndexBuilder(repo)
 	if err != nil {
 		t.Fatalf("NewIndexBuilder: %v", err)
@@ -232,7 +232,7 @@ func testIndexBuilder(t *testing.T, repo *zoekt.Repository, docs ...zoekt.Docume
 	return b
 }
 
-func searcherForTest(t *testing.T, b *zoekt.IndexBuilder) zoekt.Searcher {
+func searcherForTest(t testing.TB, b *zoekt.IndexBuilder) zoekt.Searcher {
 	var buf bytes.Buffer
 	b.Write(&buf)
 	f := &memSeeker{buf.Bytes()}
@@ -243,4 +243,80 @@ func searcherForTest(t *testing.T, b *zoekt.IndexBuilder) zoekt.Searcher {
 	}
 
 	return searcher
+}
+
+func reposForTest(n int) (result []*zoekt.Repository) {
+	for i := 0; i < n; i++ {
+		result = append(result, &zoekt.Repository{
+			Name: fmt.Sprintf("test-repository-%d", i),
+		})
+	}
+	return result
+}
+
+func testSearcherForRepo(b testing.TB, r *zoekt.Repository, numFiles int) zoekt.Searcher {
+	builder := testIndexBuilder(b, r)
+
+	for i := 0; i < numFiles; i++ {
+		builder.Add(zoekt.Document{
+			Name:    fmt.Sprintf("%s/filename-%d.go", r.Name, i),
+			Content: []byte("needle needle needle"),
+		})
+	}
+
+	return searcherForTest(b, builder)
+}
+
+func BenchmarkShardedSearch(b *testing.B) {
+	ss := newShardedSearcher(int64(runtime.GOMAXPROCS(0)))
+
+	filesPerRepo := 300
+	repos := reposForTest(3000)
+	repoSetNames := make([]string, 0, len(repos)/2)
+
+	for i, r := range repos {
+		searcher := testSearcherForRepo(b, r, filesPerRepo)
+		ss.replace(r.Name, searcher)
+		if i%2 == 0 {
+			repoSetNames = append(repoSetNames, r.Name)
+		}
+	}
+
+	ctx := context.Background()
+	opts := &zoekt.SearchOptions{}
+
+	set := query.NewRepoSet(repoSetNames...)
+	sub := &query.Substring{Pattern: "needle"}
+
+	search := func(b *testing.B, q query.Q, wantFiles int) {
+		b.Helper()
+
+		res, err := ss.Search(ctx, q, opts)
+		if err != nil {
+			b.Fatalf("Search(%s): %v", q, err)
+		}
+		if have := len(res.Files); have != wantFiles {
+			b.Fatalf("wrong number of file results. have=%d, want=%d", have, wantFiles)
+		}
+	}
+
+	b.Run("substring", func(b *testing.B) {
+		q := sub
+
+		b.ReportAllocs()
+
+		for n := 0; n < b.N; n++ {
+			search(b, q, len(repos)*filesPerRepo)
+		}
+	})
+
+	b.Run("substring and repo set", func(b *testing.B) {
+		q := query.NewAnd(set, sub)
+
+		b.ReportAllocs()
+
+		for n := 0; n < b.N; n++ {
+			search(b, q, len(repoSetNames)*filesPerRepo)
+		}
+	})
 }
