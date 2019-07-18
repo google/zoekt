@@ -21,13 +21,11 @@ import (
 	"strconv"
 	"time"
 
+	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/net/trace"
 
 	"github.com/google/zoekt/build"
-	"github.com/hashicorp/go-retryablehttp"
-
-	// Tune GOMAXPROCS to match Linux container CPU quota.
-	_ "go.uber.org/automaxprocs"
+	retryablehttp "github.com/hashicorp/go-retryablehttp"
 )
 
 // Server is the main functionality of zoekt-sourcegraph-indexserver. It
@@ -364,6 +362,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("url.Parse(%v): %v", *root, err)
 	}
+
+	// Tune GOMAXPROCS to match Linux container CPU quota.
+	maxprocs.Set()
 
 	// Automatically prepend our own path at the front, to minimize
 	// required configuration.

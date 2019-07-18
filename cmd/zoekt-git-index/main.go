@@ -23,9 +23,7 @@ import (
 
 	"github.com/google/zoekt/cmd"
 	"github.com/google/zoekt/gitindex"
-
-	// Tune GOMAXPROCS to match Linux container CPU quota.
-	_ "go.uber.org/automaxprocs"
+	"go.uber.org/automaxprocs/maxprocs"
 )
 
 func main() {
@@ -39,6 +37,9 @@ func main() {
 		"this is used to find repositories for submodules. "+
 		"It also affects name if the indexed repository is under this directory.")
 	flag.Parse()
+
+	// Tune GOMAXPROCS to match Linux container CPU quota.
+	maxprocs.Set()
 
 	if *repoCacheDir != "" {
 		dir, err := filepath.Abs(*repoCacheDir)
