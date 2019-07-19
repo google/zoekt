@@ -133,7 +133,6 @@ func selectRepoSet(shards []rankedShard, q query.Q) ([]rankedShard, query.Q) {
 				}
 			}
 		}
-
 		and.Children[i] = &query.Const{Value: len(filtered) > 0}
 
 		// Stop after first RepoSet, otherwise we might append duplicate
