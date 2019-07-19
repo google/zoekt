@@ -31,6 +31,10 @@ import (
 	"github.com/google/zoekt/query"
 )
 
+type Repositorer interface {
+	Repository() *zoekt.Repository
+}
+
 type rankedShard struct {
 	zoekt.Searcher
 	rank uint16
@@ -107,6 +111,35 @@ func (ss *shardedSearcher) Close() {
 	}
 }
 
+func selectRepoSet(shards []rankedShard, q query.Q) []rankedShard {
+	filtered := shards[:0]
+
+	eval := query.Map(q, func(q query.Q) query.Q {
+		setQuery, ok := q.(*query.RepoSet)
+		if !ok {
+			return q
+		}
+
+		for _, s := range shards {
+			if repositorer, ok := s.Searcher.(Repositorer); ok {
+				repo := repositorer.Repository()
+				if setQuery.Set[repo.Name] {
+					filtered = append(filtered, s)
+				}
+			}
+		}
+
+		return &query.Const{Value: true}
+	})
+	query.Simplify(eval)
+
+	if len(filtered) != 0 {
+		return filtered
+	}
+
+	return shards
+}
+
 func (ss *shardedSearcher) Search(ctx context.Context, q query.Q, opts *zoekt.SearchOptions) (sr *zoekt.SearchResult, err error) {
 	tr := trace.New("shardedSearcher.Search", "")
 	tr.LazyLog(q, true)
@@ -141,6 +174,8 @@ func (ss *shardedSearcher) Search(ctx context.Context, q query.Q, opts *zoekt.Se
 	start = time.Now()
 
 	shards := ss.getShards()
+	shards = selectRepoSet(shards, q)
+
 	all := make(chan shardResult, len(shards))
 
 	var childCtx context.Context

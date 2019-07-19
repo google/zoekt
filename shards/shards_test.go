@@ -72,6 +72,7 @@ func TestCrashResilience(t *testing.T) {
 
 type rankSearcher struct {
 	rank uint16
+	repo *zoekt.Repository
 }
 
 func (s *rankSearcher) Close() {
@@ -112,6 +113,8 @@ func (s *rankSearcher) List(ctx context.Context, q query.Q) (*zoekt.RepoList, er
 	}, nil
 }
 
+func (s *rankSearcher) Repository() *zoekt.Repository { return s.repo }
+
 func TestOrderByShard(t *testing.T) {
 	ss := newShardedSearcher(1)
 
@@ -151,6 +154,46 @@ func TestOrderByShard(t *testing.T) {
 		if got != want {
 			t.Logf("%d: got %q, want %q", i, got, want)
 		}
+	}
+}
+
+func TestFilteringShardsByRepoSet(t *testing.T) {
+	ss := newShardedSearcher(1)
+
+	repoSetNames := []string{}
+	n := 10 * runtime.GOMAXPROCS(0)
+	for i := 0; i < n; i++ {
+		shardName := fmt.Sprintf("shard%d", i)
+		repoName := fmt.Sprintf("repository%d", i)
+
+		if i%2 == 0 {
+			repoSetNames = append(repoSetNames, repoName)
+		}
+
+		ss.replace(shardName, &rankSearcher{
+			repo: &zoekt.Repository{Name: repoName},
+			rank: uint16(i),
+		})
+	}
+
+	res, err := ss.Search(context.Background(), &query.Substring{Pattern: "bla"}, &zoekt.SearchOptions{})
+	if err != nil {
+		t.Errorf("Search: %v", err)
+	}
+	if len(res.Files) != n {
+		t.Fatalf("no reposet: got %d results, want %d", len(res.Files), n)
+	}
+
+	set := query.NewRepoSet(repoSetNames...)
+	sub := &query.Substring{Pattern: "bla"}
+	res, err = ss.Search(context.Background(), query.NewAnd(set, sub), &zoekt.SearchOptions{})
+	if err != nil {
+		t.Errorf("Search: %v", err)
+	}
+	// Note: Assertion is based on fact that `rankSearcher` always returns a
+	// result and using repoSet will half the number of results
+	if len(res.Files) != len(repoSetNames) {
+		t.Fatalf("with reposet: got %d results, want %d", len(res.Files), len(repoSetNames))
 	}
 }
 
@@ -218,7 +261,7 @@ func TestUnloadIndex(t *testing.T) {
 	}
 }
 
-func testIndexBuilder(t *testing.T, repo *zoekt.Repository, docs ...zoekt.Document) *zoekt.IndexBuilder {
+func testIndexBuilder(t testing.TB, repo *zoekt.Repository, docs ...zoekt.Document) *zoekt.IndexBuilder {
 	b, err := zoekt.NewIndexBuilder(repo)
 	if err != nil {
 		t.Fatalf("NewIndexBuilder: %v", err)
@@ -232,7 +275,7 @@ func testIndexBuilder(t *testing.T, repo *zoekt.Repository, docs ...zoekt.Docume
 	return b
 }
 
-func searcherForTest(t *testing.T, b *zoekt.IndexBuilder) zoekt.Searcher {
+func searcherForTest(t testing.TB, b *zoekt.IndexBuilder) zoekt.Searcher {
 	var buf bytes.Buffer
 	b.Write(&buf)
 	f := &memSeeker{buf.Bytes()}
@@ -243,4 +286,94 @@ func searcherForTest(t *testing.T, b *zoekt.IndexBuilder) zoekt.Searcher {
 	}
 
 	return searcher
+}
+
+func reposForTest(n int) (result []*zoekt.Repository) {
+	for i := 0; i < n; i++ {
+		result = append(result, &zoekt.Repository{
+			Name: fmt.Sprintf("test-repository-%d", i),
+		})
+	}
+	return result
+}
+
+func testSearcherForRepo(b testing.TB, r *zoekt.Repository, numFiles int) zoekt.Searcher {
+	builder := testIndexBuilder(b, r)
+
+	builder.Add(zoekt.Document{
+		Name:    fmt.Sprintf("%s/filename-%d.go", r.Name, 0),
+		Content: []byte("needle needle needle haystack"),
+	})
+
+	for i := 1; i < numFiles; i++ {
+		builder.Add(zoekt.Document{
+			Name:    fmt.Sprintf("%s/filename-%d.go", r.Name, i),
+			Content: []byte("haystack haystack haystack"),
+		})
+	}
+
+	return searcherForTest(b, builder)
+}
+
+func BenchmarkShardedSearch(b *testing.B) {
+	ss := newShardedSearcher(int64(runtime.GOMAXPROCS(0)))
+
+	filesPerRepo := 300
+	repos := reposForTest(3000)
+	repoSetNames := make([]string, 0, len(repos)/2)
+
+	for i, r := range repos {
+		searcher := testSearcherForRepo(b, r, filesPerRepo)
+		ss.replace(r.Name, searcher)
+		if i%2 == 0 {
+			repoSetNames = append(repoSetNames, r.Name)
+		}
+	}
+
+	ctx := context.Background()
+	opts := &zoekt.SearchOptions{}
+
+	set := query.NewRepoSet(repoSetNames...)
+	needleSub := &query.Substring{Pattern: "needle"}
+	haystackSub := &query.Substring{Pattern: "haystack"}
+	helloworldSub := &query.Substring{Pattern: "helloworld"}
+
+	search := func(b *testing.B, q query.Q, wantFiles int) {
+		b.Helper()
+
+		res, err := ss.Search(ctx, q, opts)
+		if err != nil {
+			b.Fatalf("Search(%s): %v", q, err)
+		}
+		if have := len(res.Files); have != wantFiles {
+			b.Fatalf("wrong number of file results. have=%d, want=%d", have, wantFiles)
+		}
+	}
+
+	benchmarks := []struct {
+		name      string
+		q         query.Q
+		wantFiles int
+	}{
+		{"substring all results", haystackSub, len(repos) * filesPerRepo},
+		{"substring no results", helloworldSub, 0},
+		{"substring some results", needleSub, len(repos)},
+
+		{"substring all results and repo set", query.NewAnd(set, haystackSub), len(repoSetNames) * filesPerRepo},
+		{"substring some results and repo set", query.NewAnd(set, needleSub), len(repoSetNames)},
+		{"substring no results and repo set", query.NewAnd(set, helloworldSub), 0},
+	}
+
+	for _, bb := range benchmarks {
+		b.Run(bb.name, func(b *testing.B) {
+			q := bb.q
+
+			b.ReportAllocs()
+
+			for n := 0; n < b.N; n++ {
+				search(b, q, bb.wantFiles)
+			}
+		})
+	}
+
 }
