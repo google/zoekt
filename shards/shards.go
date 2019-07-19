@@ -31,7 +31,7 @@ import (
 	"github.com/google/zoekt/query"
 )
 
-type Repositorer interface {
+type repositorer interface {
 	Repository() *zoekt.Repository
 }
 
@@ -126,7 +126,7 @@ func selectRepoSet(shards []rankedShard, q query.Q) ([]rankedShard, query.Q) {
 		filtered := shards[:0]
 
 		for _, s := range shards {
-			if repositorer, ok := s.Searcher.(Repositorer); ok {
+			if repositorer, ok := s.Searcher.(repositorer); ok {
 				repo := repositorer.Repository()
 				if setQuery.Set[repo.Name] {
 					filtered = append(filtered, s)
