@@ -166,7 +166,7 @@ func TestFilteringShardsByRepoSet(t *testing.T) {
 		shardName := fmt.Sprintf("shard%d", i)
 		repoName := fmt.Sprintf("repository%d", i)
 
-		if i%2 == 0 {
+		if i%3 == 0 {
 			repoSetNames = append(repoSetNames, repoName)
 		}
 
@@ -194,6 +194,15 @@ func TestFilteringShardsByRepoSet(t *testing.T) {
 	// result and using repoSet will half the number of results
 	if len(res.Files) != len(repoSetNames) {
 		t.Fatalf("with reposet: got %d results, want %d", len(res.Files), len(repoSetNames))
+	}
+
+	// With the same reposet multiple times
+	res, err = ss.Search(context.Background(), query.NewAnd(set, set, sub), &zoekt.SearchOptions{})
+	if err != nil {
+		t.Errorf("Search: %v", err)
+	}
+	if len(res.Files) != len(repoSetNames) {
+		t.Fatalf("with reposet multiple times: got %d results, want %d", len(res.Files), len(repoSetNames))
 	}
 }
 

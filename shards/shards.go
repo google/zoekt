@@ -111,14 +111,19 @@ func (ss *shardedSearcher) Close() {
 	}
 }
 
-func selectRepoSet(shards []rankedShard, q query.Q) []rankedShard {
-	filtered := shards[:0]
+func selectRepoSet(shards []rankedShard, q query.Q) ([]rankedShard, query.Q) {
+	and, ok := q.(*query.And)
+	if !ok {
+		return shards, q
+	}
 
-	eval := query.Map(q, func(q query.Q) query.Q {
-		setQuery, ok := q.(*query.RepoSet)
+	for i, c := range and.Children {
+		setQuery, ok := c.(*query.RepoSet)
 		if !ok {
-			return q
+			continue
 		}
+
+		filtered := shards[:0]
 
 		for _, s := range shards {
 			if repositorer, ok := s.Searcher.(Repositorer); ok {
@@ -129,15 +134,16 @@ func selectRepoSet(shards []rankedShard, q query.Q) []rankedShard {
 			}
 		}
 
-		return &query.Const{Value: true}
-	})
-	query.Simplify(eval)
+		and.Children[i] = &query.Const{Value: len(filtered) > 0}
 
-	if len(filtered) != 0 {
-		return filtered
+		// Stop after first RepoSet, otherwise we might append duplicate
+		// shards to `filtered`
+		if len(filtered) != 0 {
+			return filtered, and
+		}
 	}
 
-	return shards
+	return shards, and
 }
 
 func (ss *shardedSearcher) Search(ctx context.Context, q query.Q, opts *zoekt.SearchOptions) (sr *zoekt.SearchResult, err error) {
@@ -174,7 +180,7 @@ func (ss *shardedSearcher) Search(ctx context.Context, q query.Q, opts *zoekt.Se
 	start = time.Now()
 
 	shards := ss.getShards()
-	shards = selectRepoSet(shards, q)
+	shards, q = selectRepoSet(shards, q)
 
 	all := make(chan shardResult, len(shards))
 
