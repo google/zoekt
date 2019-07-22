@@ -137,9 +137,7 @@ func selectRepoSet(shards []rankedShard, q query.Q) ([]rankedShard, query.Q) {
 
 		// Stop after first RepoSet, otherwise we might append duplicate
 		// shards to `filtered`
-		if len(filtered) != 0 {
-			return filtered, and
-		}
+		return filtered, and
 	}
 
 	return shards, and
