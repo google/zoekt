@@ -166,7 +166,7 @@ func TestFilteringShardsByRepoSet(t *testing.T) {
 		shardName := fmt.Sprintf("shard%d", i)
 		repoName := fmt.Sprintf("repository%d", i)
 
-		if i%2 == 0 {
+		if i%3 == 0 {
 			repoSetNames = append(repoSetNames, repoName)
 		}
 
@@ -194,6 +194,15 @@ func TestFilteringShardsByRepoSet(t *testing.T) {
 	// result and using repoSet will half the number of results
 	if len(res.Files) != len(repoSetNames) {
 		t.Fatalf("with reposet: got %d results, want %d", len(res.Files), len(repoSetNames))
+	}
+
+	// With the same reposet multiple times
+	res, err = ss.Search(context.Background(), query.NewAnd(set, set, sub), &zoekt.SearchOptions{})
+	if err != nil {
+		t.Errorf("Search: %v", err)
+	}
+	if len(res.Files) != len(repoSetNames) {
+		t.Fatalf("with reposet multiple times: got %d results, want %d", len(res.Files), len(repoSetNames))
 	}
 }
 
@@ -333,10 +342,15 @@ func BenchmarkShardedSearch(b *testing.B) {
 	ctx := context.Background()
 	opts := &zoekt.SearchOptions{}
 
-	set := query.NewRepoSet(repoSetNames...)
 	needleSub := &query.Substring{Pattern: "needle"}
 	haystackSub := &query.Substring{Pattern: "haystack"}
 	helloworldSub := &query.Substring{Pattern: "helloworld"}
+
+	setAnd := func(q query.Q) func() query.Q {
+		return func() query.Q {
+			return query.NewAnd(query.NewRepoSet(repoSetNames...), q)
+		}
+	}
 
 	search := func(b *testing.B, q query.Q, wantFiles int) {
 		b.Helper()
@@ -352,25 +366,25 @@ func BenchmarkShardedSearch(b *testing.B) {
 
 	benchmarks := []struct {
 		name      string
-		q         query.Q
+		q         func() query.Q
 		wantFiles int
 	}{
-		{"substring all results", haystackSub, len(repos) * filesPerRepo},
-		{"substring no results", helloworldSub, 0},
-		{"substring some results", needleSub, len(repos)},
+		{"substring all results", func() query.Q { return haystackSub }, len(repos) * filesPerRepo},
+		{"substring no results", func() query.Q { return helloworldSub }, 0},
+		{"substring some results", func() query.Q { return needleSub }, len(repos)},
 
-		{"substring all results and repo set", query.NewAnd(set, haystackSub), len(repoSetNames) * filesPerRepo},
-		{"substring some results and repo set", query.NewAnd(set, needleSub), len(repoSetNames)},
-		{"substring no results and repo set", query.NewAnd(set, helloworldSub), 0},
+		{"substring all results and repo set", setAnd(haystackSub), len(repoSetNames) * filesPerRepo},
+		{"substring some results and repo set", setAnd(needleSub), len(repoSetNames)},
+		{"substring no results and repo set", setAnd(helloworldSub), 0},
 	}
 
 	for _, bb := range benchmarks {
 		b.Run(bb.name, func(b *testing.B) {
-			q := bb.q
-
 			b.ReportAllocs()
 
 			for n := 0; n < b.N; n++ {
+				q := bb.q()
+
 				search(b, q, bb.wantFiles)
 			}
 		})
