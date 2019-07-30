@@ -146,40 +146,18 @@ func deleteStaleProjects(destDir string, filter *gitindex.Filter, projects []*gi
 		return err
 	}
 
-	paths, err := gitindex.ListRepos(destDir, u)
-	if err != nil {
-		return err
-	}
-
-	names := map[string]bool{}
+	names := map[string]struct{}{}
 	for _, p := range projects {
 		u, err := url.Parse(p.HTTPURLToRepo)
 		if err != nil {
 			return err
 		}
 
-		names[filepath.Join(u.Host, u.Path)] = true
+		names[filepath.Join(u.Host, u.Path)] = struct{}{}
 	}
 
-	var toDelete []string
-	for _, p := range paths {
-		if filter.Include(p) && !names[p] {
-			toDelete = append(toDelete, p)
-		}
-	}
-
-	if len(toDelete) > 0 {
-		log.Printf("deleting repos %v", toDelete)
-	}
-
-	var errs []string
-	for _, d := range toDelete {
-		if err := os.RemoveAll(filepath.Join(destDir, d)); err != nil {
-			errs = append(errs, err.Error())
-		}
-	}
-	if len(errs) > 0 {
-		return fmt.Errorf("errors: %v", errs)
+	if err := gitindex.DeleteRepos(destDir, u, names, filter); err != nil {
+		log.Fatalf("deleteRepos: %v", err)
 	}
 	return nil
 }

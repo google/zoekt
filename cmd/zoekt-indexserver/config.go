@@ -195,7 +195,7 @@ func executeMirror(cfg []ConfigEntry, repoDir string, pendingRepos chan<- string
 			cmd.Args = append(cmd.Args, c.CGitURL)
 		} else if c.BitBucketServerURL != "" {
 			cmd = exec.Command("zoekt-mirror-bitbucket-server",
-				"-dest", repoDir, "-url", c.BitBucketServerURL)
+				"-dest", repoDir, "-url", c.BitBucketServerURL, "-delete")
 			if c.BitBucketServerProject != "" {
 				cmd.Args = append(cmd.Args, "-project", c.BitBucketServerProject)
 			}
