@@ -30,7 +30,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/go-github/github"
+	"github.com/google/go-github/v27/github"
 	"golang.org/x/oauth2"
 
 	"github.com/google/zoekt/gitindex"
