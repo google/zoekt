@@ -106,6 +106,7 @@ func indexArg(arg string, opts build.Options, ignore map[string]struct{}) error 
 	if err != nil {
 		return err
 	}
+	defer builder.Finish()
 
 	comm := make(chan fileInfo, 100)
 	agg := fileAggregator{

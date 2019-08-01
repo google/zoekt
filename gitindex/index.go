@@ -459,6 +459,7 @@ func IndexGitRepo(opts Options) error {
 	if err != nil {
 		return err
 	}
+	defer builder.Finish()
 
 	var names []string
 	fileKeys := map[string][]fileKey{}
