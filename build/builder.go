@@ -272,7 +272,8 @@ func (b *Builder) Add(doc zoekt.Document) error {
 }
 
 // Finish creates a last shard from the buffered documents, and clears
-// stale shards from previous runs
+// stale shards from previous runs. This should always be called, also
+// in failure cases, to ensure cleanup.
 func (b *Builder) Finish() error {
 	b.flush()
 	b.building.Wait()
@@ -281,6 +282,7 @@ func (b *Builder) Finish() error {
 		for tmp := range b.finishedShards {
 			os.Remove(tmp)
 		}
+		b.finishedShards = map[string]string{}
 		return b.buildError
 	}
 
@@ -289,6 +291,7 @@ func (b *Builder) Finish() error {
 			b.buildError = err
 		}
 	}
+	b.finishedShards = map[string]string{}
 
 	if b.nextShardNum > 0 {
 		b.deleteRemainingShards()
