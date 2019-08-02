@@ -15,6 +15,7 @@ Downloading:
 
 Indexing:
 
+    go get -u go.uber.org/automaxprocs
     go install github.com/google/zoekt/cmd/zoekt-index
     $GOPATH/bin/zoekt-index .
 
