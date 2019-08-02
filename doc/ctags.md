@@ -19,11 +19,12 @@ access to the indexing machine.
 Use the following invocation to compile and install universal-ctags:
 
 ```
-sudo apt-get install
-  pkg-config autoconf \
-  libseccomp-dev libseccomp \
-  libjansson-dev libjansson 
+sudo apt install \
+  pkg-config autoconf python3-docutils \
+  libseccomp-dev libseccomp2 \
+  libjansson-dev libjansson4
 
+git clone --depth=1 https://github.com/universal-ctags/ctags.git && cd ctags
 ./autogen.sh
 LDFLAGS=-static ./configure --enable-json --enable-seccomp
 make -j4
