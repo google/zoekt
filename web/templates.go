@@ -28,7 +28,7 @@ var TemplateText = map[string]string{
 	"didyoumean": `
 <html>
 <head>
-  <title>Error</title>
+  <title>Zoekt · Error</title>
 </head>
 <body>
   <p>{{.Message}}. Did you mean <a href="/search?q={{.Suggestion}}">{{.Suggestion}}</a> ?
@@ -199,7 +199,7 @@ var TemplateText = map[string]string{
 	"results": `
 <html>
 {{template "head"}}
-<title>Results for {{.QueryStr}}</title>
+<title>Zoekt · Results for {{.QueryStr}}</title>
 <script>
   function zoektAddQ(atom) {
       window.location.href = "/search?q=" + escape("{{.QueryStr}}" + " " + atom) +
@@ -319,7 +319,7 @@ var TemplateText = map[string]string{
 	"print": `
 <html>
   {{template "head"}}
-  <title>{{.Repo}}:{{.Name}}</title>
+  <title>Zoekt · {{.Repo}}:{{.Name}}</title>
 <body id="results">
   {{template "navbar" .Last}}
   <div class="container-fluid container-results" >
@@ -345,7 +345,7 @@ var TemplateText = map[string]string{
 
 <html>
   {{template "head"}}
-  <title>About <em>zoekt</em></title>
+  <title>Zoekt · About <em>zoekt</em></title>
 <body>
 
 
