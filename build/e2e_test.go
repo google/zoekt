@@ -58,7 +58,9 @@ func TestBasic(t *testing.T) {
 		b.AddFile("F"+s, []byte(strings.Repeat(s, 1000)))
 	}
 
-	b.Finish()
+	if err := b.Finish(); err != nil {
+		t.Errorf("Finish: %v", err)
+	}
 
 	fs, _ := filepath.Glob(dir + "/*")
 	if len(fs) <= 1 {
@@ -117,7 +119,9 @@ func TestLargeFileOption(t *testing.T) {
 		b.AddFile("F"+s, []byte(strings.Repeat("a", sizeMax+1)))
 	}
 
-	b.Finish()
+	if err := b.Finish(); err != nil {
+		t.Errorf("Finish: %v", err)
+	}
 
 	ss, err := shards.NewDirectorySearcher(dir)
 	if err != nil {
@@ -163,7 +167,9 @@ func TestUpdate(t *testing.T) {
 		t.Fatalf("NewBuilder: %v", err)
 	} else {
 		b.AddFile("F", []byte("hoi"))
-		b.Finish()
+		if err := b.Finish(); err != nil {
+			t.Errorf("Finish: %v", err)
+		}
 	}
 	ss, err := shards.NewDirectorySearcher(dir)
 	if err != nil {
@@ -194,7 +200,9 @@ func TestUpdate(t *testing.T) {
 		t.Fatalf("NewBuilder: %v", err)
 	} else {
 		b.AddFile("F", []byte("hoi"))
-		b.Finish()
+		if err := b.Finish(); err != nil {
+			t.Errorf("Finish: %v", err)
+		}
 	}
 
 	// This is ugly, and potentially flaky, but there is no
@@ -255,7 +263,9 @@ func TestDeleteOldShards(t *testing.T) {
 		s := fmt.Sprintf("%d\n", i)
 		b.AddFile("F"+s, []byte(strings.Repeat(s, 1024/2)))
 	}
-	b.Finish()
+	if err := b.Finish(); err != nil {
+		t.Errorf("Finish: %v", err)
+	}
 
 	glob := filepath.Join(dir, "*")
 	fs, err := filepath.Glob(glob)
@@ -282,7 +292,9 @@ func TestDeleteOldShards(t *testing.T) {
 		s := fmt.Sprintf("%d\n", i)
 		b.AddFile("F"+s, []byte(strings.Repeat(s, 1024/2)))
 	}
-	b.Finish()
+	if err := b.Finish(); err != nil {
+		t.Errorf("Finish: %v", err)
+	}
 
 	fs, err = filepath.Glob(glob)
 	if err != nil {
@@ -296,7 +308,9 @@ func TestDeleteOldShards(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewBuilder: %v", err)
 	}
-	b.Finish()
+	if err := b.Finish(); err != nil {
+		t.Errorf("Finish: %v", err)
+	}
 
 	fs, err = filepath.Glob(glob)
 	if err != nil {
@@ -342,8 +356,10 @@ func TestPartialSuccess(t *testing.T) {
 		t.Fatalf("chmod(%s, writable): %s", dir, err)
 	}
 
+	// No error checking.
 	b.Finish()
 
+	// Finish cleans up temporary files.
 	if fs, err := filepath.Glob(dir + "/*"); err != nil {
 		t.Errorf("glob(%s): %v", dir, err)
 	} else if len(fs) != 0 {
@@ -444,7 +460,9 @@ func TestEmptyContent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewBuilder: %v", err)
 	}
-	b.Finish()
+	if err := b.Finish(); err != nil {
+		t.Errorf("Finish: %v", err)
+	}
 
 	fs, _ := filepath.Glob(dir + "/*")
 	if len(fs) != 1 {
