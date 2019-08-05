@@ -272,10 +272,8 @@ func (b *IndexBuilder) AddFile(name string, content []byte) error {
 	return b.Add(Document{Name: name, Content: content})
 }
 
-const maxTrigramCount = 20000
-
 // CheckText returns a reason why the given contents are probably not source texts.
-func CheckText(content []byte) error {
+func CheckText(content []byte, maxTrigramCount int) error {
 	if len(content) == 0 {
 		return nil
 	}

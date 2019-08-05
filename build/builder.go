@@ -59,6 +59,9 @@ type Options struct {
 	// ShardMax sets the maximum corpus size for a single shard
 	ShardMax int
 
+	// TrigramMax sets the maximum number of distinct trigrams per document.
+	TrigramMax int
+
 	// RepositoryDescription holds names and URLs for the repository.
 	RepositoryDescription zoekt.Repository
 
@@ -142,6 +145,9 @@ func (o *Options) SetDefaults() {
 	}
 	if o.ShardMax == 0 {
 		o.ShardMax = 128 << 20
+	}
+	if o.TrigramMax == 0 {
+		o.TrigramMax = 20000
 	}
 
 	if o.RepositoryDescription.Name == "" && o.RepositoryDescription.URL != "" {
@@ -257,7 +263,7 @@ func (b *Builder) Add(doc zoekt.Document) error {
 	// insert a reason here too.
 	if len(doc.Content) > b.opts.SizeMax && !b.opts.IgnoreSizeMax(doc.Name) {
 		doc.SkipReason = fmt.Sprintf("document size %d larger than limit %d", len(doc.Content), b.opts.SizeMax)
-	} else if err := zoekt.CheckText(doc.Content); err != nil {
+	} else if err := zoekt.CheckText(doc.Content, b.opts.TrigramMax); err != nil {
 		doc.SkipReason = err.Error()
 		doc.Language = "binary"
 	}
