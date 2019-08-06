@@ -1,5 +1,3 @@
-// Copyright 2016 Google Inc. All rights reserved.
-//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -41,6 +39,7 @@ func main() {
 	serverUrl := flag.String("url", "", "BitBucket Server url")
 	credentialsFile := flag.String("credentials", ".bitbucket-credentials", "file holding BitBucket Server credentials")
 	project := flag.String("project", "", "project to mirror")
+	deleteRepos := flag.Bool("delete", false, "delete missing repos")
 	namePattern := flag.String("name", "", "only clone repos whose name matches the given regexp.")
 	excludePattern := flag.String("exclude", "", "don't mirror repos whose names match this regexp.")
 	projectType := flag.String("type", "", "only clone repos whose type matches the given string. "+
@@ -137,6 +136,36 @@ func main() {
 	if err := cloneRepos(destDir, rootURL.Host, repos, password); err != nil {
 		log.Fatalf("cloneRepos: %v", err)
 	}
+
+	if *deleteRepos {
+		if err := deleteStaleRepos(*dest, filter, repos); err != nil {
+			log.Fatalf("deleteStaleRepos: %v", err)
+		}
+	}
+}
+
+func deleteStaleRepos(destDir string, filter *gitindex.Filter, repos []bitbucketv1.Repository) error {
+	var baseURL string
+	if len(repos) > 0 {
+		baseURL = repos[0].Links.Self[0].Href
+	} else {
+		return nil
+	}
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return err
+	}
+	u.Path = ""
+
+	names := map[string]struct{}{}
+	for _, r := range repos {
+		names[filepath.Join(u.Host, r.Project.Key, r.Slug+".git")] = struct{}{}
+	}
+
+	if err := gitindex.DeleteRepos(destDir, u, names, filter); err != nil {
+		log.Fatalf("deleteRepos: %v", err)
+	}
+	return nil
 }
 
 func IsValidProjectType(projectType string) bool {

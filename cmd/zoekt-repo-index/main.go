@@ -281,7 +281,8 @@ func main() {
 
 		doc.Branches = append(doc.Branches, branches...)
 		if err := builder.Add(doc); err != nil {
-			log.Fatalf("Add(%s): %v", doc.Name, err)
+			log.Printf("Add(%s): %v", doc.Name, err)
+			break
 		}
 	}
 	if err := builder.Finish(); err != nil {

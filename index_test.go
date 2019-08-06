@@ -1877,12 +1877,12 @@ func TestSkipInvalidContent(t *testing.T) {
 
 func TestCheckText(t *testing.T) {
 	for _, text := range []string{"", "simple ascii", "símplé unicödé", "\uFEFFwith utf8 'bom'", "with \uFFFD unicode replacement char"} {
-		if err := CheckText([]byte(text)); err != nil {
+		if err := CheckText([]byte(text), 20000); err != nil {
 			t.Errorf("CheckText(%q): %v", text, err)
 		}
 	}
-	for _, text := range []string{"zero\x00byte", "xx"} {
-		if err := CheckText([]byte(text)); err == nil {
+	for _, text := range []string{"zero\x00byte", "xx", "0123456789abcdefghi"} {
+		if err := CheckText([]byte(text), 15); err == nil {
 			t.Errorf("CheckText(%q) succeeded", text)
 		}
 	}
