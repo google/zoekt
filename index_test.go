@@ -182,39 +182,14 @@ func TestQueryNewlines(t *testing.T) {
 	text := "line1\nline2\nbla"
 	b := testIndexBuilder(t, nil,
 		Document{Name: "filename", Content: []byte(text)})
-
 	sres := searchForTest(t, b, &query.Substring{Pattern: "ine2\nbla"})
-
 	matches := sres.Files
-	want := []FileMatch{{
-		FileName: "filename",
-		LineMatches: []LineMatch{
-			{
-				LineFragments: []LineFragmentMatch{{
-					Offset:      12,
-					LineOffset:  0,
-					MatchLength: 3,
-				}},
-				Line:       []byte("bla"),
-				LineStart:  12,
-				LineEnd:    15,
-				LineNumber: 3,
-			},
-			{
-				LineFragments: []LineFragmentMatch{{
-					Offset:      7,
-					LineOffset:  1,
-					MatchLength: 4,
-				}},
-				Line:       []byte("line2"),
-				LineStart:  6,
-				LineEnd:    11,
-				LineNumber: 2,
-			},
-		}}}
-
-	if !reflect.DeepEqual(matches, want) {
-		t.Errorf("\ngot  %+v,\nwant %+v", matches, want)
+	if len(matches) != 1 {
+		t.Fatalf("got %d file matches, want exactly one", len(matches))
+	}
+	m := matches[0]
+	if len(m.LineMatches) != 2 {
+		t.Fatalf("got %d line matches, want exactly two", len(m.LineMatches))
 	}
 }
 
@@ -1902,12 +1877,12 @@ func TestSkipInvalidContent(t *testing.T) {
 
 func TestCheckText(t *testing.T) {
 	for _, text := range []string{"", "simple ascii", "símplé unicödé", "\uFEFFwith utf8 'bom'", "with \uFFFD unicode replacement char"} {
-		if err := CheckText([]byte(text)); err != nil {
+		if err := CheckText([]byte(text), 20000); err != nil {
 			t.Errorf("CheckText(%q): %v", text, err)
 		}
 	}
-	for _, text := range []string{"zero\x00byte", "xx"} {
-		if err := CheckText([]byte(text)); err == nil {
+	for _, text := range []string{"zero\x00byte", "xx", "0123456789abcdefghi"} {
+		if err := CheckText([]byte(text), 15); err == nil {
 			t.Errorf("CheckText(%q) succeeded", text)
 		}
 	}

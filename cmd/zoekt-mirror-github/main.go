@@ -30,7 +30,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/go-github/github"
+	"github.com/google/go-github/v27/github"
 	"golang.org/x/oauth2"
 
 	"github.com/google/zoekt/gitindex"
@@ -53,8 +53,8 @@ func main() {
 	if *dest == "" {
 		log.Fatal("must set --dest")
 	}
-	if (*org == "") == (*user == "") {
-		log.Fatal("must set either --org or --user")
+	if *githubURL == "" && *org == "" && *user == "" {
+		log.Fatal("must set either --org or --user when github.com is used as host")
 	}
 
 	var host string
@@ -112,6 +112,9 @@ func main() {
 		repos, err = getOrgRepos(client, *org)
 	} else if *user != "" {
 		repos, err = getUserRepos(client, *user)
+	} else {
+		log.Printf("no user or org specified, cloning all repos.")
+		repos, err = getUserRepos(client, "")
 	}
 
 	if err != nil {
@@ -167,39 +170,17 @@ func deleteStaleRepos(destDir string, filter *gitindex.Filter, repos []*github.R
 	}
 	u.Path = user
 
-	paths, err := gitindex.ListRepos(destDir, u)
-	if err != nil {
-		return err
-	}
-
-	names := map[string]bool{}
+	names := map[string]struct{}{}
 	for _, r := range repos {
 		u, err := url.Parse(*r.HTMLURL)
 		if err != nil {
 			return err
 		}
 
-		names[filepath.Join(u.Host, u.Path+".git")] = true
+		names[filepath.Join(u.Host, u.Path+".git")] = struct{}{}
 	}
-	var toDelete []string
-	for _, p := range paths {
-		if filter.Include(filepath.Base(p)) && !names[p] {
-			toDelete = append(toDelete, p)
-		}
-	}
-
-	if len(toDelete) > 0 {
-		log.Printf("deleting repos %v", toDelete)
-	}
-
-	var errs []string
-	for _, d := range toDelete {
-		if err := os.RemoveAll(filepath.Join(destDir, d)); err != nil {
-			errs = append(errs, err.Error())
-		}
-	}
-	if len(errs) > 0 {
-		return fmt.Errorf("errors: %v", errs)
+	if err := gitindex.DeleteRepos(destDir, u, names, filter); err != nil {
+		log.Fatalf("deleteRepos: %v", err)
 	}
 	return nil
 }

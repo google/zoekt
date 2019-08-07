@@ -112,6 +112,8 @@ func (d *indexData) calculateStats() {
 	}
 }
 
+func (d *indexData) Repository() *Repository { return &d.repoMetaData }
+
 func (d *indexData) String() string {
 	return fmt.Sprintf("shard(%s)", d.file.Name())
 }

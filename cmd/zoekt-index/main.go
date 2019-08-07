@@ -27,6 +27,7 @@ import (
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
 	"github.com/google/zoekt/cmd"
+	"go.uber.org/automaxprocs/maxprocs"
 )
 
 type fileInfo struct {
@@ -62,6 +63,9 @@ func main() {
 	var cpuProfile = flag.String("cpu_profile", "", "write cpu profile to file")
 	ignoreDirs := flag.String("ignore_dirs", ".git,.hg,.svn", "comma separated list of directories to ignore.")
 	flag.Parse()
+
+	// Tune GOMAXPROCS to match Linux container CPU quota.
+	maxprocs.Set()
 
 	opts := cmd.OptionsFromFlags()
 	if *cpuProfile != "" {
@@ -102,6 +106,7 @@ func indexArg(arg string, opts build.Options, ignore map[string]struct{}) error 
 	if err != nil {
 		return err
 	}
+	defer builder.Finish()
 
 	comm := make(chan fileInfo, 100)
 	agg := fileAggregator{

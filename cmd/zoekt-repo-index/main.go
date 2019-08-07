@@ -45,6 +45,7 @@ import (
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
 	"github.com/google/zoekt/gitindex"
+	"go.uber.org/automaxprocs/maxprocs"
 
 	git "gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing"
@@ -135,6 +136,9 @@ func main() {
 	maxSubProjects := flag.Int("max_sub_projects", 0, "trim number of projects in manifest, for debugging.")
 	incremental := flag.Bool("incremental", true, "only index if the repository has changed.")
 	flag.Parse()
+
+	// Tune GOMAXPROCS to match Linux container CPU quota.
+	maxprocs.Set()
 
 	if *repoCacheDir == "" {
 		log.Fatal("must set --repo_cache")
@@ -277,7 +281,8 @@ func main() {
 
 		doc.Branches = append(doc.Branches, branches...)
 		if err := builder.Add(doc); err != nil {
-			log.Fatalf("Add(%s): %v", doc.Name, err)
+			log.Printf("Add(%s): %v", doc.Name, err)
+			break
 		}
 	}
 	if err := builder.Finish(); err != nil {

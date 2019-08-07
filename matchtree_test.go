@@ -57,22 +57,6 @@ func Test_breakOnNewlines(t *testing.T) {
 			},
 		},
 		{
-			name: "no newlines in longer match",
-			args: args{
-				cm: &candidateMatch{
-					byteOffset:  4,
-					byteMatchSz: 3,
-				},
-				text: []byte("abc def ghi"),
-			},
-			want: []*candidateMatch{
-				{
-					byteOffset:  4,
-					byteMatchSz: 3,
-				},
-			},
-		},
-		{
 			name: "newline at start",
 			args: args{
 				cm: &candidateMatch{
@@ -85,50 +69,6 @@ func Test_breakOnNewlines(t *testing.T) {
 				{
 					byteOffset:  1,
 					byteMatchSz: 1,
-				},
-			},
-		},
-		{
-			name: "newline at start of three lines",
-			args: args{
-				cm: &candidateMatch{
-					byteOffset:  0,
-					byteMatchSz: 7,
-				},
-				text: []byte("\na\nbc\nde"),
-			},
-			want: []*candidateMatch{
-				{
-					byteOffset:  1,
-					byteMatchSz: 1,
-				},
-				{
-					byteOffset:  3,
-					byteMatchSz: 2,
-				},
-				{
-					byteOffset:  6,
-					byteMatchSz: 1,
-				},
-			},
-		},
-		{
-			name: "newline at end of three lines",
-			args: args{
-				cm: &candidateMatch{
-					byteOffset:  2,
-					byteMatchSz: 6,
-				},
-				text: []byte("a\nbc\nde\n"),
-			},
-			want: []*candidateMatch{
-				{
-					byteOffset:  2,
-					byteMatchSz: 2,
-				},
-				{
-					byteOffset:  5,
-					byteMatchSz: 2,
 				},
 			},
 		},
@@ -182,26 +122,6 @@ func Test_breakOnNewlines(t *testing.T) {
 					byteOffset:  0,
 					byteMatchSz: 1,
 				},
-				{
-					byteOffset:  2,
-					byteMatchSz: 1,
-				},
-				{
-					byteOffset:  4,
-					byteMatchSz: 1,
-				},
-			},
-		},
-		{
-			name: "two newlines, nonzero offset",
-			args: args{
-				cm: &candidateMatch{
-					byteOffset:  2,
-					byteMatchSz: 3,
-				},
-				text: []byte("a\nb\nc"),
-			},
-			want: []*candidateMatch{
 				{
 					byteOffset:  2,
 					byteMatchSz: 1,

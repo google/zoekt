@@ -46,6 +46,7 @@ func main() {
 		filepath.Join(os.Getenv("HOME"), ".gitlab-token"),
 		"file holding API token.")
 	isMember := flag.Bool("membership", false, "only mirror repos this user is a member of ")
+	isPublic := flag.Bool("public", false, "only mirror public repos")
 	deleteRepos := flag.Bool("delete", false, "delete missing repos")
 	namePattern := flag.String("name", "", "only clone repos whose name matches the given regexp.")
 	excludePattern := flag.String("exclude", "", "don't mirror repos whose names match this regexp.")
@@ -82,6 +83,9 @@ func main() {
 			Page:    1,
 		},
 		Membership: isMember,
+	}
+	if *isPublic {
+		opt.Visibility = gitlab.Visibility(gitlab.PublicVisibility)
 	}
 
 	var gitlabProjects []*gitlab.Project
@@ -142,40 +146,18 @@ func deleteStaleProjects(destDir string, filter *gitindex.Filter, projects []*gi
 		return err
 	}
 
-	paths, err := gitindex.ListRepos(destDir, u)
-	if err != nil {
-		return err
-	}
-
-	names := map[string]bool{}
+	names := map[string]struct{}{}
 	for _, p := range projects {
 		u, err := url.Parse(p.HTTPURLToRepo)
 		if err != nil {
 			return err
 		}
 
-		names[filepath.Join(u.Host, u.Path)] = true
+		names[filepath.Join(u.Host, u.Path)] = struct{}{}
 	}
 
-	var toDelete []string
-	for _, p := range paths {
-		if filter.Include(p) && !names[p] {
-			toDelete = append(toDelete, p)
-		}
-	}
-
-	if len(toDelete) > 0 {
-		log.Printf("deleting repos %v", toDelete)
-	}
-
-	var errs []string
-	for _, d := range toDelete {
-		if err := os.RemoveAll(filepath.Join(destDir, d)); err != nil {
-			errs = append(errs, err.Error())
-		}
-	}
-	if len(errs) > 0 {
-		return fmt.Errorf("errors: %v", errs)
+	if err := gitindex.DeleteRepos(destDir, u, names, filter); err != nil {
+		log.Fatalf("deleteRepos: %v", err)
 	}
 	return nil
 }

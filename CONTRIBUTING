@@ -34,3 +34,13 @@ For submitting patches, please use gerrit:
     git push gerrit HEAD:refs/for/master
 
 * Add hanwen@google.com as a reviewer in the Web UI
+
+* To make changes in response to the review, do
+
+    git commit --amend
+
+  and include your updated files into the commit. Then
+
+    git push gerrit HEAD:refs/for/master
+
+  will push a new patchset.

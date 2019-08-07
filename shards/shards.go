@@ -31,6 +31,10 @@ import (
 	"github.com/google/zoekt/query"
 )
 
+type repositorer interface {
+	Repository() *zoekt.Repository
+}
+
 type rankedShard struct {
 	zoekt.Searcher
 	rank uint16
@@ -59,10 +63,10 @@ func newShardedSearcher(n int64) *shardedSearcher {
 // NewDirectorySearcher returns a searcher instance that loads all
 // shards corresponding to a glob into memory.
 func NewDirectorySearcher(dir string) (zoekt.Searcher, error) {
-	ss := newShardedSearcher(int64(runtime.NumCPU()))
+	ss := newShardedSearcher(int64(runtime.GOMAXPROCS(0)))
 	tl := &throttledLoader{
 		ss:       ss,
-		throttle: make(chan struct{}, runtime.NumCPU()),
+		throttle: make(chan struct{}, runtime.GOMAXPROCS(0)),
 	}
 	_, err := NewDirectoryWatcher(dir, tl)
 	if err != nil {
@@ -107,6 +111,38 @@ func (ss *shardedSearcher) Close() {
 	}
 }
 
+func selectRepoSet(shards []rankedShard, q query.Q) ([]rankedShard, query.Q) {
+	and, ok := q.(*query.And)
+	if !ok {
+		return shards, q
+	}
+
+	for i, c := range and.Children {
+		setQuery, ok := c.(*query.RepoSet)
+		if !ok {
+			continue
+		}
+
+		filtered := shards[:0]
+
+		for _, s := range shards {
+			if repositorer, ok := s.Searcher.(repositorer); ok {
+				repo := repositorer.Repository()
+				if setQuery.Set[repo.Name] {
+					filtered = append(filtered, s)
+				}
+			}
+		}
+		and.Children[i] = &query.Const{Value: len(filtered) > 0}
+
+		// Stop after first RepoSet, otherwise we might append duplicate
+		// shards to `filtered`
+		return filtered, query.Simplify(and)
+	}
+
+	return shards, and
+}
+
 func (ss *shardedSearcher) Search(ctx context.Context, q query.Q, opts *zoekt.SearchOptions) (sr *zoekt.SearchResult, err error) {
 	tr := trace.New("shardedSearcher.Search", "")
 	tr.LazyLog(q, true)
@@ -141,6 +177,8 @@ func (ss *shardedSearcher) Search(ctx context.Context, q query.Q, opts *zoekt.Se
 	start = time.Now()
 
 	shards := ss.getShards()
+	shards, q = selectRepoSet(shards, q)
+
 	all := make(chan shardResult, len(shards))
 
 	var childCtx context.Context
@@ -163,7 +201,7 @@ func (ss *shardedSearcher) Search(ctx context.Context, q query.Q, opts *zoekt.Se
 		feeder <- s
 	}
 	close(feeder)
-	for i := 0; i < runtime.NumCPU(); i++ {
+	for i := 0; i < runtime.GOMAXPROCS(0); i++ {
 		go func() {
 			for s := range feeder {
 				searchOneShard(childCtx, s, q, opts, all)
@@ -286,7 +324,7 @@ func (ss *shardedSearcher) List(ctx context.Context, r query.Q) (rl *zoekt.RepoL
 		feeder <- s
 	}
 	close(feeder)
-	for i := 0; i < runtime.NumCPU(); i++ {
+	for i := 0; i < runtime.GOMAXPROCS(0); i++ {
 		go func() {
 			for s := range feeder {
 				listOneShard(ctx, s, r, all)
