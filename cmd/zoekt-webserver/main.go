@@ -212,6 +212,7 @@ func main() {
 	}
 	go watchdog(30*time.Second, watchdogAddr)
 
+	log.Printf("listening on %v", *listen)
 	if *sslCert != "" || *sslKey != "" {
 		err = http.ListenAndServeTLS(*listen, *sslCert, *sslKey, handler)
 	} else {
