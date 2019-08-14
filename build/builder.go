@@ -125,6 +125,12 @@ type finishedShard struct {
 // SetDefaults sets reasonable default options.
 func (o *Options) SetDefaults() {
 	if o.CTags == "" {
+		if ctags := os.Getenv("CTAGS_COMMAND"); ctags != "" {
+			o.CTags = ctags
+		}
+	}
+
+	if o.CTags == "" {
 		ctags, err := exec.LookPath("universal-ctags")
 		if err == nil {
 			o.CTags = ctags
