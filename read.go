@@ -77,13 +77,13 @@ func (r *reader) readTOC(toc *indexTOC) error {
 		return err
 	}
 
-	secs := toc.sections()
+	secs := toc.sectionsHACK(sectionCount)
 
 	if len(secs) != int(sectionCount) {
 		return fmt.Errorf("section count mismatch: got %d want %d", sectionCount, len(secs))
 	}
 
-	for _, s := range toc.sections() {
+	for _, s := range secs {
 		if err := s.read(r); err != nil {
 			return err
 		}
@@ -154,9 +154,14 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 		return nil, err
 	}
 
-	if d.metaData.IndexFormatVersion != IndexFormatVersion {
+	ensureSourcegraphSymbolsHack()
+
+	// Once we are not on version 16 use this code again
+	// if d.metaData.IndexFormatVersion != IndexFormatVersion {
+	if d.metaData.IndexFormatVersion != 16 && d.metaData.IndexFormatVersion != 15 {
 		return nil, fmt.Errorf("file is v%d, want v%d", d.metaData.IndexFormatVersion, IndexFormatVersion)
 	}
+	readSymbols := d.metaData.IndexFormatVersion == 16
 
 	blob, err = d.readSectionBlob(toc.repoMetaData)
 	if err != nil {
@@ -173,8 +178,10 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 	d.docSectionsStart = toc.fileSections.data.off
 	d.docSectionsIndex = toc.fileSections.relativeIndex()
 
-	d.symIndex = toc.symbolMap.relativeIndex()
-	d.symKindIndex = toc.symbolKindMap.relativeIndex()
+	if readSymbols {
+		d.symIndex = toc.symbolMap.relativeIndex()
+		d.symKindIndex = toc.symbolKindMap.relativeIndex()
+	}
 
 	d.checksums, err = d.readSectionBlob(toc.contentChecksums)
 	if err != nil {
@@ -202,9 +209,11 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 		}
 	}
 
-	d.fileEndSymbol, err = readSectionU32(d.file, toc.fileEndSymbol)
-	if err != nil {
-		return nil, err
+	if readSymbols {
+		d.fileEndSymbol, err = readSectionU32(d.file, toc.fileEndSymbol)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	d.fileBranchMasks, err = readSectionU64(d.file, toc.branchMasks)
@@ -212,19 +221,21 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 		return nil, err
 	}
 
-	d.symContent, err = d.readSectionBlob(toc.symbolMap.data)
-	if err != nil {
-		return nil, err
-	}
+	if readSymbols {
+		d.symContent, err = d.readSectionBlob(toc.symbolMap.data)
+		if err != nil {
+			return nil, err
+		}
 
-	d.symKindContent, err = d.readSectionBlob(toc.symbolKindMap.data)
-	if err != nil {
-		return nil, err
-	}
+		d.symKindContent, err = d.readSectionBlob(toc.symbolKindMap.data)
+		if err != nil {
+			return nil, err
+		}
 
-	d.symMetaData, err = d.readSectionBlob(toc.symbolMetaData)
-	if err != nil {
-		return nil, err
+		d.symMetaData, err = d.readSectionBlob(toc.symbolMetaData)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	d.fileNameContent, err = d.readSectionBlob(toc.fileNames.data)
