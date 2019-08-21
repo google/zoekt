@@ -518,6 +518,7 @@ func (b *Builder) buildShard(todo []*zoekt.Document, nextShardNum int) (*finishe
 
 func (b *Builder) newShardBuilder() (*zoekt.IndexBuilder, error) {
 	desc := b.opts.RepositoryDescription
+	desc.HasSymbols = b.opts.CTags != ""
 	desc.SubRepoMap = b.opts.SubRepositories
 	desc.IndexOptions = b.opts.HashOptions()
 
