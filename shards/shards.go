@@ -355,6 +355,11 @@ func shardRank(s zoekt.Searcher) uint16 {
 }
 
 func (s *shardedSearcher) replace(key string, shard zoekt.Searcher) {
+	var rank uint16
+	if shard != nil {
+		rank = shardRank(shard)
+	}
+
 	s.lock(context.Background())
 	defer s.unlock()
 	old := s.shards[key]
@@ -365,9 +370,8 @@ func (s *shardedSearcher) replace(key string, shard zoekt.Searcher) {
 	if shard == nil {
 		delete(s.shards, key)
 	} else {
-
 		s.shards[key] = rankedShard{
-			rank:     shardRank(shard),
+			rank:     rank,
 			Searcher: shard,
 		}
 	}
