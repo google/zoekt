@@ -16,9 +16,19 @@ package zoekt
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"io/ioutil"
+	"os"
 	"reflect"
 	"testing"
+
+	"github.com/google/zoekt/query"
 )
+
+var update = flag.Bool("update", false, "update golden files")
 
 func TestReadWrite(t *testing.T) {
 	b, err := NewIndexBuilder(nil)
@@ -96,5 +106,110 @@ func TestReadWriteNames(t *testing.T) {
 	}
 	if got := data.fileNameNgrams[stringToNGram("bCd")]; !reflect.DeepEqual(got, []uint32{1}) {
 		t.Errorf("got trigram bcd at bits %v, want sz 2", data.fileNameNgrams)
+	}
+}
+
+func loadShard(fn string) (Searcher, error) {
+	f, err := os.Open(fn)
+	if err != nil {
+		return nil, err
+	}
+
+	iFile, err := NewIndexFile(f)
+	if err != nil {
+		return nil, err
+	}
+	s, err := NewSearcher(iFile)
+	if err != nil {
+		iFile.Close()
+		return nil, fmt.Errorf("NewSearcher(%s): %v", fn, err)
+	}
+
+	return s, nil
+}
+
+func TestReadSearch(t *testing.T) {
+	type out struct {
+		FormatVersion  int
+		FeatureVersion int
+		FileMatches    [][]FileMatch
+	}
+
+	qs := []query.Q{
+		&query.Substring{Pattern: "func main", Content: true},
+		&query.Regexp{Regexp: mustParseRE("^package"), Content: true},
+		&query.Symbol{&query.Substring{Pattern: "num"}},
+		&query.Symbol{&query.Regexp{Regexp: mustParseRE("sage$")}},
+	}
+
+	shards := []string{"ctagsrepo_v16.00000", "repo_v15.00000", "repo_v16.00000"}
+	for _, name := range shards {
+		shard, err := loadShard("testdata/shards/" + name + ".zoekt")
+		if err != nil {
+			t.Fatalf("error loading shard %s %v", name, err)
+		}
+
+		index, ok := shard.(*indexData)
+		if !ok {
+			t.Fatalf("expected *indexData for %s", name)
+		}
+
+		golden := "testdata/golden/TestReadSearch/" + name + ".golden"
+
+		if *update {
+			got := out{
+				FormatVersion:  index.metaData.IndexFormatVersion,
+				FeatureVersion: index.metaData.IndexFeatureVersion,
+			}
+			for _, q := range qs {
+				res, err := shard.Search(context.Background(), q, &SearchOptions{})
+				if err != nil {
+					t.Fatalf("failed search %s on %s during updating: %v", q, name, err)
+				}
+				got.FileMatches = append(got.FileMatches, res.Files)
+			}
+
+			if raw, err := json.MarshalIndent(got, "", "  "); err != nil {
+				t.Errorf("failed marshalling search results for %s during updating: %v", name, err)
+				continue
+			} else if err := ioutil.WriteFile(golden, raw, 0644); err != nil {
+				t.Errorf("failed writing search results for %s during updating: %v", name, err)
+				continue
+			}
+		}
+
+		var want out
+		if buf, err := ioutil.ReadFile(golden); err != nil {
+			t.Fatalf("failed reading search results for %s: %v", name, err)
+		} else if err := json.Unmarshal(buf, &want); err != nil {
+			t.Fatalf("failed unmarshalling search results for %s: %v", name, err)
+		}
+
+		if index.metaData.IndexFormatVersion != want.FormatVersion {
+			t.Errorf("got %d index format version, want %d for %s", index.metaData.IndexFormatVersion, want.FormatVersion, name)
+		}
+
+		if index.metaData.IndexFeatureVersion != want.FeatureVersion {
+			t.Errorf("got %d index feature version, want %d for %s", index.metaData.IndexFeatureVersion, want.FeatureVersion, name)
+		}
+
+		for j, q := range qs {
+			res, err := shard.Search(context.Background(), q, &SearchOptions{})
+			if err != nil {
+				t.Fatalf("failed search %s on %s: %v", q, name, err)
+			}
+
+			if len(res.Files) != len(want.FileMatches[j]) {
+				t.Fatalf("got %d file matches for %s on %s, want %d", len(res.Files), q, name, len(want.FileMatches[j]))
+			}
+
+			if len(want.FileMatches[j]) == 0 {
+				continue
+			}
+
+			if !reflect.DeepEqual(res.Files, want.FileMatches[j]) {
+				t.Errorf("matches for %s on %s\ngot:\n%v\nwant:\n%v", q, name, res.Files[0], want.FileMatches[j])
+			}
+		}
 	}
 }
