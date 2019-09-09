@@ -20,10 +20,13 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/google/zoekt"
 )
 
 type shardLoader interface {
@@ -70,14 +73,55 @@ func (s *shardWatcher) String() string {
 	return fmt.Sprintf("shardWatcher(%s)", s.dir)
 }
 
+// versionFromPath extracts url encoded repository name and
+// index format version from a shard name from builder.
+func versionFromPath(path string) (string, int) {
+	und := strings.LastIndex(path, "_")
+	if und < 0 {
+		return path, 0
+	}
+
+	dot := strings.Index(path[und:], ".")
+	if dot < 0 {
+		return path, 0
+	}
+	dot += und
+
+	version, err := strconv.Atoi(path[und+2 : dot])
+	if err != nil {
+		return path, 0
+	}
+
+	return path[:und], version
+}
+
 func (s *shardWatcher) scan() error {
 	fs, err := filepath.Glob(filepath.Join(s.dir, "*.zoekt"))
 	if err != nil {
 		return err
 	}
 
+	latest := map[string]int{}
+	for _, fn := range fs {
+		name, version := versionFromPath(fn)
+
+		// In the case of downgrades, avoid reading
+		// newer index formats.
+		if version > zoekt.IndexFormatVersion {
+			continue
+		}
+
+		if latest[name] < version {
+			latest[name] = version
+		}
+	}
+
 	ts := map[string]time.Time{}
 	for _, fn := range fs {
+		if name, version := versionFromPath(fn); latest[name] != version {
+			continue
+		}
+
 		fi, err := os.Lstat(fn)
 		if err != nil {
 			continue
