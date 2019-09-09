@@ -177,16 +177,12 @@ func hashString(s string) string {
 
 // ShardName returns the name the given index shard.
 func (o *Options) shardName(n int) string {
-	return o.shardNameForVersion(zoekt.IndexFormatVersion, n)
-}
-
-func (o *Options) shardNameForVersion(version, n int) string {
 	abs := url.QueryEscape(o.RepositoryDescription.Name)
 	if len(abs) > 200 {
 		abs = abs[:200] + hashString(abs)[:8]
 	}
 	return filepath.Join(o.IndexDir,
-		fmt.Sprintf("%s_v%d.%05d.zoekt", abs, version, n))
+		fmt.Sprintf("%s_v%d.%05d.zoekt", abs, zoekt.IndexFormatVersion, n))
 }
 
 // IndexVersions returns the versions as present in the index, for
@@ -322,7 +318,6 @@ func (b *Builder) Finish() error {
 
 	if b.nextShardNum > 0 {
 		b.deleteRemainingShards()
-		b.deleteOlderVersionShards()
 	}
 	return b.buildError
 }
@@ -334,19 +329,6 @@ func (b *Builder) deleteRemainingShards() {
 		name := b.opts.shardName(shard)
 		if err := os.Remove(name); os.IsNotExist(err) {
 			break
-		}
-	}
-}
-
-// deleteOlderVersionShards removes shards for repo from earlier
-// IndexFormatVersions.
-func (b *Builder) deleteOlderVersionShards() {
-	for version := 0; version < zoekt.IndexFormatVersion; version++ {
-		for shard := 0; ; shard++ {
-			name := b.opts.shardNameForVersion(version, shard)
-			if err := os.Remove(name); os.IsNotExist(err) {
-				break
-			}
 		}
 	}
 }
