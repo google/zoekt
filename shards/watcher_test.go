@@ -45,6 +45,7 @@ func TestDirWatcherUnloadOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer os.RemoveAll(dir)
 
 	logger := &loggingLoader{
 		loads: make(chan string, 10),

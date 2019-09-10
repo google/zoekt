@@ -53,8 +53,7 @@ func CloneRepo(destDir, name, cloneURL string, settings map[string]string) (stri
 
 	cmd := exec.Command(
 		"git", "clone", "--bare", "--verbose", "--progress",
-		// Only fetch branch heads, and ignore note branches.
-		"--config", "remote.origin.fetch=+refs/heads/*:refs/heads/*")
+	)
 	cmd.Args = append(cmd.Args, config...)
 	cmd.Args = append(cmd.Args, cloneURL, repoDest)
 
@@ -64,5 +63,6 @@ func CloneRepo(destDir, name, cloneURL string, settings map[string]string) (stri
 	if err := cmd.Run(); err != nil {
 		return "", err
 	}
+
 	return repoDest, nil
 }
