@@ -91,6 +91,7 @@ func TestFindGitRepos(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TempDir: %v", err)
 	}
+	defer os.RemoveAll(dir)
 
 	if err := createSubmoduleRepo(dir); err != nil {
 		t.Error("createSubmoduleRepo", err)

@@ -3,6 +3,7 @@ package gitindex
 import (
 	"io/ioutil"
 	"net/url"
+	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -13,6 +14,7 @@ func TestDeleteRepos(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TempDir: %v", err)
 	}
+	defer os.RemoveAll(dir)
 
 	if err := createSubmoduleRepo(dir); err != nil {
 		t.Error("createSubmoduleRepo", err)
