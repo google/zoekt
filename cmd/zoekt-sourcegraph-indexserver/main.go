@@ -101,7 +101,14 @@ func (s *Server) Run() {
 	go func() {
 		t := time.NewTicker(s.Interval)
 		for {
-			repos, err := listRepos(s.Root)
+			hostname, err := os.Hostname()
+			if err != nil {
+				log.Println(err)
+				<-t.C
+				continue
+			}
+
+			repos, err := listRepos(hostname, s.Root)
 			if err != nil {
 				log.Println(err)
 				<-t.C
@@ -305,8 +312,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var err error
-	data.Repos, err = listRepos(s.Root)
+	hostname, err := os.Hostname()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	data.Repos, err = listRepos(hostname, s.Root)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -315,12 +327,25 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	repoTmpl.Execute(w, data)
 }
 
-func listRepos(root *url.URL) ([]string, error) {
+func listRepos(hostname string, root *url.URL) ([]string, error) {
 	c := retryablehttp.NewClient()
 	c.Logger = debug
 
+	body, err := json.Marshal(&struct {
+		Hostname string
+		Enabled  bool
+		Index    bool
+	}{
+		Hostname: hostname,
+		Enabled:  true,
+		Index:    true,
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	u := root.ResolveReference(&url.URL{Path: "/.internal/repos/list"})
-	resp, err := c.Post(u.String(), "application/json; charset=utf8", bytes.NewReader([]byte(`{"Enabled": true, "Index": true}`)))
+	resp, err := c.Post(u.String(), "application/json; charset=utf8", bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
