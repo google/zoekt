@@ -211,7 +211,7 @@ func (p *contentProvider) fillContentMatches(ms []*candidateMatch) []LineMatch {
 			LineEnd:    lineEnd,
 			LineNumber: num,
 		}
-		finalMatch.Line = p.data(false)[lineStart:lineEnd]
+		finalMatch.Line = data[lineStart:lineEnd]
 
 		for _, m := range lineCands {
 			fragment := LineFragmentMatch{
