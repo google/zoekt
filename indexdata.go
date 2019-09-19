@@ -27,7 +27,7 @@ import (
 // in memory to search. Most of the memory is taken up by the ngram =>
 // offset index.
 type indexData struct {
-	symbolData
+	symbols symbolData
 
 	file IndexFile
 
@@ -94,15 +94,41 @@ type symbolData struct {
 	// symContent stores Symbol.Sym and Symbol.Parent.
 	// TODO we don't need to store Symbol.Sym.
 	symContent []byte
-	symIndex   []uint32
+	symIndex   []byte
 	// symKindContent is an enum of sym.Kind and sym.ParentKind
 	symKindContent []byte
 	symKindIndex   []uint32
-	//symMetadata is [4]uint32 Sym Kind Parent ParentKind
+	// symMetadata is [4]uint32 0 Kind Parent ParentKind
 	symMetaData []byte
 }
 
-// data returns the symbol at i
+func uint32SliceAt(a []byte, n uint32) uint32 {
+	return binary.BigEndian.Uint32(a[n*4:])
+}
+
+func uint32SliceLen(a []byte) uint32 {
+	return uint32(len(a) / 4)
+}
+
+// parent returns index i of the parent enum
+func (d *symbolData) parent(i uint32) []byte {
+	delta := uint32SliceAt(d.symIndex, 0)
+	start := uint32SliceAt(d.symIndex, i) - delta
+	var end uint32
+	if i+1 == uint32SliceLen(d.symIndex) {
+		end = uint32(len(d.symContent))
+	} else {
+		end = uint32SliceAt(d.symIndex, i+1) - delta
+	}
+	return d.symContent[start:end]
+}
+
+// kind returns index i of the kind enum
+func (d *symbolData) kind(i uint32) []byte {
+	return d.symKindContent[d.symKindIndex[i]:d.symKindIndex[i+1]]
+}
+
+// data returns the symbol at index i
 func (d *symbolData) data(i uint32) *Symbol {
 	size := uint32(4 * 4) // 4 uint32s
 	offset := i * size
@@ -112,17 +138,12 @@ func (d *symbolData) data(i uint32) *Symbol {
 
 	metadata := d.symMetaData[offset : offset+size]
 	sym := &Symbol{}
-	key := binary.BigEndian.Uint32(metadata)
-	// TODO keeps these as bytes to avoid copy from mmap region. Only copy to
-	// string when collecting matches.
-	sym.Sym = string(d.symContent[d.symIndex[key]:d.symIndex[key+1]])
-	key = binary.BigEndian.Uint32(metadata[4:])
-	sym.Kind = string(d.symKindContent[d.symKindIndex[key]:d.symKindIndex[key+1]])
-	key = binary.BigEndian.Uint32(metadata[8:])
-	sym.Parent = string(d.symContent[d.symIndex[key]:d.symIndex[key+1]])
-
-	key = binary.BigEndian.Uint32(metadata[12:])
-	sym.ParentKind = string(d.symKindContent[d.symKindIndex[key]:d.symKindIndex[key+1]])
+	key := uint32SliceAt(metadata, 1)
+	sym.Kind = string(d.kind(key))
+	key = uint32SliceAt(metadata, 2)
+	sym.Parent = string(d.parent(key))
+	key = uint32SliceAt(metadata, 3)
+	sym.ParentKind = string(d.kind(key))
 	return sym
 }
 
@@ -167,6 +188,7 @@ func (d *indexData) memoryUse() int {
 		d.boundaries, d.fileNameIndex,
 		d.runeOffsets, d.fileNameRuneOffsets,
 		d.fileEndRunes, d.fileNameEndRunes,
+		d.fileEndSymbol, d.symbols.symKindIndex,
 	} {
 		sz += 4 * len(a)
 	}

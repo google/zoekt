@@ -368,12 +368,15 @@ func (b *IndexBuilder) symbolKindID(t string) uint32 {
 func (b *IndexBuilder) addSymbols(symbols []*Symbol) {
 	for _, sym := range symbols {
 		b.symMetaData = append(b.symMetaData,
-			b.symbolID(sym.Sym),
+			// This field was removed due to redundancy. To avoid
+			// needing to reindex, it is set to zero for now. In the
+			// future, this field will be completely removed. It
+			// will require incrementing the feature version.
+			0,
 			b.symbolKindID(sym.Kind),
 			b.symbolID(sym.Parent),
 			b.symbolKindID(sym.ParentKind))
 	}
-	b.fileEndSymbol = append(b.fileEndSymbol, uint32(len(b.symMetaData)/4))
 }
 
 // Add a file which only occurs in certain branches.
@@ -447,6 +450,7 @@ func (b *IndexBuilder) Add(doc Document) error {
 
 	b.nameStrings = append(b.nameStrings, nameStr)
 	b.docSections = append(b.docSections, doc.Symbols)
+	b.fileEndSymbol = append(b.fileEndSymbol, uint32(len(b.runeDocSections)))
 	b.branchMasks = append(b.branchMasks, mask)
 	b.checksums = append(b.checksums, hasher.Sum(nil)...)
 
