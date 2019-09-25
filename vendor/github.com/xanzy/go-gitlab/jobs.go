@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"net/url"
 	"time"
 )
 
@@ -36,23 +35,33 @@ type JobsService struct {
 //
 // GitLab API docs: https://docs.gitlab.com/ce/api/jobs.html
 type Job struct {
-	Commit        *Commit    `json:"commit"`
-	CreatedAt     *time.Time `json:"created_at"`
-	Coverage      float64    `json:"coverage"`
-	ArtifactsFile struct {
-		Filename string `json:"filename"`
-		Size     int    `json:"size"`
-	} `json:"artifacts_file"`
-	FinishedAt *time.Time `json:"finished_at"`
-	ID         int        `json:"id"`
-	Name       string     `json:"name"`
-	Pipeline   struct {
+	Commit            *Commit    `json:"commit"`
+	Coverage          float64    `json:"coverage"`
+	AllowFailure      bool       `json:"allow_failure"`
+	CreatedAt         *time.Time `json:"created_at"`
+	StartedAt         *time.Time `json:"started_at"`
+	FinishedAt        *time.Time `json:"finished_at"`
+	Duration          float64    `json:"duration"`
+	ArtifactsExpireAt *time.Time `json:"artifacts_expire_at"`
+	ID                int        `json:"id"`
+	Name              string     `json:"name"`
+	Pipeline          struct {
 		ID     int    `json:"id"`
 		Ref    string `json:"ref"`
 		Sha    string `json:"sha"`
 		Status string `json:"status"`
 	} `json:"pipeline"`
-	Ref    string `json:"ref"`
+	Ref       string `json:"ref"`
+	Artifacts []struct {
+		FileType   string `json:"file_type"`
+		Filename   string `json:"filename"`
+		Size       int    `json:"size"`
+		FileFormat string `json:"file_format"`
+	} `json:"artifacts"`
+	ArtifactsFile struct {
+		Filename string `json:"filename"`
+		Size     int    `json:"size"`
+	} `json:"artifacts_file"`
 	Runner struct {
 		ID          int    `json:"id"`
 		Description string `json:"description"`
@@ -60,18 +69,17 @@ type Job struct {
 		IsShared    bool   `json:"is_shared"`
 		Name        string `json:"name"`
 	} `json:"runner"`
-	Stage     string     `json:"stage"`
-	StartedAt *time.Time `json:"started_at"`
-	Status    string     `json:"status"`
-	Tag       bool       `json:"tag"`
-	User      *User      `json:"user"`
-	WebURL    string     `json:"web_url"`
+	Stage  string `json:"stage"`
+	Status string `json:"status"`
+	Tag    bool   `json:"tag"`
+	WebURL string `json:"web_url"`
+	User   *User  `json:"user"`
 }
 
 // ListJobsOptions are options for two list apis
 type ListJobsOptions struct {
 	ListOptions
-	Scope []BuildStateValue `url:"scope,omitempty" json:"scope,omitempty"`
+	Scope []BuildStateValue `url:"scope[],omitempty" json:"scope,omitempty"`
 }
 
 // ListProjectJobs gets a list of jobs in a project.
@@ -86,7 +94,7 @@ func (s *JobsService) ListProjectJobs(pid interface{}, opts *ListJobsOptions, op
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("projects/%s/jobs", url.QueryEscape(project))
+	u := fmt.Sprintf("projects/%s/jobs", pathEscape(project))
 
 	req, err := s.client.NewRequest("GET", u, opts, options)
 	if err != nil {
@@ -112,7 +120,7 @@ func (s *JobsService) ListPipelineJobs(pid interface{}, pipelineID int, opts *Li
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("projects/%s/pipelines/%d/jobs", url.QueryEscape(project), pipelineID)
+	u := fmt.Sprintf("projects/%s/pipelines/%d/jobs", pathEscape(project), pipelineID)
 
 	req, err := s.client.NewRequest("GET", u, opts, options)
 	if err != nil {
@@ -137,7 +145,7 @@ func (s *JobsService) GetJob(pid interface{}, jobID int, options ...OptionFunc) 
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("projects/%s/jobs/%d", url.QueryEscape(project), jobID)
+	u := fmt.Sprintf("projects/%s/jobs/%d", pathEscape(project), jobID)
 
 	req, err := s.client.NewRequest("GET", u, nil, options)
 	if err != nil {
@@ -162,7 +170,7 @@ func (s *JobsService) GetJobArtifacts(pid interface{}, jobID int, options ...Opt
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("projects/%s/jobs/%d/artifacts", url.QueryEscape(project), jobID)
+	u := fmt.Sprintf("projects/%s/jobs/%d/artifacts", pathEscape(project), jobID)
 
 	req, err := s.client.NewRequest("GET", u, nil, options)
 	if err != nil {
@@ -197,7 +205,7 @@ func (s *JobsService) DownloadArtifactsFile(pid interface{}, refName string, opt
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("projects/%s/jobs/artifacts/%s/download", url.QueryEscape(project), refName)
+	u := fmt.Sprintf("projects/%s/jobs/artifacts/%s/download", pathEscape(project), refName)
 
 	req, err := s.client.NewRequest("GET", u, opt, options)
 	if err != nil {
@@ -228,7 +236,7 @@ func (s *JobsService) DownloadSingleArtifactsFile(pid interface{}, jobID int, ar
 
 	u := fmt.Sprintf(
 		"projects/%s/jobs/%d/artifacts/%s",
-		url.QueryEscape(project),
+		pathEscape(project),
 		jobID,
 		artifactPath,
 	)
@@ -256,7 +264,7 @@ func (s *JobsService) GetTraceFile(pid interface{}, jobID int, options ...Option
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("projects/%s/jobs/%d/trace", url.QueryEscape(project), jobID)
+	u := fmt.Sprintf("projects/%s/jobs/%d/trace", pathEscape(project), jobID)
 
 	req, err := s.client.NewRequest("GET", u, nil, options)
 	if err != nil {
@@ -281,7 +289,7 @@ func (s *JobsService) CancelJob(pid interface{}, jobID int, options ...OptionFun
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("projects/%s/jobs/%d/cancel", url.QueryEscape(project), jobID)
+	u := fmt.Sprintf("projects/%s/jobs/%d/cancel", pathEscape(project), jobID)
 
 	req, err := s.client.NewRequest("POST", u, nil, options)
 	if err != nil {
@@ -306,7 +314,7 @@ func (s *JobsService) RetryJob(pid interface{}, jobID int, options ...OptionFunc
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("projects/%s/jobs/%d/retry", url.QueryEscape(project), jobID)
+	u := fmt.Sprintf("projects/%s/jobs/%d/retry", pathEscape(project), jobID)
 
 	req, err := s.client.NewRequest("POST", u, nil, options)
 	if err != nil {
@@ -332,7 +340,7 @@ func (s *JobsService) EraseJob(pid interface{}, jobID int, options ...OptionFunc
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("projects/%s/jobs/%d/erase", url.QueryEscape(project), jobID)
+	u := fmt.Sprintf("projects/%s/jobs/%d/erase", pathEscape(project), jobID)
 
 	req, err := s.client.NewRequest("POST", u, nil, options)
 	if err != nil {
@@ -358,7 +366,7 @@ func (s *JobsService) KeepArtifacts(pid interface{}, jobID int, options ...Optio
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("projects/%s/jobs/%d/artifacts/keep", url.QueryEscape(project), jobID)
+	u := fmt.Sprintf("projects/%s/jobs/%d/artifacts/keep", pathEscape(project), jobID)
 
 	req, err := s.client.NewRequest("POST", u, nil, options)
 	if err != nil {
@@ -383,7 +391,7 @@ func (s *JobsService) PlayJob(pid interface{}, jobID int, options ...OptionFunc)
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("projects/%s/jobs/%d/play", url.QueryEscape(project), jobID)
+	u := fmt.Sprintf("projects/%s/jobs/%d/play", pathEscape(project), jobID)
 
 	req, err := s.client.NewRequest("POST", u, nil, options)
 	if err != nil {

@@ -23,62 +23,65 @@ to add new and/or missing endpoints. Currently the following services are suppor
 - [x] Award Emojis
 - [x] Branches
 - [x] Broadcast Messages
-- [x] Project-level Variables
-- [x] Group-level Variables
 - [x] Commits
+- [x] Container Registry
 - [x] Custom Attributes
-- [x] Deployments
 - [x] Deploy Keys
+- [x] Deployments
+- [ ] Discussions (threaded comments)
 - [x] Environments
-- [ ] Epics
 - [ ] Epic Issues
+- [ ] Epics
 - [x] Events
-- [x] Feature flags
+- [x] Feature Flags
 - [ ] Geo Nodes
-- [x] Gitignores templates
-- [x] GitLab CI Config templates
-- [x] Groups
+- [x] GitLab CI Config Templates
+- [x] Gitignores Templates
 - [x] Group Access Requests
-- [x] Group Members
-- [x] Issues
-- [x] Issue Boards
 - [x] Group Issue Boards
+- [x] Group Members
+- [x] Group Milestones
+- [x] Group-Level Variables
+- [x] Groups
+- [x] Issue Boards
+- [x] Issues
 - [x] Jobs
 - [x] Keys
 - [x] Labels
 - [x] License
-- [x] Merge Requests
 - [x] Merge Request Approvals
-- [x] Project Milestones
-- [x] Group Milestones
+- [x] Merge Requests
 - [x] Namespaces
 - [x] Notes (comments)
-- [ ] Discussions (threaded comments)
-- [x] Notification settings
-- [x] Open source license templates
+- [x] Notification Settings
+- [x] Open Source License Templates
 - [x] Pages Domains
-- [x] Pipelines
-- [x] Pipeline Triggers
 - [x] Pipeline Schedules
-- [x] Projects (including setting Webhooks)
+- [x] Pipeline Triggers
+- [x] Pipelines
 - [x] Project Access Requests
-- [x] Project badges
-- [ ] Project import/export
+- [x] Project Badges
+- [x] Project Clusters
+- [x] Project Import/export
 - [x] Project Members
+- [x] Project Milestones
 - [x] Project Snippets
+- [x] Project-Level Variables
+- [x] Projects (including setting Webhooks)
 - [x] Protected Branches
+- [x] Protected Tags
 - [x] Repositories
 - [x] Repository Files
 - [x] Runners
 - [x] Search
 - [x] Services
 - [x] Settings
-- [x] Sidekiq metrics
+- [x] Sidekiq Metrics
 - [x] System Hooks
 - [x] Tags
 - [x] Todos
 - [x] Users
-- [x] Validate CI configuration
+- [x] Validate CI Configuration
 - [x] Version
 - [x] Wikis
 

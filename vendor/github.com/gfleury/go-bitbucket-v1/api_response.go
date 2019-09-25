@@ -125,7 +125,7 @@ type PullRequestRef struct {
 
 type PullRequest struct {
 	ID           int                `json:"id"`
-	Version      int32                `json:"version"`
+	Version      int32              `json:"version"`
 	Title        string             `json:"title"`
 	Description  string             `json:"description"`
 	State        string             `json:"state"`
@@ -174,7 +174,7 @@ type BuildStatus struct {
 	Key         string `json:"key"`
 	Name        string `json:"name"`
 	Url         string `json:"url"`
-	Description string `json:"description`
+	Description string `json:"description"`
 	DateAdded   int64  `json:"dateAdded"`
 }
 
@@ -244,6 +244,35 @@ type Branch struct {
 	IsDefault       bool   `json:"isDefault"`
 }
 
+// Content contains repository content information (and files content)
+type Content struct {
+	Children struct {
+		IsLastPage bool `json:"isLastPage"`
+		Limit      int  `json:"limit"`
+		Size       int  `json:"size"`
+		Start      int  `json:"start"`
+		Values     []struct {
+			ContentID string `json:"contentId,omitempty"`
+			Path      struct {
+				Components []string `json:"components"`
+				Extension  string   `json:"extension"`
+				Name       string   `json:"name"`
+				Parent     string   `json:"parent"`
+				ToString   string   `json:"toString"`
+			} `json:"path"`
+			Size int    `json:"size,omitempty"`
+			Type string `json:"type"`
+			Node string `json:"node,omitempty"`
+		} `json:"values"`
+	} `json:"children"`
+	Path struct {
+		Components []string `json:"components"`
+		Name       string   `json:"name"`
+		ToString   string   `json:"toString"`
+	} `json:"path"`
+	Revision string `json:"revision"`
+}
+
 func (k *SSHKey) String() string {
 	parts := make([]string, 1, 2)
 	parts[0] = strings.TrimSpace(k.Text)
@@ -297,6 +326,20 @@ func GetSSHKeysResponse(r *APIResponse) ([]SSHKey, error) {
 	var m []SSHKey
 	err := mapstructure.Decode(r.Values["values"], &m)
 	return m, err
+}
+
+// GetPullRequestResponse cast PullRequest into structure
+func GetPullRequestResponse(r *APIResponse) (PullRequest, error) {
+	var m PullRequest
+	err := mapstructure.Decode(r.Values, &m)
+	return m, err
+}
+
+// GetContentResponse cast Content into structure
+func GetContentResponse(r *APIResponse) (Content, error) {
+	var c Content
+	err := mapstructure.Decode(r.Values, &c)
+	return c, err
 }
 
 // NewAPIResponse create new APIResponse from http.Response

@@ -18,7 +18,6 @@ package gitlab
 
 import (
 	"fmt"
-	"net/url"
 )
 
 // GroupsService handles communication with the group related methods of
@@ -47,6 +46,7 @@ type Group struct {
 	ParentID             int                `json:"parent_id"`
 	Projects             []*Project         `json:"projects"`
 	Statistics           *StorageStatistics `json:"statistics"`
+	CustomAttributes     []*CustomAttribute `json:"custom_attributes"`
 }
 
 // ListGroupsOptions represents the available ListGroups() options.
@@ -54,12 +54,15 @@ type Group struct {
 // GitLab API docs: https://docs.gitlab.com/ce/api/groups.html#list-project-groups
 type ListGroupsOptions struct {
 	ListOptions
-	AllAvailable *bool   `url:"all_available,omitempty" json:"all_available,omitempty"`
-	OrderBy      *string `url:"order_by,omitempty" json:"order_by,omitempty"`
-	Owned        *bool   `url:"owned,omitempty" json:"owned,omitempty"`
-	Search       *string `url:"search,omitempty" json:"search,omitempty"`
-	Sort         *string `url:"sort,omitempty" json:"sort,omitempty"`
-	Statistics   *bool   `url:"statistics,omitempty" json:"statistics,omitempty"`
+	AllAvailable         *bool             `url:"all_available,omitempty" json:"all_available,omitempty"`
+	MinAccessLevel       *AccessLevelValue `url:"min_access_level,omitempty" json:"min_access_level,omitempty"`
+	OrderBy              *string           `url:"order_by,omitempty" json:"order_by,omitempty"`
+	Owned                *bool             `url:"owned,omitempty" json:"owned,omitempty"`
+	Search               *string           `url:"search,omitempty" json:"search,omitempty"`
+	SkipGroups           []int             `url:"skip_groups,omitempty" json:"skip_groups,omitempty"`
+	Sort                 *string           `url:"sort,omitempty" json:"sort,omitempty"`
+	Statistics           *bool             `url:"statistics,omitempty" json:"statistics,omitempty"`
+	WithCustomAttributes *bool             `url:"with_custom_attributes,omitempty" json:"with_custom_attributes,omitempty"`
 }
 
 // ListGroups gets a list of groups (as user: my groups, as admin: all groups).
@@ -89,7 +92,7 @@ func (s *GroupsService) GetGroup(gid interface{}, options ...OptionFunc) (*Group
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("groups/%s", url.QueryEscape(group))
+	u := fmt.Sprintf("groups/%s", pathEscape(group))
 
 	req, err := s.client.NewRequest("GET", u, nil, options)
 	if err != nil {
@@ -147,14 +150,11 @@ func (s *GroupsService) TransferGroup(gid interface{}, pid interface{}, options 
 	if err != nil {
 		return nil, nil, err
 	}
-
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, nil, err
 	}
-
-	u := fmt.Sprintf("groups/%s/projects/%s", url.QueryEscape(group),
-		url.QueryEscape(project))
+	u := fmt.Sprintf("groups/%s/projects/%s", pathEscape(group), pathEscape(project))
 
 	req, err := s.client.NewRequest("POST", u, nil, options)
 	if err != nil {
@@ -185,7 +185,7 @@ func (s *GroupsService) UpdateGroup(gid interface{}, opt *UpdateGroupOptions, op
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("groups/%s", url.QueryEscape(group))
+	u := fmt.Sprintf("groups/%s", pathEscape(group))
 
 	req, err := s.client.NewRequest("PUT", u, opt, options)
 	if err != nil {
@@ -209,7 +209,7 @@ func (s *GroupsService) DeleteGroup(gid interface{}, options ...OptionFunc) (*Re
 	if err != nil {
 		return nil, err
 	}
-	u := fmt.Sprintf("groups/%s", url.QueryEscape(group))
+	u := fmt.Sprintf("groups/%s", pathEscape(group))
 
 	req, err := s.client.NewRequest("DELETE", u, nil, options)
 	if err != nil {
@@ -247,7 +247,22 @@ func (s *GroupsService) SearchGroup(query string, options ...OptionFunc) ([]*Gro
 //
 // GitLab API docs:
 // https://docs.gitlab.com/ce/api/groups.html#list-a-group-39-s-projects
-type ListGroupProjectsOptions ListProjectsOptions
+type ListGroupProjectsOptions struct {
+	ListOptions
+	Archived                 *bool            `url:"archived,omitempty" json:"archived,omitempty"`
+	Visibility               *VisibilityValue `url:"visibility,omitempty" json:"visibility,omitempty"`
+	OrderBy                  *string          `url:"order_by,omitempty" json:"order_by,omitempty"`
+	Sort                     *string          `url:"sort,omitempty" json:"sort,omitempty"`
+	Search                   *string          `url:"search,omitempty" json:"search,omitempty"`
+	Simple                   *bool            `url:"simple,omitempty" json:"simple,omitempty"`
+	Owned                    *bool            `url:"owned,omitempty" json:"owned,omitempty"`
+	Starred                  *bool            `url:"starred,omitempty" json:"starred,omitempty"`
+	WithIssuesEnabled        *bool            `url:"with_issues_enabled,omitempty" json:"with_issues_enabled,omitempty"`
+	WithMergeRequestsEnabled *bool            `url:"with_merge_requests_enabled,omitempty" json:"with_merge_requests_enabled,omitempty"`
+	WithShared               *bool            `url:"with_shared,omitempty" json:"with_shared,omitempty"`
+	IncludeSubgroups         *bool            `url:"include_subgroups,omitempty" json:"include_subgroups,omitempty"`
+	WithCustomAttributes     *bool            `url:"with_custom_attributes,omitempty" json:"with_custom_attributes,omitempty"`
+}
 
 // ListGroupProjects get a list of group projects
 //
@@ -258,7 +273,7 @@ func (s *GroupsService) ListGroupProjects(gid interface{}, opt *ListGroupProject
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("groups/%s/projects", url.QueryEscape(group))
+	u := fmt.Sprintf("groups/%s/projects", pathEscape(group))
 
 	req, err := s.client.NewRequest("GET", u, opt, options)
 	if err != nil {
@@ -290,7 +305,7 @@ func (s *GroupsService) ListSubgroups(gid interface{}, opt *ListSubgroupsOptions
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("groups/%s/subgroups", url.QueryEscape(group))
+	u := fmt.Sprintf("groups/%s/subgroups", pathEscape(group))
 
 	req, err := s.client.NewRequest("GET", u, opt, options)
 	if err != nil {

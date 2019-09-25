@@ -6,7 +6,6 @@
     "golint",
     "vetshadow",
     "vet",
-    "unused",
     "gofmt",
     "goimports",
     "goconst",

@@ -18,7 +18,6 @@ package gitlab
 
 import (
 	"fmt"
-	"net/url"
 	"time"
 )
 
@@ -108,7 +107,7 @@ func (s *NotesService) ListIssueNotes(pid interface{}, issue int, opt *ListIssue
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("projects/%s/issues/%d/notes", url.QueryEscape(project), issue)
+	u := fmt.Sprintf("projects/%s/issues/%d/notes", pathEscape(project), issue)
 
 	req, err := s.client.NewRequest("GET", u, opt, options)
 	if err != nil {
@@ -133,7 +132,7 @@ func (s *NotesService) GetIssueNote(pid interface{}, issue, note int, options ..
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("projects/%s/issues/%d/notes/%d", url.QueryEscape(project), issue, note)
+	u := fmt.Sprintf("projects/%s/issues/%d/notes/%d", pathEscape(project), issue, note)
 
 	req, err := s.client.NewRequest("GET", u, nil, options)
 	if err != nil {
@@ -155,7 +154,8 @@ func (s *NotesService) GetIssueNote(pid interface{}, issue, note int, options ..
 // GitLab API docs:
 // https://docs.gitlab.com/ce/api/notes.html#create-new-issue-note
 type CreateIssueNoteOptions struct {
-	Body *string `url:"body,omitempty" json:"body,omitempty"`
+	Body      *string    `url:"body,omitempty" json:"body,omitempty"`
+	CreatedAt *time.Time `url:"created_at,omitempty" json:"created_at,omitempty"`
 }
 
 // CreateIssueNote creates a new note to a single project issue.
@@ -167,7 +167,7 @@ func (s *NotesService) CreateIssueNote(pid interface{}, issue int, opt *CreateIs
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("projects/%s/issues/%d/notes", url.QueryEscape(project), issue)
+	u := fmt.Sprintf("projects/%s/issues/%d/notes", pathEscape(project), issue)
 
 	req, err := s.client.NewRequest("POST", u, opt, options)
 	if err != nil {
@@ -194,13 +194,14 @@ type UpdateIssueNoteOptions struct {
 
 // UpdateIssueNote modifies existing note of an issue.
 //
+// GitLab API docs:
 // https://docs.gitlab.com/ce/api/notes.html#modify-existing-issue-note
 func (s *NotesService) UpdateIssueNote(pid interface{}, issue, note int, opt *UpdateIssueNoteOptions, options ...OptionFunc) (*Note, *Response, error) {
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("projects/%s/issues/%d/notes/%d", url.QueryEscape(project), issue, note)
+	u := fmt.Sprintf("projects/%s/issues/%d/notes/%d", pathEscape(project), issue, note)
 
 	req, err := s.client.NewRequest("PUT", u, opt, options)
 	if err != nil {
@@ -218,13 +219,14 @@ func (s *NotesService) UpdateIssueNote(pid interface{}, issue, note int, opt *Up
 
 // DeleteIssueNote deletes an existing note of an issue.
 //
+// GitLab API docs:
 // https://docs.gitlab.com/ce/api/notes.html#delete-an-issue-note
 func (s *NotesService) DeleteIssueNote(pid interface{}, issue, note int, options ...OptionFunc) (*Response, error) {
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, err
 	}
-	u := fmt.Sprintf("projects/%s/issues/%d/notes/%d", url.QueryEscape(project), issue, note)
+	u := fmt.Sprintf("projects/%s/issues/%d/notes/%d", pathEscape(project), issue, note)
 
 	req, err := s.client.NewRequest("DELETE", u, nil, options)
 	if err != nil {
@@ -254,7 +256,7 @@ func (s *NotesService) ListSnippetNotes(pid interface{}, snippet int, opt *ListS
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("projects/%s/snippets/%d/notes", url.QueryEscape(project), snippet)
+	u := fmt.Sprintf("projects/%s/snippets/%d/notes", pathEscape(project), snippet)
 
 	req, err := s.client.NewRequest("GET", u, opt, options)
 	if err != nil {
@@ -279,7 +281,7 @@ func (s *NotesService) GetSnippetNote(pid interface{}, snippet, note int, option
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("projects/%s/snippets/%d/notes/%d", url.QueryEscape(project), snippet, note)
+	u := fmt.Sprintf("projects/%s/snippets/%d/notes/%d", pathEscape(project), snippet, note)
 
 	req, err := s.client.NewRequest("GET", u, nil, options)
 	if err != nil {
@@ -314,7 +316,7 @@ func (s *NotesService) CreateSnippetNote(pid interface{}, snippet int, opt *Crea
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("projects/%s/snippets/%d/notes", url.QueryEscape(project), snippet)
+	u := fmt.Sprintf("projects/%s/snippets/%d/notes", pathEscape(project), snippet)
 
 	req, err := s.client.NewRequest("POST", u, opt, options)
 	if err != nil {
@@ -341,13 +343,14 @@ type UpdateSnippetNoteOptions struct {
 
 // UpdateSnippetNote modifies existing note of a snippet.
 //
+// GitLab API docs:
 // https://docs.gitlab.com/ce/api/notes.html#modify-existing-snippet-note
 func (s *NotesService) UpdateSnippetNote(pid interface{}, snippet, note int, opt *UpdateSnippetNoteOptions, options ...OptionFunc) (*Note, *Response, error) {
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("projects/%s/snippets/%d/notes/%d", url.QueryEscape(project), snippet, note)
+	u := fmt.Sprintf("projects/%s/snippets/%d/notes/%d", pathEscape(project), snippet, note)
 
 	req, err := s.client.NewRequest("PUT", u, opt, options)
 	if err != nil {
@@ -365,13 +368,14 @@ func (s *NotesService) UpdateSnippetNote(pid interface{}, snippet, note int, opt
 
 // DeleteSnippetNote deletes an existing note of a snippet.
 //
+// GitLab API docs:
 // https://docs.gitlab.com/ce/api/notes.html#delete-a-snippet-note
 func (s *NotesService) DeleteSnippetNote(pid interface{}, snippet, note int, options ...OptionFunc) (*Response, error) {
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, err
 	}
-	u := fmt.Sprintf("projects/%s/snippets/%d/notes/%d", url.QueryEscape(project), snippet, note)
+	u := fmt.Sprintf("projects/%s/snippets/%d/notes/%d", pathEscape(project), snippet, note)
 
 	req, err := s.client.NewRequest("DELETE", u, nil, options)
 	if err != nil {
@@ -401,7 +405,7 @@ func (s *NotesService) ListMergeRequestNotes(pid interface{}, mergeRequest int, 
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("projects/%s/merge_requests/%d/notes", url.QueryEscape(project), mergeRequest)
+	u := fmt.Sprintf("projects/%s/merge_requests/%d/notes", pathEscape(project), mergeRequest)
 
 	req, err := s.client.NewRequest("GET", u, opt, options)
 	if err != nil {
@@ -426,7 +430,7 @@ func (s *NotesService) GetMergeRequestNote(pid interface{}, mergeRequest, note i
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("projects/%s/merge_requests/%d/notes/%d", url.QueryEscape(project), mergeRequest, note)
+	u := fmt.Sprintf("projects/%s/merge_requests/%d/notes/%d", pathEscape(project), mergeRequest, note)
 
 	req, err := s.client.NewRequest("GET", u, nil, options)
 	if err != nil {
@@ -460,7 +464,7 @@ func (s *NotesService) CreateMergeRequestNote(pid interface{}, mergeRequest int,
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("projects/%s/merge_requests/%d/notes", url.QueryEscape(project), mergeRequest)
+	u := fmt.Sprintf("projects/%s/merge_requests/%d/notes", pathEscape(project), mergeRequest)
 
 	req, err := s.client.NewRequest("POST", u, opt, options)
 	if err != nil {
@@ -487,6 +491,7 @@ type UpdateMergeRequestNoteOptions struct {
 
 // UpdateMergeRequestNote modifies existing note of a merge request.
 //
+// GitLab API docs:
 // https://docs.gitlab.com/ce/api/notes.html#modify-existing-merge-request-note
 func (s *NotesService) UpdateMergeRequestNote(pid interface{}, mergeRequest, note int, opt *UpdateMergeRequestNoteOptions, options ...OptionFunc) (*Note, *Response, error) {
 	project, err := parseID(pid)
@@ -494,7 +499,7 @@ func (s *NotesService) UpdateMergeRequestNote(pid interface{}, mergeRequest, not
 		return nil, nil, err
 	}
 	u := fmt.Sprintf(
-		"projects/%s/merge_requests/%d/notes/%d", url.QueryEscape(project), mergeRequest, note)
+		"projects/%s/merge_requests/%d/notes/%d", pathEscape(project), mergeRequest, note)
 	req, err := s.client.NewRequest("PUT", u, opt, options)
 	if err != nil {
 		return nil, nil, err
@@ -511,6 +516,7 @@ func (s *NotesService) UpdateMergeRequestNote(pid interface{}, mergeRequest, not
 
 // DeleteMergeRequestNote deletes an existing note of a merge request.
 //
+// GitLab API docs:
 // https://docs.gitlab.com/ce/api/notes.html#delete-a-merge-request-note
 func (s *NotesService) DeleteMergeRequestNote(pid interface{}, mergeRequest, note int, options ...OptionFunc) (*Response, error) {
 	project, err := parseID(pid)
@@ -518,7 +524,150 @@ func (s *NotesService) DeleteMergeRequestNote(pid interface{}, mergeRequest, not
 		return nil, err
 	}
 	u := fmt.Sprintf(
-		"projects/%s/merge_requests/%d/notes/%d", url.QueryEscape(project), mergeRequest, note)
+		"projects/%s/merge_requests/%d/notes/%d", pathEscape(project), mergeRequest, note)
+
+	req, err := s.client.NewRequest("DELETE", u, nil, options)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.client.Do(req, nil)
+}
+
+// ListEpicNotesOptions represents the available ListEpicNotes() options.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ee/api/notes.html#list-all-epic-notes
+type ListEpicNotesOptions struct {
+	ListOptions
+	OrderBy *string `url:"order_by,omitempty" json:"order_by,omitempty"`
+	Sort    *string `url:"sort,omitempty" json:"sort,omitempty"`
+}
+
+// ListEpicNotes gets a list of all notes for a single epic.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ee/api/notes.html#list-all-epic-notes
+func (s *NotesService) ListEpicNotes(gid interface{}, epic int, opt *ListEpicNotesOptions, options ...OptionFunc) ([]*Note, *Response, error) {
+	group, err := parseID(gid)
+	if err != nil {
+		return nil, nil, err
+	}
+	u := fmt.Sprintf("groups/%s/epics/%d/notes", pathEscape(group), epic)
+
+	req, err := s.client.NewRequest("GET", u, opt, options)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var n []*Note
+	resp, err := s.client.Do(req, &n)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return n, resp, err
+}
+
+// GetEpicNote returns a single note for an epic.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ee/api/notes.html#get-single-epic-note
+func (s *NotesService) GetEpicNote(gid interface{}, epic, note int, options ...OptionFunc) (*Note, *Response, error) {
+	group, err := parseID(gid)
+	if err != nil {
+		return nil, nil, err
+	}
+	u := fmt.Sprintf("groups/%s/epics/%d/notes/%d", pathEscape(group), epic, note)
+
+	req, err := s.client.NewRequest("GET", u, nil, options)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	n := new(Note)
+	resp, err := s.client.Do(req, n)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return n, resp, err
+}
+
+// CreateEpicNoteOptions represents the available CreateEpicNote() options.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ee/api/notes.html#create-new-epic-note
+type CreateEpicNoteOptions struct {
+	Body *string `url:"body,omitempty" json:"body,omitempty"`
+}
+
+// CreateEpicNote creates a new note for a single merge request.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ee/api/notes.html#create-new-epic-note
+func (s *NotesService) CreateEpicNote(gid interface{}, epic int, opt *CreateEpicNoteOptions, options ...OptionFunc) (*Note, *Response, error) {
+	group, err := parseID(gid)
+	if err != nil {
+		return nil, nil, err
+	}
+	u := fmt.Sprintf("groups/%s/epics/%d/notes", pathEscape(group), epic)
+
+	req, err := s.client.NewRequest("POST", u, opt, options)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	n := new(Note)
+	resp, err := s.client.Do(req, n)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return n, resp, err
+}
+
+// UpdateEpicNoteOptions represents the available UpdateEpicNote() options.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ee/api/notes.html#modify-existing-epic-note
+type UpdateEpicNoteOptions struct {
+	Body *string `url:"body,omitempty" json:"body,omitempty"`
+}
+
+// UpdateEpicNote modifies existing note of an epic.
+//
+// https://docs.gitlab.com/ee/api/notes.html#modify-existing-epic-note
+func (s *NotesService) UpdateEpicNote(gid interface{}, epic, note int, opt *UpdateEpicNoteOptions, options ...OptionFunc) (*Note, *Response, error) {
+	group, err := parseID(gid)
+	if err != nil {
+		return nil, nil, err
+	}
+	u := fmt.Sprintf("groups/%s/epics/%d/notes/%d", pathEscape(group), epic, note)
+
+	req, err := s.client.NewRequest("PUT", u, opt, options)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	n := new(Note)
+	resp, err := s.client.Do(req, n)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return n, resp, err
+}
+
+// DeleteEpicNote deletes an existing note of a merge request.
+//
+// https://docs.gitlab.com/ee/api/notes.html#delete-an-epic-note
+func (s *NotesService) DeleteEpicNote(gid interface{}, epic, note int, options ...OptionFunc) (*Response, error) {
+	group, err := parseID(gid)
+	if err != nil {
+		return nil, err
+	}
+	u := fmt.Sprintf("groups/%s/epics/%d/notes/%d", pathEscape(group), epic, note)
 
 	req, err := s.client.NewRequest("DELETE", u, nil, options)
 	if err != nil {

@@ -1,4 +1,4 @@
-.PHONY: fmt vet check-vendor lint check clean test build
+.PHONY: fmt vet lint check test
 PACKAGES = $(shell go list ./...)
 PACKAGE_DIRS = $(shell go list -f '{{ .Dir }}' ./...)
 

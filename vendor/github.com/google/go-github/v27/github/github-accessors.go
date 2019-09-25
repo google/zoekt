@@ -4612,6 +4612,14 @@ func (i *IssueStats) GetTotalIssues() int {
 	return *i.TotalIssues
 }
 
+// GetCreatedAt returns the CreatedAt field if it's non-nil, zero value otherwise.
+func (k *Key) GetCreatedAt() Timestamp {
+	if k == nil || k.CreatedAt == nil {
+		return Timestamp{}
+	}
+	return *k.CreatedAt
+}
+
 // GetID returns the ID field if it's non-nil, zero value otherwise.
 func (k *Key) GetID() int64 {
 	if k == nil || k.ID == nil {
@@ -8858,6 +8866,14 @@ func (p *PushEventRepository) GetPrivate() bool {
 		return false
 	}
 	return *p.Private
+}
+
+// GetPullsURL returns the PullsURL field if it's non-nil, zero value otherwise.
+func (p *PushEventRepository) GetPullsURL() string {
+	if p == nil || p.PullsURL == nil {
+		return ""
+	}
+	return *p.PullsURL
 }
 
 // GetPushedAt returns the PushedAt field if it's non-nil, zero value otherwise.

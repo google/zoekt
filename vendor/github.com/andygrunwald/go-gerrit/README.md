@@ -26,7 +26,7 @@ go-gerrit is a [Go(lang)](https://golang.org/) client library for accessing the 
 
 ## Installation
 
-go-gerrit requires Go version 1.8 or greater.
+go-gerrit requires Go version 1.10 or greater.
 
 It is go gettable ...
 
