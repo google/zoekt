@@ -412,22 +412,22 @@ func resolveRevision(root *url.URL, repo, spec string) (string, error) {
 }
 
 func ping(root *url.URL) error {
-	u := root.ResolveReference(&url.URL{Path: "/.internal/ping"})
+	u := root.ResolveReference(&url.URL{Path: "/.internal/ping", RawQuery: "service=gitserver"})
 	resp, err := http.Get(u.String())
 	if err != nil {
 		return err
 	}
 
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("ping: bad HTTP response status %d", resp.StatusCode)
-	}
-	body, err := ioutil.ReadAll(io.LimitReader(resp.Body, 16))
+	body, err := ioutil.ReadAll(io.LimitReader(resp.Body, 1024))
 	if err != nil {
 		return err
 	}
-	if want := []byte("pong"); !bytes.Equal(body, want) {
-		return fmt.Errorf("ping: bad HTTP response body %q (want %q)", string(body), string(want))
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("ping: bad HTTP response status %d: %s", resp.StatusCode, string(body))
+	}
+	if !bytes.Equal(body, []byte("pong")) {
+		return fmt.Errorf("ping: did not receive pong: %s", string(body))
 	}
 	return nil
 }
@@ -444,7 +444,7 @@ func waitForFrontend(root *url.URL) {
 		if time.Since(lastWarn) > 15*time.Second {
 			warned = true
 			lastWarn = time.Now()
-			log.Printf("frontend API not reachable, will try again: %s", err)
+			log.Printf("frontend or gitserver API not available, will try again: %s", err)
 		}
 
 		time.Sleep(250 * time.Millisecond)

@@ -95,6 +95,10 @@ func TestPing(t *testing.T) {
 			http.Error(w, "not found", http.StatusNotFound)
 			return
 		}
+		if r.URL.Query().Get("service") != "gitserver" {
+			http.Error(w, "expected service gitserver in request", http.StatusBadRequest)
+			return
+		}
 		_, _ = w.Write(response)
 	}))
 	defer server.Close()
@@ -107,7 +111,7 @@ func TestPing(t *testing.T) {
 	// Ping fails
 	response = []byte("hello")
 	err = ping(root)
-	if got, want := fmt.Sprintf("%v", err), "bad HTTP response body"; !strings.Contains(got, want) {
+	if got, want := fmt.Sprintf("%v", err), "did not receive pong"; !strings.Contains(got, want) {
 		t.Errorf("wanted ping to fail,\ngot:  %q\nwant: %q", got, want)
 	}
 
