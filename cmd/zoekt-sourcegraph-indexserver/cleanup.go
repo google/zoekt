@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"time"
 
@@ -134,6 +135,29 @@ func shardRepoName(path string) (string, error) {
 	}
 
 	return repo.Name, nil
+}
+
+var incompleteRE = regexp.MustCompile("\\.zoekt[0-9]+$")
+
+func removeIncompleteShards(dir string) {
+	d, err := os.Open(dir)
+	if err != nil {
+		debug.Printf("failed to removeIncompleteShards: %s", dir)
+		return
+	}
+	defer d.Close()
+
+	names, _ := d.Readdirnames(-1)
+	for _, n := range names {
+		if incompleteRE.MatchString(n) {
+			path := filepath.Join(dir, n)
+			if err := os.Remove(path); err != nil {
+				debug.Printf("failed to remove incomplete shard %s: %v", path, err)
+			} else {
+				debug.Printf("cleaned up incomplete shard %s", path)
+			}
+		}
+	}
 }
 
 func removeAll(shards []shard) {
