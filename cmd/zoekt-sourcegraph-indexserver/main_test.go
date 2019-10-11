@@ -15,6 +15,11 @@ import (
 )
 
 func TestIndexArgs(t *testing.T) {
+	root, err := url.Parse("http://api.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	minimal := indexArgs{
 		Name:   "test/repo",
 		Commit: "deadbeef",
@@ -23,8 +28,9 @@ func TestIndexArgs(t *testing.T) {
 		"-name", "test/repo",
 		"-commit", "deadbeef",
 		"-disable_ctags",
+		"http://api.test/.internal/git/test/repo/tar/deadbeef",
 	}
-	if got := minimal.CmdArgs(); !cmp.Equal(got, want) {
+	if got := minimal.CmdArgs(root); !cmp.Equal(got, want) {
 		t.Errorf("all mismatch (-want +got):\n%s", cmp.Diff(want, got))
 	}
 
@@ -52,8 +58,9 @@ func TestIndexArgs(t *testing.T) {
 		"-large_file", "foo",
 		"-large_file", "bar",
 		"-require_ctags",
+		"http://api.test/.internal/git/test/repo/tar/deadbeef",
 	}
-	if got := all.CmdArgs(); !cmp.Equal(got, want) {
+	if got := all.CmdArgs(root); !cmp.Equal(got, want) {
 		t.Errorf("all mismatch (-want +got):\n%s", cmp.Diff(want, got))
 	}
 }

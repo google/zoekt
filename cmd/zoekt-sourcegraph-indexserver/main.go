@@ -219,7 +219,7 @@ type indexArgs struct {
 }
 
 // CmdArgs returns the arguments to pass to the zoekt-archive-index command.
-func (o *indexArgs) CmdArgs() []string {
+func (o *indexArgs) CmdArgs(root *url.URL) []string {
 	args := []string{
 		"-name", o.Name,
 		"-commit", o.Commit,
@@ -258,6 +258,8 @@ func (o *indexArgs) CmdArgs() []string {
 	} else {
 		args = append(args, "-disable_ctags")
 	}
+
+	args = append(args, root.ResolveReference(&url.URL{Path: fmt.Sprintf("/.internal/git/%s/tar/%s", o.Name, o.Commit)}).String())
 
 	return args
 }
@@ -300,10 +302,7 @@ func (s *Server) Index(args indexArgs) error {
 		return err
 	}
 
-	a := args.CmdArgs()
-	a = append(a, tarballURL(s.Root, args.Name, args.Commit))
-
-	cmd := exec.Command("zoekt-archive-index", a...)
+	cmd := exec.Command("zoekt-archive-index", args.CmdArgs(s.Root)...)
 	// Prevent prompting
 	cmd.Stdin = &bytes.Buffer{}
 	return s.loggedRun(tr, cmd)
@@ -514,10 +513,6 @@ func waitForFrontend(root *url.URL) {
 	if warned {
 		log.Println("frontend API is now reachable. Starting indexing...")
 	}
-}
-
-func tarballURL(root *url.URL, repo, commit string) string {
-	return root.ResolveReference(&url.URL{Path: fmt.Sprintf("/.internal/git/%s/tar/%s", repo, commit)}).String()
 }
 
 func main() {
