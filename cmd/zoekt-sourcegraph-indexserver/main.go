@@ -207,12 +207,9 @@ func (o *indexArgs) CmdArgs() []string {
 	return args
 }
 
-func getIndexOptions(root *url.URL, client *http.Client) (*indexArgs, error) {
-	if client == nil {
-		client = http.DefaultClient
-	}
+func getIndexOptions(root *url.URL) (*indexArgs, error) {
 	u := root.ResolveReference(&url.URL{Path: "/.internal/search/configuration"})
-	resp, err := client.Get(u.String())
+	resp, err := http.Get(u.String())
 	if err != nil {
 		return nil, err
 	}
@@ -247,7 +244,7 @@ func (s *Server) Index(name, commit string) error {
 		return s.createEmptyShard(tr, name)
 	}
 
-	opts, err := getIndexOptions(s.Root, nil)
+	opts, err := getIndexOptions(s.Root)
 	if err != nil {
 		return err
 	}

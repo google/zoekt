@@ -37,7 +37,7 @@ func TestGetIndexOptions(t *testing.T) {
 	for r, want := range cases {
 		response = []byte(r)
 
-		opts, err := getIndexOptions(u, server.Client())
+		opts, err := getIndexOptions(u)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
