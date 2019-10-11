@@ -10,7 +10,72 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
 )
+
+func TestIndexArgs(t *testing.T) {
+	minimal := indexArgs{
+		Name:   "test/repo",
+		Commit: "deadbeef",
+	}
+	want := []string{
+		"-name", "test/repo",
+		"-commit", "deadbeef",
+		"-disable_ctags",
+	}
+	if got := minimal.CmdArgs(); !cmp.Equal(got, want) {
+		t.Errorf("all mismatch (-want +got):\n%s", cmp.Diff(want, got))
+	}
+
+	all := indexArgs{
+		Name:              "test/repo",
+		Commit:            "deadbeef",
+		Incremental:       true,
+		IndexDir:          "/data/index",
+		Parallelism:       4,
+		FileLimit:         123,
+		Branch:            "HEAD",
+		DownloadLimitMBPS: "1000",
+		LargeFiles:        []string{"foo", "bar"},
+		Symbols:           true,
+	}
+	want = []string{
+		"-name", "test/repo",
+		"-commit", "deadbeef",
+		"-incremental",
+		"-index", "/data/index",
+		"-parallelism", "4",
+		"-file_limit", "123",
+		"-branch", "HEAD",
+		"-download-limit-mbps", "1000",
+		"-large_file", "foo",
+		"-large_file", "bar",
+		"-require_ctags",
+	}
+	if got := all.CmdArgs(); !cmp.Equal(got, want) {
+		t.Errorf("all mismatch (-want +got):\n%s", cmp.Diff(want, got))
+	}
+}
+
+func TestServer_defaultArgs(t *testing.T) {
+	s := &Server{
+		IndexDir: "/testdata/index",
+		CPUCount: 6,
+	}
+	want := indexArgs{
+		IndexDir:          "/testdata/index",
+		Parallelism:       6,
+		Incremental:       true,
+		Branch:            "HEAD",
+		FileLimit:         1 << 20,
+		DownloadLimitMBPS: "1000",
+	}
+	got := s.defaultArgs()
+	if !cmp.Equal(got, want) {
+		t.Errorf("mismatch (-want +got):\n%s", cmp.Diff(want, got))
+	}
+}
 
 func TestGetIndexOptions(t *testing.T) {
 	var response []byte
@@ -24,26 +89,41 @@ func TestGetIndexOptions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cases := map[string][]string{
-		`{"Symbols": true, "LargeFiles": ["foo","bar"]}`: []string{"-require_ctags", "-large_file", "foo", "-large_file", "bar"},
+	cases := map[string]indexArgs{
+		`{"Symbols": true, "LargeFiles": ["foo","bar"]}`: indexArgs{
+			Symbols:    true,
+			LargeFiles: []string{"foo", "bar"},
+		},
 
-		`{"Symbols": false, "LargeFiles": ["foo","bar"]}`: []string{"-disable_ctags", "-large_file", "foo", "-large_file", "bar"},
+		`{"Symbols": false, "LargeFiles": ["foo","bar"]}`: indexArgs{
+			LargeFiles: []string{"foo", "bar"},
+		},
 
-		`{}`: []string{"-disable_ctags"},
+		`{}`: indexArgs{},
 
-		`{"Symbols": true}`: []string{"-require_ctags"},
+		`{"Symbols": true}`: indexArgs{
+			Symbols: true,
+		},
 	}
 
 	for r, want := range cases {
 		response = []byte(r)
 
-		opts, err := getIndexOptions(u)
-		if err != nil {
+		// Test we mix in the response
+		want.Name = "test/repo"
+		want.Commit = "deadbeef"
+		got := indexArgs{
+			Name:   "test/repo",
+			Commit: "deadbeef",
+		}
+
+		if err := getIndexOptions(u, &got); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		if got := opts.CmdArgs(); !reflect.DeepEqual(got, want) {
-			t.Errorf("got unexpected arguments from options\ngot: %v\nwant: %v\n", got, want)
+		if !cmp.Equal(got, want) {
+			t.Log("response", r)
+			t.Errorf("mismatch (-want +got):\n%s", cmp.Diff(want, got))
 		}
 	}
 }

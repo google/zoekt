@@ -168,7 +168,10 @@ func (s *Server) Run() {
 		}
 
 		start := time.Now()
-		err := s.Index(name, commit)
+		args := s.defaultArgs()
+		args.Name = name
+		args.Commit = commit
+		err := s.Index(args)
 		if err != nil {
 			indexDuration.WithLabelValues("fail").Observe(time.Since(start).Seconds())
 			log.Printf("error indexing %s@%s: %s", name, commit, err)
@@ -181,6 +184,31 @@ func (s *Server) Run() {
 
 // indexArgs represents the arguments we pass to zoekt-archive-index
 type indexArgs struct {
+	// Name is the name of the repository.
+	Name string
+
+	// Commit is the absolute commit SHA.
+	Commit string
+
+	// Incremental indicates to skip indexing if already indexed.
+	Incremental bool
+
+	// IndexDir is the index directory to store the shards.
+	IndexDir string
+
+	// Parallelism is the number of shards to compute in parallel.
+	Parallelism int
+
+	// FileLimit is the maximum size of a file
+	FileLimit int
+
+	// Branch is the branch name.
+	Branch string
+
+	// DownloadLimitMBPS is the maximum MB/s to use when downloading the
+	// archive.
+	DownloadLimitMBPS string
+
 	// LargeFiles is a slice of glob patterns where matching files are indexed
 	// regardless of their size.
 	LargeFiles []string
@@ -192,7 +220,38 @@ type indexArgs struct {
 
 // CmdArgs returns the arguments to pass to the zoekt-archive-index command.
 func (o *indexArgs) CmdArgs() []string {
-	var args []string
+	args := []string{
+		"-name", o.Name,
+		"-commit", o.Commit,
+	}
+
+	if o.Incremental {
+		args = append(args, "-incremental")
+	}
+
+	if o.IndexDir != "" {
+		args = append(args, "-index", o.IndexDir)
+	}
+
+	if o.Parallelism != 0 {
+		args = append(args, "-parallelism", strconv.Itoa(o.Parallelism))
+	}
+
+	if o.FileLimit != 0 {
+		args = append(args, "-file_limit", strconv.Itoa(o.FileLimit))
+	}
+
+	if o.Branch != "" {
+		args = append(args, "-branch", o.Branch)
+	}
+
+	if o.DownloadLimitMBPS != "" {
+		args = append(args, "-download-limit-mbps", o.DownloadLimitMBPS)
+	}
+
+	for _, a := range o.LargeFiles {
+		args = append(args, "-large_file", a)
+	}
 
 	if o.Symbols {
 		args = append(args, "-require_ctags")
@@ -200,86 +259,81 @@ func (o *indexArgs) CmdArgs() []string {
 		args = append(args, "-disable_ctags")
 	}
 
-	for _, a := range o.LargeFiles {
-		args = append(args, "-large_file", a)
-	}
-
 	return args
 }
 
-func getIndexOptions(root *url.URL) (*indexArgs, error) {
+func getIndexOptions(root *url.URL, args *indexArgs) error {
 	u := root.ResolveReference(&url.URL{Path: "/.internal/search/configuration"})
 	resp, err := http.Get(u.String())
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
-		return nil, os.ErrNotExist
+		return os.ErrNotExist
 	}
 	if resp.StatusCode != http.StatusOK {
-		fmt.Println(resp.StatusCode)
-		return nil, errors.New("failed to get configuration options")
+		return errors.New("failed to get configuration options")
 	}
 
-	var opts indexArgs
-
-	err = json.NewDecoder(resp.Body).Decode(&opts)
+	err = json.NewDecoder(resp.Body).Decode(&args)
 	if err != nil {
-		return nil, fmt.Errorf("error decoding body: %v", err)
+		return fmt.Errorf("error decoding body: %v", err)
 	}
 
-	return &opts, nil
+	return nil
 }
 
 // Index starts an index job for repo name at commit.
-func (s *Server) Index(name, commit string) error {
-	tr := trace.New("index", name)
+func (s *Server) Index(args indexArgs) error {
+	tr := trace.New("index", args.Name)
 	defer tr.Finish()
 
-	tr.LazyPrintf("commit: %v", commit)
+	tr.LazyPrintf("commit: %v", args.Commit)
 
-	if commit == "" {
-		return s.createEmptyShard(tr, name)
+	if args.Commit == "" {
+		return s.createEmptyShard(tr, args.Name)
 	}
 
-	opts, err := getIndexOptions(s.Root)
-	if err != nil {
+	if err := getIndexOptions(s.Root, &args); err != nil {
 		return err
 	}
 
-	// We are downloading archives from within the same network from
-	// another Sourcegraph service (gitserver). This can end up being
-	// so fast that we harm gitserver's network connectivity and our
-	// own. In the case of zoekt-indexserver and gitserver running on
-	// the same host machine, we can even reach up to ~100 Gbps and
-	// effectively DoS the Docker network, temporarily disrupting other
-	// containers running on the host.
-	//
-	// Google Compute Engine has a network bandwidth of about 1.64 Gbps
-	// between nodes, and AWS varies widely depending on instance type.
-	// We play it safe and default to 1 Gbps here (~119 MiB/s), which
-	// means we can fetch a 1 GiB archive in ~8.5 seconds.
-	downloadLimitMbps := "1000" // 1 Gbps
+	a := args.CmdArgs()
+	a = append(a, tarballURL(s.Root, args.Name, args.Commit))
 
-	args := []string{
-		fmt.Sprintf("-parallelism=%d", s.CPUCount),
-		"-index", s.IndexDir,
-		"-file_limit", strconv.Itoa(1 << 20), // 1 MB; match https://sourcegraph.sgdev.org/github.com/sourcegraph/sourcegraph/-/blob/cmd/symbols/internal/symbols/search.go#L22
-		"-incremental",
-		"-branch", "HEAD",
-		"-commit", commit,
-		"-name", name,
-		"-download-limit-mbps", downloadLimitMbps,
-	}
-	args = append(args, opts.CmdArgs()...)
-	args = append(args, tarballURL(s.Root, name, commit))
-
-	cmd := exec.Command("zoekt-archive-index", args...)
+	cmd := exec.Command("zoekt-archive-index", a...)
 	// Prevent prompting
 	cmd.Stdin = &bytes.Buffer{}
 	return s.loggedRun(tr, cmd)
+}
+
+func (s *Server) defaultArgs() indexArgs {
+	return indexArgs{
+		IndexDir:    s.IndexDir,
+		Parallelism: s.CPUCount,
+
+		Incremental: true,
+		Branch:      "HEAD",
+
+		// 1 MB; match https://sourcegraph.sgdev.org/github.com/sourcegraph/sourcegraph/-/blob/cmd/symbols/internal/symbols/search.go#L22
+		FileLimit: 1 << 20,
+
+		// We are downloading archives from within the same network from
+		// another Sourcegraph service (gitserver). This can end up being
+		// so fast that we harm gitserver's network connectivity and our
+		// own. In the case of zoekt-indexserver and gitserver running on
+		// the same host machine, we can even reach up to ~100 Gbps and
+		// effectively DoS the Docker network, temporarily disrupting other
+		// containers running on the host.
+		//
+		// Google Compute Engine has a network bandwidth of about 1.64 Gbps
+		// between nodes, and AWS varies widely depending on instance type.
+		// We play it safe and default to 1 Gbps here (~119 MiB/s), which
+		// means we can fetch a 1 GiB archive in ~8.5 seconds.
+		DownloadLimitMBPS: "1000", // 1 Gbps
+	}
 }
 
 func (s *Server) createEmptyShard(tr trace.Trace, name string) error {
@@ -324,7 +378,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if err != nil && !os.IsNotExist(err) {
 				return err
 			}
-			return s.Index(name, commit)
+			args := s.defaultArgs()
+			args.Name = name
+			args.Commit = commit
+			return s.Index(args)
 		}
 		err := index()
 		if err != nil {
