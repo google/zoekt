@@ -42,7 +42,7 @@ func TestGetIndexOptions(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		if got := opts.toArgs(); !reflect.DeepEqual(got, want) {
+		if got := opts.CmdArgs(); !reflect.DeepEqual(got, want) {
 			t.Errorf("got unexpected arguments from options\ngot: %v\nwant: %v\n", got, want)
 		}
 	}

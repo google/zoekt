@@ -179,29 +179,35 @@ func (s *Server) Run() {
 	}
 }
 
-type IndexOptions struct {
-	// LargeFiles is a slice of glob patterns where matching files are
-	// indexed regardless of their size.
+// indexArgs represents the arguments we pass to zoekt-archive-index
+type indexArgs struct {
+	// LargeFiles is a slice of glob patterns where matching files are indexed
+	// regardless of their size.
 	LargeFiles []string
 
-	// Symbols is a boolean that indicates whether to generate ctags metadata or not
+	// Symbols is a boolean that indicates whether to generate ctags metadata
+	// or not
 	Symbols bool
 }
 
-func (o *IndexOptions) toArgs() []string {
-	args := make([]string, 0, len(o.LargeFiles)*2+1)
+// CmdArgs returns the arguments to pass to the zoekt-archive-index command.
+func (o *indexArgs) CmdArgs() []string {
+	var args []string
+
 	if o.Symbols {
 		args = append(args, "-require_ctags")
 	} else {
 		args = append(args, "-disable_ctags")
 	}
+
 	for _, a := range o.LargeFiles {
 		args = append(args, "-large_file", a)
 	}
+
 	return args
 }
 
-func getIndexOptions(root *url.URL, client *http.Client) (*IndexOptions, error) {
+func getIndexOptions(root *url.URL, client *http.Client) (*indexArgs, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
@@ -220,7 +226,7 @@ func getIndexOptions(root *url.URL, client *http.Client) (*IndexOptions, error) 
 		return nil, errors.New("failed to get configuration options")
 	}
 
-	var opts IndexOptions
+	var opts indexArgs
 
 	err = json.NewDecoder(resp.Body).Decode(&opts)
 	if err != nil {
@@ -270,7 +276,7 @@ func (s *Server) Index(name, commit string) error {
 		"-name", name,
 		"-download-limit-mbps", downloadLimitMbps,
 	}
-	args = append(args, opts.toArgs()...)
+	args = append(args, opts.CmdArgs()...)
 	args = append(args, tarballURL(s.Root, name, commit))
 
 	cmd := exec.Command("zoekt-archive-index", args...)
