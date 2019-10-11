@@ -380,6 +380,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			args := s.defaultArgs()
 			args.Name = name
 			args.Commit = commit
+			args.Incremental = false // force re-index
 			return s.Index(args)
 		}
 		err := index()
