@@ -33,7 +33,7 @@ const debug = false
 type ctagsProcess struct {
 	cmd     *exec.Cmd
 	in      io.WriteCloser
-	out     *bufio.Scanner
+	out     *scanner
 	outPipe io.ReadCloser
 }
 
@@ -58,7 +58,7 @@ func newProcess(bin string) (*ctagsProcess, error) {
 	proc := ctagsProcess{
 		cmd:     cmd,
 		in:      in,
-		out:     bufio.NewScanner(out),
+		out:     &scanner{r: bufio.NewReaderSize(out, 4096)},
 		outPipe: out,
 	}
 
@@ -82,15 +82,14 @@ func (p *ctagsProcess) Close() {
 
 func (p *ctagsProcess) read(rep *reply) error {
 	if !p.out.Scan() {
-		// Some errors (eg. token too long) do not kill the
-		// parser. We would deadlock if we waited for the
-		// process to exit.
+		// Some errors do not kill the parser. We would deadlock if we waited
+		// for the process to exit.
 		err := p.out.Err()
 		p.Close()
 		return err
 	}
 	if debug {
-		log.Printf("read %s", p.out.Text())
+		log.Printf("read %q", p.out.Bytes())
 	}
 
 	// See https://github.com/universal-ctags/ctags/issues/1493
@@ -100,7 +99,7 @@ func (p *ctagsProcess) read(rep *reply) error {
 
 	err := json.Unmarshal(p.out.Bytes(), rep)
 	if err != nil {
-		return fmt.Errorf("unmarshal(%s): %v", p.out.Text(), err)
+		return fmt.Errorf("unmarshal(%q): %v", p.out.Bytes(), err)
 	}
 	return nil
 }
@@ -186,6 +185,52 @@ func (p *ctagsProcess) Parse(name string, content []byte) ([]*Entry, error) {
 	}
 
 	return es, nil
+}
+
+// scanner is like bufio.Scanner but skips long lines instead of returning
+// bufio.ErrTooLong.
+//
+// Additionally it will skip empty lines.
+type scanner struct {
+	r    *bufio.Reader
+	line []byte
+	err  error
+}
+
+func (s *scanner) Scan() bool {
+	if s.err != nil {
+		return false
+	}
+
+	var (
+		err  error
+		line []byte
+	)
+
+	for err == nil && len(line) == 0 {
+		line, err = s.r.ReadSlice('\n')
+		for err == bufio.ErrBufferFull {
+			// make line empty so we ignore it
+			line = nil
+			_, err = s.r.ReadSlice('\n')
+		}
+		line = bytes.TrimSuffix(line, []byte{'\n'})
+		line = bytes.TrimSuffix(line, []byte{'\r'})
+	}
+
+	s.line, s.err = line, err
+	return len(line) > 0
+}
+
+func (s *scanner) Bytes() []byte {
+	return s.line
+}
+
+func (s *scanner) Err() error {
+	if s.err == io.EOF {
+		return nil
+	}
+	return s.err
 }
 
 type Parser interface {
