@@ -65,6 +65,10 @@ type Server struct {
 	// Interval is how often we sync with Sourcegraph.
 	Interval time.Duration
 
+	// Hostname is the name we advertise to Sourcegraph when asking for the
+	// list of repositories to index.
+	Hostname string
+
 	// CPUCount is the amount of parallelism to use when indexing a
 	// repository.
 	CPUCount int
@@ -105,14 +109,7 @@ func (s *Server) Run() {
 	go func() {
 		t := time.NewTicker(s.Interval)
 		for {
-			hostname, err := os.Hostname()
-			if err != nil {
-				log.Println(err)
-				<-t.C
-				continue
-			}
-
-			repos, err := listRepos(hostname, s.Root)
+			repos, err := listRepos(s.Hostname, s.Root)
 			if err != nil {
 				log.Println(err)
 				<-t.C
@@ -391,13 +388,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	hostname, err := os.Hostname()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	data.Repos, err = listRepos(hostname, s.Root)
+	var err error
+	data.Repos, err = listRepos(s.Hostname, s.Root)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -516,11 +508,20 @@ func waitForFrontend(root *url.URL) {
 	}
 }
 
+func hostnameBestEffort() string {
+	if h := os.Getenv("HOSTNAME"); h != "" {
+		return h
+	}
+	hostname, _ := os.Hostname()
+	return hostname
+}
+
 func main() {
 	root := flag.String("sourcegraph_url", "", "http://sourcegraph-frontend-internal or http://localhost:3090")
 	interval := flag.Duration("interval", 10*time.Minute, "sync with sourcegraph this often")
 	index := flag.String("index", build.DefaultDir, "set index directory to use")
 	listen := flag.String("listen", "", "listen on this address.")
+	hostname := flag.String("hostname", hostnameBestEffort(), "the name we advertise to Sourcegraph when asking for the list of repositories to index. Can also be set via the HOSTNAME environment variable.")
 	cpuFraction := flag.Float64("cpu_fraction", 0.25,
 		"use this fraction of the cores for indexing.")
 	dbg := flag.Bool("debug", false,
@@ -569,6 +570,7 @@ func main() {
 		IndexDir: *index,
 		Interval: *interval,
 		CPUCount: cpuCount,
+		Hostname: *hostname,
 	}
 
 	if *listen != "" {
