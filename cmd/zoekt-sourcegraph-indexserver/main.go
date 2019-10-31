@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -19,7 +20,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
+	"sync"
 	"time"
 
 	"go.uber.org/automaxprocs/maxprocs"
@@ -72,6 +75,9 @@ type Server struct {
 	// CPUCount is the amount of parallelism to use when indexing a
 	// repository.
 	CPUCount int
+
+	mu            sync.Mutex
+	lastListRepos []string
 }
 
 var debug = log.New(ioutil.Discard, "", log.LstdFlags)
@@ -109,12 +115,16 @@ func (s *Server) Run() {
 	go func() {
 		t := time.NewTicker(s.Interval)
 		for {
-			repos, err := listRepos(s.Hostname, s.Root)
+			repos, err := listRepos(context.Background(), s.Hostname, s.Root, listIndexed(s.IndexDir))
 			if err != nil {
 				log.Println(err)
 				<-t.C
 				continue
 			}
+
+			s.mu.Lock()
+			s.lastListRepos = repos
+			s.mu.Unlock()
 
 			debug.Printf("updating index queue with %d repositories", len(repos))
 
@@ -388,34 +398,39 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var err error
-	data.Repos, err = listRepos(s.Hostname, s.Root)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	s.mu.Lock()
+	data.Repos = s.lastListRepos
+	s.mu.Unlock()
 
 	repoTmpl.Execute(w, data)
 }
 
-func listRepos(hostname string, root *url.URL) ([]string, error) {
+func listIndexed(indexDir string) []string {
+	index := getShards(indexDir)
+	repoNames := make([]string, 0, len(index))
+	for name := range index {
+		repoNames = append(repoNames, name)
+	}
+	sort.Strings(repoNames)
+	return repoNames
+}
+
+func listRepos(ctx context.Context, hostname string, root *url.URL, indexed []string) ([]string, error) {
 	c := retryablehttp.NewClient()
 	c.Logger = debug
 
 	body, err := json.Marshal(&struct {
 		Hostname string
-		Enabled  bool
-		Index    bool
+		Indexed  []string
 	}{
 		Hostname: hostname,
-		Enabled:  true,
-		Index:    true,
+		Indexed:  indexed,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	u := root.ResolveReference(&url.URL{Path: "/.internal/repos/list"})
+	u := root.ResolveReference(&url.URL{Path: "/.internal/repos/index"})
 	resp, err := c.Post(u.String(), "application/json; charset=utf8", bytes.NewReader(body))
 	if err != nil {
 		return nil, err
@@ -426,19 +441,15 @@ func listRepos(hostname string, root *url.URL) ([]string, error) {
 		return nil, fmt.Errorf("failed to list repositories: status %s", resp.Status)
 	}
 
-	var data []struct {
-		URI string
+	var data struct {
+		RepoNames []string
 	}
 	err = json.NewDecoder(resp.Body).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
 
-	repos := make([]string, len(data))
-	for i, r := range data {
-		repos[i] = r.URI
-	}
-	return repos, nil
+	return data.RepoNames, nil
 }
 
 func resolveRevision(root *url.URL, repo, spec string) (string, error) {

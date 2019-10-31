@@ -1,12 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -147,7 +147,7 @@ func TestListRepos(t *testing.T) {
 		}
 		gotBody = string(b)
 
-		_, err = w.Write([]byte(`[{"uri":"foo"}, {"uri":"bar"}, {"uri":"baz"}]`))
+		_, err = w.Write([]byte(`{"RepoNames": ["foo", "bar", "baz"]}`))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -159,19 +159,19 @@ func TestListRepos(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	gotRepos, err := listRepos("test-indexed-search-1", u)
+	gotRepos, err := listRepos(context.Background(), "test-indexed-search-1", u, []string{"foo", "bam"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if want := []string{"foo", "bar", "baz"}; !reflect.DeepEqual(gotRepos, want) {
-		t.Fatalf("unexpected repos. got %v, want %v", gotRepos, want)
+	if want := []string{"foo", "bar", "baz"}; !cmp.Equal(gotRepos, want) {
+		t.Errorf("repos mismatch (-want +got):\n%s", cmp.Diff(want, gotRepos))
 	}
-	if want := `{"Hostname":"test-indexed-search-1","Enabled":true,"Index":true}`; gotBody != want {
-		t.Fatalf("unexpected request body. got %q, want %q", gotBody, want)
+	if want := `{"Hostname":"test-indexed-search-1","Indexed":["foo","bam"]}`; gotBody != want {
+		t.Errorf("body mismatch (-want +got):\n%s", cmp.Diff(want, gotBody))
 	}
-	if want := "/.internal/repos/list"; gotURL.Path != want {
-		t.Fatalf("unexpected request path. got %q, want %q", gotURL.Path, want)
+	if want := "/.internal/repos/index"; gotURL.Path != want {
+		t.Errorf("request path mismatch (-want +got):\n%s", cmp.Diff(want, gotURL.Path))
 	}
 }
 
