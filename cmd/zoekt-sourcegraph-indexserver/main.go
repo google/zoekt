@@ -520,6 +520,9 @@ func waitForFrontend(root *url.URL) {
 }
 
 func hostnameBestEffort() string {
+	if h := os.Getenv("NODE_NAME"); h != "" {
+		return h
+	}
 	if h := os.Getenv("HOSTNAME"); h != "" {
 		return h
 	}
@@ -532,7 +535,7 @@ func main() {
 	interval := flag.Duration("interval", 10*time.Minute, "sync with sourcegraph this often")
 	index := flag.String("index", build.DefaultDir, "set index directory to use")
 	listen := flag.String("listen", "", "listen on this address.")
-	hostname := flag.String("hostname", hostnameBestEffort(), "the name we advertise to Sourcegraph when asking for the list of repositories to index. Can also be set via the HOSTNAME environment variable.")
+	hostname := flag.String("hostname", hostnameBestEffort(), "the name we advertise to Sourcegraph when asking for the list of repositories to index. Can also be set via the NODE_NAME environment variable.")
 	cpuFraction := flag.Float64("cpu_fraction", 0.25,
 		"use this fraction of the cores for indexing.")
 	dbg := flag.Bool("debug", false,
