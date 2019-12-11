@@ -38,7 +38,8 @@ const IndexFormatVersion = 15
 // 6: Include '#' into the LineFragment template
 // 7: Record skip reasons in the index.
 // 8: Record source path in the index.
-const FeatureVersion = 8
+// 9: Bump default max file size.
+const FeatureVersion = 9
 
 type indexTOC struct {
 	fileContents compoundSection
