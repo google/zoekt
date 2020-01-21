@@ -50,10 +50,7 @@ func (a *tarArchive) Next() (*File, error) {
 }
 
 func (a *tarArchive) Close() error {
-	if a.closer != nil {
-		return a.closer.Close()
-	}
-	return nil
+	return a.closer.Close()
 }
 
 func detectContentType(r io.Reader) (string, io.Reader, error) {
@@ -69,14 +66,7 @@ func detectContentType(r io.Reader) (string, io.Reader, error) {
 	return ct, io.MultiReader(bytes.NewReader(buf[:n]), r), nil
 }
 
-// openArchive opens the tar at the URL or filepath u. Also supported is tgz
-// files over http.
-func openArchive(u string) (Archive, error) {
-	var (
-		r      io.Reader
-		closer io.Closer
-	)
-
+func openReader(u string) (io.ReadCloser, error) {
 	if strings.HasPrefix(u, "https://") || strings.HasPrefix(u, "http://") {
 		resp, err := http.Get(u)
 		if err != nil {
@@ -84,7 +74,7 @@ func openArchive(u string) (Archive, error) {
 		}
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			b, err := ioutil.ReadAll(io.LimitReader(resp.Body, 1024))
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			if err != nil {
 				return nil, err
 			}
@@ -94,35 +84,40 @@ func openArchive(u string) (Archive, error) {
 				Err: fmt.Errorf("%s: %s", resp.Status, string(b)),
 			}
 		}
-		closer = resp.Body
-		r = resp.Body
+		return resp.Body, nil
 	} else if u == "-" {
-		r = os.Stdin
-	} else {
-		f, err := os.Open(u)
-		if err != nil {
-			return nil, err
-		}
-		closer = f
-		r = f
+		return ioutil.NopCloser(os.Stdin), nil
 	}
 
-	ct, r, err := detectContentType(r)
+	return os.Open(u)
+}
+
+// openArchive opens the tar at the URL or filepath u. Also supported is tgz
+// files over http.
+func openArchive(u string) (ar Archive, err error) {
+	readCloser, err := openReader(u)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err != nil {
+			_ = readCloser.Close()
+		}
+	}()
+
+	ct, r, err := detectContentType(readCloser)
 	if err != nil {
 		return nil, err
 	}
 	if ct == "application/x-gzip" {
 		r, err = gzip.NewReader(r)
 		if err != nil {
-			if closer != nil {
-				_ = closer.Close()
-			}
 			return nil, err
 		}
 	}
 
 	return &tarArchive{
 		tr:     tar.NewReader(r),
-		closer: closer,
+		closer: readCloser,
 	}, nil
 }
