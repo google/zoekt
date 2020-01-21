@@ -66,9 +66,6 @@ func newProcess(bin string) (*ctagsProcess, error) {
 		out:     &scanner{r: bufio.NewReaderSize(out, 4096)},
 		outPipe: out,
 	}
-	initialBuffer := make([]byte, bufio.MaxScanTokenSize)
-	maxBufferSize := 1 * 1024 * 1024 // 1 MiB
-	proc.out.Buffer(initialBuffer, maxBufferSize)
 
 	if err := cmd.Start(); err != nil {
 		return nil, err
@@ -98,12 +95,6 @@ func (p *ctagsProcess) read(rep *reply) error {
 	}
 	if debug {
 		log.Printf("read %q", p.out.Bytes())
-	}
-
-	if l := len(p.out.Bytes()); l > bufio.MaxScanTokenSize {
-		log.Printf("warning: discarding ctags line which exceed bufio.MaxScanTokenSize with length=%d", l)
-		log.Printf("line: %q", p.out.Text())
-		return nil
 	}
 
 	// See https://github.com/universal-ctags/ctags/issues/1493
