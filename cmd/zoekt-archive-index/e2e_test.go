@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/tar"
+	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
@@ -16,7 +17,19 @@ import (
 	"github.com/google/zoekt/shards"
 )
 
-func writeArchive(w io.Writer, files map[string]string) error {
+func writeArchive(w io.Writer, format string, files map[string]string) (err error) {
+	if format == "tgz" {
+		gw := gzip.NewWriter(w)
+		defer func() {
+			err2 := gw.Close()
+			if err == nil {
+				err = err2
+			}
+		}()
+		w = gw
+		format = "tar"
+	}
+
 	tw := tar.NewWriter(w)
 
 	for name, body := range files {
@@ -45,6 +58,14 @@ func writeArchive(w io.Writer, files map[string]string) error {
 // -incremental=true option changing the options between indexes and ensuring
 // the results change as expected.
 func TestIndexIncrementally(t *testing.T) {
+	for _, format := range []string{"tar", "tgz"} {
+		t.Run(format, func(t *testing.T) {
+			testIndexIncrementally(t, format)
+		})
+	}
+}
+
+func testIndexIncrementally(t *testing.T, format string) {
 	indexdir, err := ioutil.TempDir("", "TestIndexArg-index")
 	if err != nil {
 		t.Fatalf("TempDir: %v", err)
@@ -64,7 +85,7 @@ func TestIndexIncrementally(t *testing.T) {
 		files["F"+s] = strings.Repeat("a", fileSize)
 	}
 
-	err = writeArchive(archive, files)
+	err = writeArchive(archive, format, files)
 	if err != nil {
 		t.Fatalf("unable to create archive %v", err)
 	}
