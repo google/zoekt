@@ -15,9 +15,13 @@
 package ctags
 
 import (
+	"bufio"
 	"os/exec"
 	"reflect"
+	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestJSON(t *testing.T) {
@@ -110,5 +114,38 @@ class Back implements Future extends Frob {
 		if !reflect.DeepEqual(got[i], want[i]) {
 			t.Fatalf("got %#v, want %#v", got[i], want[i])
 		}
+	}
+}
+
+func TestScanner(t *testing.T) {
+	size := 20
+
+	input := strings.Join([]string{
+		"aaaaaaaaa",
+		strings.Repeat("B", 3*size+3),
+		strings.Repeat("C", size) + strings.Repeat("D", size+1),
+		"",
+		strings.Repeat("e", size-1),
+		"f\r",
+		"gg",
+	}, "\n")
+	want := []string{
+		"aaaaaaaaa",
+		strings.Repeat("e", size-1),
+		"f",
+		"gg",
+	}
+
+	var got []string
+	r := &scanner{r: bufio.NewReaderSize(strings.NewReader(input), size)}
+	for r.Scan() {
+		got = append(got, string(r.Bytes()))
+	}
+	if err := r.Err(); err != nil {
+		t.Fatal(err)
+	}
+
+	if !cmp.Equal(got, want) {
+		t.Errorf("mismatch (-want +got):\n%s", cmp.Diff(want, got))
 	}
 }

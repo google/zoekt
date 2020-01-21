@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/tar"
+	"bytes"
 	"compress/gzip"
 	"fmt"
 	"io"
@@ -57,6 +58,19 @@ func (a *tarArchive) Close() error {
 	return nil
 }
 
+func detectContentType(r io.Reader) (string, io.Reader, error) {
+	var buf [512]byte
+	n, err := io.ReadFull(r, buf[:])
+	if err != nil && err != io.ErrUnexpectedEOF {
+		return "", nil, err
+	}
+
+	ct := http.DetectContentType(buf[:n])
+
+	// Return a new reader which merges in the read bytes
+	return ct, io.MultiReader(bytes.NewReader(buf[:n]), r), nil
+}
+
 // openArchive opens the tar at the URL or filepath u. Also supported is tgz
 // files over http.
 //
@@ -93,13 +107,6 @@ func openArchive(u string, limitMbps int64) (Archive, error) {
 		}
 		closer = resp.Body
 		r = body
-		if resp.Header.Get("Content-Type") == "application/x-gzip" {
-			r, err = gzip.NewReader(r)
-			if err != nil {
-				resp.Body.Close()
-				return nil, err
-			}
-		}
 	} else if u == "-" {
 		r = os.Stdin
 	} else {
@@ -109,6 +116,20 @@ func openArchive(u string, limitMbps int64) (Archive, error) {
 		}
 		closer = f
 		r = f
+	}
+
+	ct, r, err := detectContentType(r)
+	if err != nil {
+		return nil, err
+	}
+	if ct == "application/x-gzip" {
+		r, err = gzip.NewReader(r)
+		if err != nil {
+			if closer != nil {
+				_ = closer.Close()
+			}
+			return nil, err
+		}
 	}
 
 	return &tarArchive{

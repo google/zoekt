@@ -39,7 +39,7 @@ const IndexFormatVersion = 16
 // 6: Include '#' into the LineFragment template
 // 7: Record skip reasons in the index.
 // 8: Record source path in the index.
-// 9: Store ctags metadata
+// 9: Store ctags metadata & bump default max file size
 const FeatureVersion = 9
 
 func init() {

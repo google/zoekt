@@ -21,6 +21,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+
+	git "gopkg.in/src-d/go-git.v4"
+	"gopkg.in/src-d/go-git.v4/config"
 )
 
 // CloneRepo clones one repository, adding the given config
@@ -64,5 +67,30 @@ func CloneRepo(destDir, name, cloneURL string, settings map[string]string) (stri
 		return "", err
 	}
 
+	if err := setFetch(repoDest, "origin", "+refs/heads/*:refs/heads/*"); err != nil {
+		log.Printf("addFetch: %v", err)
+	}
 	return repoDest, nil
+}
+
+func setFetch(repoDir, remote, refspec string) error {
+	repo, err := git.PlainOpen(repoDir)
+	if err != nil {
+		return err
+	}
+
+	cfg, err := repo.Config()
+	if err != nil {
+		return err
+	}
+
+	rm := cfg.Remotes[remote]
+	if rm != nil {
+		rm.Fetch = []config.RefSpec{config.RefSpec(refspec)}
+	}
+	if err := repo.Storer.SetConfig(cfg); err != nil {
+		return err
+	}
+
+	return nil
 }
