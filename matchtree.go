@@ -491,6 +491,9 @@ func (t *substrMatchTree) matches(cp *contentProvider, cost int, known map[match
 }
 
 func (d *indexData) newMatchTree(q query.Q) (matchTree, error) {
+	if q == nil {
+		return nil, fmt.Errorf("got nil (sub)query")
+	}
 	switch s := q.(type) {
 	case *query.Regexp:
 		subQ := query.RegexpToQuery(s.Regexp, ngramSize)
