@@ -2,8 +2,10 @@ package main
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -18,6 +20,20 @@ import (
 )
 
 func writeArchive(w io.Writer, format string, files map[string]string) (err error) {
+	if format == "zip" {
+		zw := zip.NewWriter(w)
+		for name, body := range files {
+			f, err := zw.Create(name)
+			if err != nil {
+				return err
+			}
+			if _, err := f.Write([]byte(body)); err != nil {
+				return err
+			}
+		}
+		return zw.Close()
+	}
+
 	if format == "tgz" {
 		gw := gzip.NewWriter(w)
 		defer func() {
@@ -28,6 +44,10 @@ func writeArchive(w io.Writer, format string, files map[string]string) (err erro
 		}()
 		w = gw
 		format = "tar"
+	}
+
+	if format != "tar" {
+		return errors.New("expected tar")
 	}
 
 	tw := tar.NewWriter(w)
@@ -58,7 +78,7 @@ func writeArchive(w io.Writer, format string, files map[string]string) (err erro
 // -incremental=true option changing the options between indexes and ensuring
 // the results change as expected.
 func TestIndexIncrementally(t *testing.T) {
-	for _, format := range []string{"tar", "tgz"} {
+	for _, format := range []string{"tar", "tgz", "zip"} {
 		t.Run(format, func(t *testing.T) {
 			testIndexIncrementally(t, format)
 		})

@@ -105,6 +105,7 @@ func TestParseQuery(t *testing.T) {
 		{"(type:repo abc) def", NewAnd(&Type{Type: TypeRepo, Child: &Substring{Pattern: "abc"}}, &Substring{Pattern: "def"})},
 
 		// errors.
+		{"--", nil},
 		{"\"abc", nil},
 		{"\"a\\", nil},
 		{"case:foo", nil},
