@@ -184,6 +184,9 @@ func parseExpr(in []byte) (Q, int, error) {
 		if err != nil {
 			return nil, 0, err
 		}
+		if subQ == nil {
+			return nil, 0, fmt.Errorf("query: '-' operator needs an argument")
+		}
 		b = b[n:]
 		expr = &Not{subQ}
 

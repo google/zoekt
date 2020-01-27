@@ -98,6 +98,7 @@ func TestParseQuery(t *testing.T) {
 		)},
 
 		// errors.
+		{"--", nil},
 		{"\"abc", nil},
 		{"\"a\\", nil},
 		{"case:foo", nil},
