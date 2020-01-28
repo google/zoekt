@@ -42,6 +42,28 @@ var Funcmap = template.FuncMap{
 	"More": func(orig int) int {
 		return orig * 3
 	},
+	"IsLangFilterChecked": func(query, lang string) bool {
+		return strings.Contains(query, "lang:"+lang)
+	},
+	"IsRepoFilterChecked": func(query, repo string) bool {
+		return strings.Contains(query, "r:"+repo)
+	},
+	"Repos": func(fileMatches []*FileMatch) map[string]int {
+		repos := make(map[string]int)
+		for _, fileMatch := range fileMatches {
+			repos[fileMatch.Repo]++
+		}
+
+		return repos
+	},
+	"Languages": func(fileMatches []*FileMatch) map[string]int {
+		languages := make(map[string]int)
+		for _, fileMatch := range fileMatches {
+			languages[fileMatch.Language]++
+		}
+
+		return languages
+	},
 	"HumanUnit": func(orig int64) string {
 		b := orig
 		suffix := ""
@@ -542,6 +564,11 @@ func (s *Server) servePrintErr(w http.ResponseWriter, r *http.Request) error {
 		strLines = append(strLines, string(l))
 	}
 
+	fileMatches, err := s.formatResults(result, queryStr, s.Print)
+	if err != nil {
+		return err
+	}
+
 	d := PrintInput{
 		Name:  f.FileName,
 		Repo:  f.Repository,
@@ -551,6 +578,7 @@ func (s *Server) servePrintErr(w http.ResponseWriter, r *http.Request) error {
 			Num:       num,
 			AutoFocus: false,
 		},
+		FileMatches: fileMatches,
 	}
 
 	var buf bytes.Buffer

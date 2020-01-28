@@ -107,7 +107,8 @@ type Repository struct {
 
 // PrintInput is provided to the server.Print template.
 type PrintInput struct {
-	Repo, Name string
-	Lines      []string
-	Last       LastInput
+	Repo, Name  string
+	Lines       []string
+	Last        LastInput
+	FileMatches []*FileMatch
 }
