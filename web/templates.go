@@ -135,6 +135,15 @@ var TemplateText = map[string]string{
     </div>
   </div>
 </nav>
+<script>
+document.onkeydown=function(e){
+  var e = e || window.event;
+  if(e.key == "/") {
+    document.getElementById("navsearchbox").focus();
+    return false;
+  }
+};
+</script>
 `,
 	// search box for the entry page.
 	"search": `
