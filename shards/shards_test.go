@@ -106,9 +106,14 @@ func (s *rankSearcher) Search(ctx context.Context, q query.Q, opts *zoekt.Search
 }
 
 func (s *rankSearcher) List(ctx context.Context, q query.Q) (*zoekt.RepoList, error) {
+	r := zoekt.Repository{}
+	if s.repo != nil {
+		r = *s.repo
+	}
+	r.Rank = s.rank
 	return &zoekt.RepoList{
 		Repos: []*zoekt.RepoListEntry{
-			{Repository: zoekt.Repository{Rank: s.rank}},
+			{Repository: r},
 		},
 	}, nil
 }
@@ -164,7 +169,7 @@ func TestFilteringShardsByRepoSet(t *testing.T) {
 	n := 10 * runtime.GOMAXPROCS(0)
 	for i := 0; i < n; i++ {
 		shardName := fmt.Sprintf("shard%d", i)
-		repoName := fmt.Sprintf("repository%d", i)
+		repoName := fmt.Sprintf("repository%.3d", i)
 
 		if i%3 == 0 {
 			repoSetNames = append(repoSetNames, repoName)
@@ -172,7 +177,7 @@ func TestFilteringShardsByRepoSet(t *testing.T) {
 
 		ss.replace(shardName, &rankSearcher{
 			repo: &zoekt.Repository{Name: repoName},
-			rank: uint16(i),
+			rank: uint16(n - i),
 		})
 	}
 

@@ -37,7 +37,9 @@ type repositorer interface {
 
 type rankedShard struct {
 	zoekt.Searcher
-	rank uint16
+	// SOURCEGRAPH we want to search shards in the order of the name to match
+	// up with how we sort results in graphqlbackend.
+	name string
 }
 
 type shardedSearcher struct {
@@ -382,7 +384,7 @@ func (s *shardedSearcher) getShards() []rankedShard {
 		res = append(res, sh)
 	}
 	sort.Slice(res, func(i, j int) bool {
-		return res[i].rank > res[j].rank
+		return res[i].name < res[j].name
 	})
 
 	// Cache ranked. Ensure we only cache the value if s.shards hasn't
@@ -411,22 +413,22 @@ func (s *shardedSearcher) unlock() {
 	s.throttle.Release(s.capacity)
 }
 
-func shardRank(s zoekt.Searcher) uint16 {
+func shardName(s zoekt.Searcher) string {
 	q := query.Repo{}
 	result, err := s.List(context.Background(), &q)
 	if err != nil {
-		return 0
+		return ""
 	}
 	if len(result.Repos) == 0 {
-		return 0
+		return ""
 	}
-	return result.Repos[0].Repository.Rank
+	return result.Repos[0].Repository.Name
 }
 
 func (s *shardedSearcher) replace(key string, shard zoekt.Searcher) {
-	var rank uint16
+	var name string
 	if shard != nil {
-		rank = shardRank(shard)
+		name = shardName(shard)
 	}
 
 	s.lock()
@@ -440,7 +442,7 @@ func (s *shardedSearcher) replace(key string, shard zoekt.Searcher) {
 		delete(s.shards, key)
 	} else {
 		s.shards[key] = rankedShard{
-			rank:     rank,
+			name:     name,
 			Searcher: shard,
 		}
 	}

@@ -23,7 +23,8 @@ minimal to avoid difficult merge conflicts. Differences:
 - We vendor in all dependencies.
 - Allow empty shard directories on startup. Needed when starting a fresh
   instance which hasn't indexed anything yet.
-- We disable ctags at the source level.
+- We can return symbol/ctag data in results. Additionally we can run symbol regex queries.
+- We search shards in order of repo name and ignore shard ranking.
 - Other minor changes.
 
 Assuming you have the gerrit upstream configured, a useful way to see what we
