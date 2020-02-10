@@ -100,7 +100,7 @@ func (ss *shardedSearcher) String() string {
 
 // Close closes references to open files. It may be called only once.
 func (ss *shardedSearcher) Close() {
-	ss.lock(context.Background())
+	ss.lock()
 	defer ss.unlock()
 	for _, s := range ss.shards {
 		s.Close()
@@ -334,8 +334,9 @@ func (s *shardedSearcher) runlock() {
 	s.throttle.Release(1)
 }
 
-func (s *shardedSearcher) lock(ctx context.Context) error {
-	return s.throttle.Acquire(ctx, s.capacity)
+func (s *shardedSearcher) lock() {
+	// won't error since context.Background won't expire
+	_ = s.throttle.Acquire(context.Background(), s.capacity)
 }
 
 func (s *shardedSearcher) unlock() {
@@ -360,7 +361,7 @@ func (s *shardedSearcher) replace(key string, shard zoekt.Searcher) {
 		rank = shardRank(shard)
 	}
 
-	s.lock(context.Background())
+	s.lock()
 	defer s.unlock()
 	old := s.shards[key]
 	if old.Searcher != nil {
