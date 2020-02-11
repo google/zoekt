@@ -126,7 +126,7 @@ func selectRepoSet(shards []rankedShard, q query.Q) ([]rankedShard, query.Q) {
 			continue
 		}
 
-		filtered := shards[:0]
+		filtered := make([]rankedShard, 0, len(setQuery.Set))
 
 		for _, s := range shards {
 			if repositorer, ok := s.Searcher.(repositorer); ok {
