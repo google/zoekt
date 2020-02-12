@@ -371,9 +371,9 @@ func (s *shardedSearcher) rlock(ctx context.Context) error {
 	return s.throttle.Acquire(ctx, 1)
 }
 
-// getShards returns the currently loaded shards. The shards must be
-// accessed under a rlock call. The shards are sorted by decreasing
-// rank.
+// getShards returns the currently loaded shards. The shards must be accessed
+// under a rlock call. The shards are sorted by decreasing rank and should not
+// be mutated.
 func (s *shardedSearcher) getShards() []rankedShard {
 	if len(s.ranked) > 0 {
 		return s.ranked
@@ -387,8 +387,9 @@ func (s *shardedSearcher) getShards() []rankedShard {
 		return res[i].name < res[j].name
 	})
 
-	// Cache ranked. Ensure we only cache the value if s.shards hasn't
-	// changed.
+	// Cache ranked. We currently hold a read lock, so start a goroutine which
+	// acquires a write lock to update. Use requiredVersion to ensure our
+	// cached slice is still current after acquiring the write lock.
 	go func(ranked []rankedShard, requiredVersion uint64) {
 		s.lock()
 		if s.rankedVersion == requiredVersion {
