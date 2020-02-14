@@ -80,7 +80,12 @@ type Server struct {
 	lastListRepos []string
 }
 
+var client = retryablehttp.NewClient()
 var debug = log.New(ioutil.Discard, "", log.LstdFlags)
+
+func init() {
+	client.Logger = debug
+}
 
 func (s *Server) loggedRun(tr trace.Trace, cmd *exec.Cmd) error {
 	out := &bytes.Buffer{}
@@ -273,7 +278,7 @@ func (o *indexArgs) CmdArgs(root *url.URL) []string {
 
 func getIndexOptions(root *url.URL, args *indexArgs) error {
 	u := root.ResolveReference(&url.URL{Path: "/.internal/search/configuration"})
-	resp, err := http.Get(u.String())
+	resp, err := client.Get(u.String())
 	if err != nil {
 		return err
 	}
@@ -416,9 +421,6 @@ func listIndexed(indexDir string) []string {
 }
 
 func listRepos(ctx context.Context, hostname string, root *url.URL, indexed []string) ([]string, error) {
-	c := retryablehttp.NewClient()
-	c.Logger = debug
-
 	body, err := json.Marshal(&struct {
 		Hostname string
 		Indexed  []string
@@ -431,7 +433,7 @@ func listRepos(ctx context.Context, hostname string, root *url.URL, indexed []st
 	}
 
 	u := root.ResolveReference(&url.URL{Path: "/.internal/repos/index"})
-	resp, err := c.Post(u.String(), "application/json; charset=utf8", bytes.NewReader(body))
+	resp, err := client.Post(u.String(), "application/json; charset=utf8", bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -454,7 +456,7 @@ func listRepos(ctx context.Context, hostname string, root *url.URL, indexed []st
 
 func resolveRevision(root *url.URL, repo, spec string) (string, error) {
 	u := root.ResolveReference(&url.URL{Path: fmt.Sprintf("/.internal/git/%s/resolve-revision/%s", repo, spec)})
-	resp, err := http.Get(u.String())
+	resp, err := client.Get(u.String())
 	if err != nil {
 		return "", err
 	}
@@ -477,7 +479,7 @@ func resolveRevision(root *url.URL, repo, spec string) (string, error) {
 
 func ping(root *url.URL) error {
 	u := root.ResolveReference(&url.URL{Path: "/.internal/ping", RawQuery: "service=gitserver"})
-	resp, err := http.Get(u.String())
+	resp, err := client.Get(u.String())
 	if err != nil {
 		return err
 	}
@@ -574,6 +576,7 @@ func main() {
 	if *dbg {
 		debug = log.New(os.Stderr, "", log.LstdFlags)
 	}
+	client.Logger = debug
 
 	cpuCount := int(math.Round(float64(runtime.GOMAXPROCS(0)) * (*cpuFraction)))
 	if cpuCount < 1 {
