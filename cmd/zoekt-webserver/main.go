@@ -263,9 +263,15 @@ func watchdog(dt time.Duration, addr string) {
 	}
 	tick := time.NewTicker(dt)
 
+	errCount := 0
 	for range tick.C {
 		err := watchdogOnce(context.Background(), client, addr)
 		if err != nil {
+			errCount++
+		} else {
+			errCount = 0
+		}
+		if errCount == 3 {
 			log.Panicf("watchdog: %v", err)
 		}
 	}
