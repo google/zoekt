@@ -332,6 +332,7 @@ document.onkeydown=function(e){
 <body id="results">
   {{template "navbar" .Last}}
   <div class="container-fluid container-results" >
+     <div><b>{{.Name}}</b></div>
      <div class="table table-hover table-condensed" style="overflow:auto; background: #eef;">
        {{ range $index, $ln := .Lines}}
 	 <pre id="l{{Inc $index}}" class="inline-pre"><span class="noselect"><a href="#l{{Inc $index}}">{{Inc $index}}</a>: </span>{{$ln}}</pre>
