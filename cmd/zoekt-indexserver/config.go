@@ -44,6 +44,7 @@ type ConfigEntry struct {
 	Exclude                string
 	GitLabURL              string
 	OnlyPublic             bool
+	GerritApiURL           string
 }
 
 func randomize(entries []ConfigEntry) []ConfigEntry {
@@ -226,6 +227,19 @@ func executeMirror(cfg []ConfigEntry, repoDir string, pendingRepos chan<- string
 			if c.CredentialPath != "" {
 				cmd.Args = append(cmd.Args, "-token", c.CredentialPath)
 			}
+		} else if c.GerritApiURL != "" {
+			cmd = exec.Command("zoekt-mirror-gerrit",
+				"-dest", repoDir)
+			if c.CredentialPath != "" {
+				cmd.Args = append(cmd.Args, "-http-credentials", c.CredentialPath)
+			}
+			if c.Name != "" {
+				cmd.Args = append(cmd.Args, "-name", c.Name)
+			}
+			if c.Exclude != "" {
+				cmd.Args = append(cmd.Args, "-exclude", c.Exclude)
+			}
+			cmd.Args = append(cmd.Args, c.GerritApiURL)
 		}
 
 		stdout, _ := loggedRun(cmd)
