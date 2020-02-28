@@ -134,7 +134,15 @@ func main() {
 		}
 
 		for _, wl := range v.WebLinks {
-			config["zoekt.web-url"] = wl.URL
+			// default gerrit gitiles config is named browse, and doese not include
+			// root domain name in it. Cheating.
+			switch wl.Name {
+			case "browse":
+				config["zoekt.web-url"] = fmt.Sprintf("%s://%s%s", rootURL.Scheme,
+					rootURL.Host, wl.URL)
+			default:
+				config["zoekt.web-url"] = wl.URL
+			}
 			config["zoekt.web-url-type"] = wl.Name
 		}
 

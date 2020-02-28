@@ -112,6 +112,7 @@ func setTemplates(repo *zoekt.Repository, u *url.URL, typ string) error {
 	repo.URL = u.String()
 	switch typ {
 	case "gitiles":
+	case "browse": // as of gerrit 3, the default gitiles weblink is nammd browse
 		/// eg. https://gerrit.googlesource.com/gitiles/+/master/tools/run_dev.sh#20
 		repo.CommitURLTemplate = u.String() + "/+/{{.Version}}"
 		repo.FileURLTemplate = u.String() + "/+/{{.Version}}/{{.Path}}"
