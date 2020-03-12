@@ -137,7 +137,7 @@ func shardRepoName(path string) (string, error) {
 	return repo.Name, nil
 }
 
-var incompleteRE = regexp.MustCompile("\\.zoekt[0-9]+$")
+var incompleteRE = regexp.MustCompile(`\.zoekt[0-9]+$`)
 
 func removeIncompleteShards(dir string) {
 	d, err := os.Open(dir)

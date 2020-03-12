@@ -138,8 +138,8 @@ func TestReadSearch(t *testing.T) {
 	qs := []query.Q{
 		&query.Substring{Pattern: "func main", Content: true},
 		&query.Regexp{Regexp: mustParseRE("^package"), Content: true},
-		&query.Symbol{&query.Substring{Pattern: "num"}},
-		&query.Symbol{&query.Regexp{Regexp: mustParseRE("sage$")}},
+		&query.Symbol{Expr: &query.Substring{Pattern: "num"}},
+		&query.Symbol{Expr: &query.Regexp{Regexp: mustParseRE("sage$")}},
 	}
 
 	shards := []string{"ctagsrepo_v16.00000", "repo_v15.00000", "repo_v16.00000"}

@@ -41,7 +41,7 @@ func (s *compoundSection) writeStrings(w *writer, strs []*searchableString) {
 
 func (s *compoundSection) writeMap(w *writer, m map[string]uint32) {
 	keys := make([]*searchableString, 0, len(m))
-	for k, _ := range m {
+	for k := range m {
 		keys = append(keys, &searchableString{
 			data: []byte(k),
 		})

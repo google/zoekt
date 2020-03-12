@@ -179,7 +179,7 @@ func TestRemoveIncompleteShards(t *testing.T) {
 
 	left, _ := filepath.Glob(filepath.Join(dir, "*"))
 	sort.Strings(left)
-	for i, _ := range left {
+	for i := range left {
 		left[i] = filepath.Base(left[i])
 	}
 
