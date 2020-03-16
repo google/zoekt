@@ -43,9 +43,6 @@ type repoWalker struct {
 	// Path => commit SHA1
 	subRepoVersions map[string]plumbing.Hash
 	repoCache       *RepoCache
-
-	// If set, don't gasp on missing submodules.
-	ignoreMissingSubmodules bool
 }
 
 // subURL returns the URL for a submodule.
@@ -66,12 +63,11 @@ func (w *repoWalker) subURL(relURL string) (*url.URL, error) {
 func newRepoWalker(r *git.Repository, repoURL string, repoCache *RepoCache) *repoWalker {
 	u, _ := url.Parse(repoURL)
 	return &repoWalker{
-		repo:                    r,
-		repoURL:                 u,
-		tree:                    map[fileKey]BlobLocation{},
-		repoCache:               repoCache,
-		subRepoVersions:         map[string]plumbing.Hash{},
-		ignoreMissingSubmodules: true,
+		repo:            r,
+		repoURL:         u,
+		tree:            map[fileKey]BlobLocation{},
+		repoCache:       repoCache,
+		subRepoVersions: map[string]plumbing.Hash{},
 	}
 }
 
@@ -121,12 +117,9 @@ func TreeToFiles(r *git.Repository, t *object.Tree,
 }
 
 func (r *repoWalker) tryHandleSubmodule(p string, id *plumbing.Hash) error {
-	err := r.handleSubmodule(p, id)
-	if r.ignoreMissingSubmodules && err != nil {
+	if err := r.handleSubmodule(p, id); err != nil {
 		log.Printf("submodule %s: ignoring error %v", p, err)
-		err = nil
 	}
-
 	return nil
 }
 
