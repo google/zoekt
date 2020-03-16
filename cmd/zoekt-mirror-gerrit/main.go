@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	gerrit "github.com/andygrunwald/go-gerrit"
@@ -123,12 +124,26 @@ func main() {
 	if projectURL == "" {
 		log.Fatalf("project URL is empty, got Schemes %#v", info.Download.Schemes)
 	}
-	projects, _, err := client.Projects.ListProjects(&gerrit.ProjectOptions{})
-	if err != nil {
-		log.Fatalf("ListProjects: %v", err)
+
+	projects := make(map[string]gerrit.ProjectInfo)
+	page := new(map[string]gerrit.ProjectInfo)
+	skip := "0"
+	for {
+		page, _, err = client.Projects.ListProjects(&gerrit.ProjectOptions{Skip: skip})
+		if err != nil {
+			log.Fatalf("ListProjects: %v", err)
+		}
+
+		if len(*page) == 0 {
+			break
+		}
+		for k, v := range *page {
+			projects[k] = v
+		}
+		skip = strconv.Itoa(len(projects))
 	}
 
-	for k, v := range *projects {
+	for k, v := range projects {
 		if !filter.Include(k) {
 			continue
 		}
