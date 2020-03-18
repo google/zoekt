@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	gerrit "github.com/andygrunwald/go-gerrit"
@@ -75,6 +76,7 @@ func main() {
 	dest := flag.String("dest", "", "destination directory")
 	namePattern := flag.String("name", "", "only clone repos whose name matches the regexp.")
 	excludePattern := flag.String("exclude", "", "don't mirror repos whose names match this regexp.")
+	httpCrendentialsPath := flag.String("http-credentials", "", "path to a file containing http credentials stored like 'user:password'.")
 	flag.Parse()
 
 	if len(flag.Args()) < 1 {
@@ -86,6 +88,16 @@ func main() {
 		log.Fatalf("url.Parse(): %v", err)
 	}
 
+	if *httpCrendentialsPath != "" {
+		creds, err := ioutil.ReadFile(*httpCrendentialsPath)
+		if err != nil {
+			log.Print("Cannot read gerrit http credentials, going Anonymous")
+		} else {
+			splitCreds := strings.Split(strings.TrimSpace(string(creds)), ":")
+			rootURL.User = url.UserPassword(splitCreds[0], splitCreds[1])
+		}
+	}
+
 	if *dest == "" {
 		log.Fatal("must set --dest")
 	}
@@ -94,6 +106,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	client, err := gerrit.NewClient(rootURL.String(), newLoggingClient())
 	if err != nil {
 		log.Fatalf("NewClient(%s): %v", rootURL, err)
@@ -111,12 +124,26 @@ func main() {
 	if projectURL == "" {
 		log.Fatalf("project URL is empty, got Schemes %#v", info.Download.Schemes)
 	}
-	projects, _, err := client.Projects.ListProjects(&gerrit.ProjectOptions{})
-	if err != nil {
-		log.Fatalf("ListProjects: %v", err)
+
+	projects := make(map[string]gerrit.ProjectInfo)
+	page := new(map[string]gerrit.ProjectInfo)
+	skip := "0"
+	for {
+		page, _, err = client.Projects.ListProjects(&gerrit.ProjectOptions{Skip: skip})
+		if err != nil {
+			log.Fatalf("ListProjects: %v", err)
+		}
+
+		if len(*page) == 0 {
+			break
+		}
+		for k, v := range *page {
+			projects[k] = v
+		}
+		skip = strconv.Itoa(len(projects))
 	}
 
-	for k, v := range *projects {
+	for k, v := range projects {
 		if !filter.Include(k) {
 			continue
 		}
@@ -134,8 +161,17 @@ func main() {
 		}
 
 		for _, wl := range v.WebLinks {
-			config["zoekt.web-url"] = wl.URL
-			config["zoekt.web-url-type"] = wl.Name
+			// default gerrit gitiles config is named browse, and does not include
+			// root domain name in it. Cheating.
+			switch wl.Name {
+			case "browse":
+				config["zoekt.web-url"] = fmt.Sprintf("%s://%s%s", rootURL.Scheme,
+					rootURL.Host, wl.URL)
+				config["zoekt.web-url-type"] = "gitiles"
+			default:
+				config["zoekt.web-url"] = wl.URL
+				config["zoekt.web-url-type"] = wl.Name
+			}
 		}
 
 		if dest, err := gitindex.CloneRepo(*dest, name, cloneURL.String(), config); err != nil {
