@@ -161,7 +161,9 @@ func main() {
 	}
 
 	// Sourcegraph: Add logging if debug logging enabled
-	if lvl := os.Getenv("SRC_LOG_LEVEL"); lvl == "" || strings.EqualFold(lvl, "dbug") {
+	logLvl := os.Getenv("SRC_LOG_LEVEL")
+	debug := logLvl == "" || strings.EqualFold(logLvl, "dbug")
+	if debug {
 		searcher = &loggedSearcher{Searcher: searcher}
 	}
 
@@ -221,7 +223,9 @@ func main() {
 	}
 	go watchdog(30*time.Second, watchdogAddr)
 
-	log.Printf("listening on %v", *listen)
+	if debug {
+		log.Printf("listening on %v", *listen)
+	}
 	if *sslCert != "" || *sslKey != "" {
 		err = http.ListenAndServeTLS(*listen, *sslCert, *sslKey, handler)
 	} else {
