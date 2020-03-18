@@ -12,6 +12,7 @@ require (
 	github.com/kylelemons/godebug v1.1.0
 	github.com/mitchellh/mapstructure v1.1.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/prometheus/client_golang v1.5.1
 	github.com/sergi/go-diff v1.1.0 // indirect
 	github.com/xanzy/go-gitlab v0.25.0
 	go.uber.org/automaxprocs v1.3.0
