@@ -198,6 +198,7 @@ func main() {
 	handler.Handle("/metrics", promhttp.Handler())
 
 	if *enablePprof {
+		handler.Handle("/metrics", promhttp.Handler())
 		handler.HandleFunc("/debug/pprof/", pprof.Index)
 		handler.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
 		handler.HandleFunc("/debug/pprof/profile", pprof.Profile)
