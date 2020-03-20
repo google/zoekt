@@ -305,7 +305,7 @@ func (s *GroupsService) SetGroupDescription(groupID, description string) (*strin
 //
 // Gerrit API docs: https://gerrit-review.googlesource.com/Documentation/rest-api-groups.html#delete-group-description
 func (s *GroupsService) DeleteGroupDescription(groupID string) (*Response, error) {
-	u := fmt.Sprintf("groups/%s/description'", groupID)
+	u := fmt.Sprintf("groups/%s/description", groupID)
 	return s.client.DeleteRequest(u, nil)
 }
 

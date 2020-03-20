@@ -113,7 +113,7 @@ func (s *GroupsService) AddGroupMembers(groupID string, input *MembersInput) (*[
 //
 // Gerrit API docs: https://gerrit-review.googlesource.com/Documentation/rest-api-groups.html#delete-group-member
 func (s *GroupsService) DeleteGroupMember(groupID, accountID string) (*Response, error) {
-	u := fmt.Sprintf("groups/%s/members/%s'", groupID, accountID)
+	u := fmt.Sprintf("groups/%s/members/%s", groupID, accountID)
 	return s.client.DeleteRequest(u, nil)
 }
 
@@ -122,7 +122,7 @@ func (s *GroupsService) DeleteGroupMember(groupID, accountID string) (*Response,
 //
 // Gerrit API docs: https://gerrit-review.googlesource.com/Documentation/rest-api-groups.html#delete-group-members
 func (s *GroupsService) DeleteGroupMembers(groupID string, input *MembersInput) (*Response, error) {
-	u := fmt.Sprintf("groups/%s/members.delete'", groupID)
+	u := fmt.Sprintf("groups/%s/members.delete", groupID)
 
 	req, err := s.client.NewRequest("POST", u, input)
 	if err != nil {

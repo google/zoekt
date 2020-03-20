@@ -19,6 +19,7 @@ package gitlab
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -75,7 +76,7 @@ type Issue struct {
 	Assignee          *IssueAssignee   `json:"assignee"`
 	Upvotes           int              `json:"upvotes"`
 	Downvotes         int              `json:"downvotes"`
-	Labels            []string         `json:"labels"`
+	Labels            Labels           `json:"labels"`
 	Title             string           `json:"title"`
 	UpdatedAt         *time.Time       `json:"updated_at"`
 	CreatedAt         *time.Time       `json:"created_at"`
@@ -91,6 +92,10 @@ type Issue struct {
 	Links             *IssueLinks      `json:"_links"`
 	IssueLinkID       int              `json:"issue_link_id"`
 	MergeRequestCount int              `json:"merge_requests_count"`
+	TaskCompletionStatus struct {
+		Count          int `json:"count"`
+		CompletedCount int `json:"completed_count"`
+	} `json:"task_completion_status"`
 }
 
 func (i Issue) String() string {
@@ -103,6 +108,12 @@ type Labels []string
 // MarshalJSON implements the json.Marshaler interface.
 func (l *Labels) MarshalJSON() ([]byte, error) {
 	return json.Marshal(strings.Join(*l, ","))
+}
+
+// EncodeValues implements the query.EncodeValues interface
+func (l *Labels) EncodeValues(key string, v *url.Values) error {
+	v.Set(key, strings.Join(*l, ","))
+	return nil
 }
 
 // ListIssuesOptions represents the available ListIssues() options.
@@ -280,7 +291,7 @@ type CreateIssueOptions struct {
 	Confidential                       *bool      `url:"confidential,omitempty" json:"confidential,omitempty"`
 	AssigneeIDs                        []int      `url:"assignee_ids,omitempty" json:"assignee_ids,omitempty"`
 	MilestoneID                        *int       `url:"milestone_id,omitempty" json:"milestone_id,omitempty"`
-	Labels                             Labels     `url:"labels,comma,omitempty" json:"labels,omitempty"`
+	Labels                             *Labels    `url:"labels,comma,omitempty" json:"labels,omitempty"`
 	CreatedAt                          *time.Time `url:"created_at,omitempty" json:"created_at,omitempty"`
 	DueDate                            *ISOTime   `url:"due_date,omitempty" json:"due_date,omitempty"`
 	MergeRequestToResolveDiscussionsOf *int       `url:"merge_request_to_resolve_discussions_of,omitempty" json:"merge_request_to_resolve_discussions_of,omitempty"`
@@ -321,7 +332,7 @@ type UpdateIssueOptions struct {
 	Confidential     *bool      `url:"confidential,omitempty" json:"confidential,omitempty"`
 	AssigneeIDs      []int      `url:"assignee_ids,omitempty" json:"assignee_ids,omitempty"`
 	MilestoneID      *int       `url:"milestone_id,omitempty" json:"milestone_id,omitempty"`
-	Labels           Labels     `url:"labels,comma,omitempty" json:"labels,omitempty"`
+	Labels           *Labels    `url:"labels,comma,omitempty" json:"labels,omitempty"`
 	StateEvent       *string    `url:"state_event,omitempty" json:"state_event,omitempty"`
 	UpdatedAt        *time.Time `url:"updated_at,omitempty" json:"updated_at,omitempty"`
 	DueDate          *ISOTime   `url:"due_date,omitempty" json:"due_date,omitempty"`
@@ -370,6 +381,38 @@ func (s *IssuesService) DeleteIssue(pid interface{}, issue int, options ...Optio
 	}
 
 	return s.client.Do(req, nil)
+}
+
+// MoveIssueOptions represents the available MoveIssue() options.
+//
+// GitLab API docs: https://docs.gitlab.com/ee/api/issues.html#move-an-issue
+type MoveIssueOptions struct {
+	ToProjectID *int `url:"to_project_id,omitempty" json:"to_project_id,omitempty"`
+}
+
+// MoveIssue updates an existing project issue. This function is also used
+// to mark an issue as closed.
+//
+// GitLab API docs: https://docs.gitlab.com/ee/api/issues.html#move-an-issue
+func (s *IssuesService) MoveIssue(pid interface{}, issue int, opt *MoveIssueOptions, options ...OptionFunc) (*Issue, *Response, error) {
+	project, err := parseID(pid)
+	if err != nil {
+		return nil, nil, err
+	}
+	u := fmt.Sprintf("projects/%s/issues/%d/move", pathEscape(project), issue)
+
+	req, err := s.client.NewRequest("POST", u, opt, options)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	i := new(Issue)
+	resp, err := s.client.Do(req, i)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return i, resp, err
 }
 
 // SubscribeToIssue subscribes the authenticated user to the given issue to

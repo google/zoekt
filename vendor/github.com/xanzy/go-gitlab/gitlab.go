@@ -14,6 +14,7 @@
 // limitations under the License.
 //
 
+// Package gitlab implements a GitLab API client.
 package gitlab
 
 import (
@@ -82,11 +83,25 @@ type BuildStateValue string
 // These constants represent all valid build states.
 const (
 	Pending  BuildStateValue = "pending"
+	Created  BuildStateValue = "created"
 	Running  BuildStateValue = "running"
 	Success  BuildStateValue = "success"
 	Failed   BuildStateValue = "failed"
 	Canceled BuildStateValue = "canceled"
 	Skipped  BuildStateValue = "skipped"
+	Manual   BuildStateValue = "manual"
+)
+
+// DeploymentStatusValue represents a Gitlab deployment status.
+type DeploymentStatusValue string
+
+// These constants represent all valid deployment statuses.
+const (
+	DeploymentStatusCreated  DeploymentStatusValue = "created"
+	DeploymentStatusRunning  DeploymentStatusValue = "running"
+	DeploymentStatusSuccess  DeploymentStatusValue = "success"
+	DeploymentStatusFailed   DeploymentStatusValue = "failed"
+	DeploymentStatusCanceled DeploymentStatusValue = "canceled"
 )
 
 // ISOTime represents an ISO 8601 formatted date
@@ -99,7 +114,7 @@ const iso8601 = "2006-01-02"
 func (t ISOTime) MarshalJSON() ([]byte, error) {
 	if y := time.Time(t).Year(); y < 0 || y >= 10000 {
 		// ISO 8901 uses 4 digits for the years
-		return nil, errors.New("ISOTime.MarshalJSON: year outside of range [0,9999]")
+		return nil, errors.New("json: ISOTime year outside of range [0,9999]")
 	}
 
 	b := make([]byte, 0, len(iso8601)+2)
@@ -213,6 +228,33 @@ const (
 	PublicVisibility   VisibilityValue = "public"
 )
 
+// ProjectCreationLevelValue represents a project creation level within GitLab.
+//
+// GitLab API docs: https://docs.gitlab.com/ce/api/
+type ProjectCreationLevelValue string
+
+// List of available project creation levels.
+//
+// GitLab API docs: https://docs.gitlab.com/ce/api/
+const (
+	NoOneProjectCreation      ProjectCreationLevelValue = "noone"
+	MaintainerProjectCreation ProjectCreationLevelValue = "maintainer"
+	DeveloperProjectCreation  ProjectCreationLevelValue = "developer"
+)
+
+// SubGroupCreationLevelValue represents a sub group creation level within GitLab.
+//
+// GitLab API docs: https://docs.gitlab.com/ce/api/
+type SubGroupCreationLevelValue string
+
+// List of available sub group creation levels.
+//
+// GitLab API docs: https://docs.gitlab.com/ce/api/
+const (
+	OwnerSubGroupCreationLevelValue      SubGroupCreationLevelValue = "owner"
+	MaintainerSubGroupCreationLevelValue SubGroupCreationLevelValue = "maintainer"
+)
+
 // VariableTypeValue represents a variable type within GitLab.
 //
 // GitLab API docs: https://docs.gitlab.com/ce/api/
@@ -317,6 +359,7 @@ type Client struct {
 	Features              *FeaturesService
 	GitIgnoreTemplates    *GitIgnoreTemplatesService
 	GroupBadges           *GroupBadgesService
+	GroupCluster          *GroupClustersService
 	GroupIssueBoards      *GroupIssueBoardsService
 	GroupLabels           *GroupLabelsService
 	GroupMembers          *GroupMembersService
@@ -466,6 +509,7 @@ func newClient(httpClient *http.Client) *Client {
 	c.Features = &FeaturesService{client: c}
 	c.GitIgnoreTemplates = &GitIgnoreTemplatesService{client: c}
 	c.GroupBadges = &GroupBadgesService{client: c}
+	c.GroupCluster = &GroupClustersService{client: c}
 	c.GroupIssueBoards = &GroupIssueBoardsService{client: c}
 	c.GroupLabels = &GroupLabelsService{client: c}
 	c.GroupMembers = &GroupMembersService{client: c}
@@ -873,6 +917,14 @@ func String(v string) *string {
 	return p
 }
 
+// Time is a helper routine that allocates a new time.Time value
+// to store v and returns a pointer to it.
+func Time(v time.Time) *time.Time {
+	p := new(time.Time)
+	*p = v
+	return p
+}
+
 // AccessLevel is a helper routine that allocates a new AccessLevelValue
 // to store v and returns a pointer to it.
 func AccessLevel(v AccessLevelValue) *AccessLevelValue {
@@ -885,6 +937,14 @@ func AccessLevel(v AccessLevelValue) *AccessLevelValue {
 // to store v and returns a pointer to it.
 func BuildState(v BuildStateValue) *BuildStateValue {
 	p := new(BuildStateValue)
+	*p = v
+	return p
+}
+
+// DeploymentStatus is a helper routine that allocates a new
+// DeploymentStatusValue to store v and returns a pointer to it.
+func DeploymentStatus(v DeploymentStatusValue) *DeploymentStatusValue {
+	p := new(DeploymentStatusValue)
 	*p = v
 	return p
 }
@@ -909,6 +969,22 @@ func VariableType(v VariableTypeValue) *VariableTypeValue {
 // to store v and returns a pointer to it.
 func Visibility(v VisibilityValue) *VisibilityValue {
 	p := new(VisibilityValue)
+	*p = v
+	return p
+}
+
+// ProjectCreationLevel is a helper routine that allocates a new ProjectCreationLevelValue
+// to store v and returns a pointer to it.
+func ProjectCreationLevel(v ProjectCreationLevelValue) *ProjectCreationLevelValue {
+	p := new(ProjectCreationLevelValue)
+	*p = v
+	return p
+}
+
+// SubGroupCreationLevel is a helper routine that allocates a new SubGroupCreationLevelValue
+// to store v and returns a pointer to it.
+func SubGroupCreationLevel(v SubGroupCreationLevelValue) *SubGroupCreationLevelValue {
+	p := new(SubGroupCreationLevelValue)
 	*p = v
 	return p
 }

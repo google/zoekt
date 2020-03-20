@@ -1,9 +1,25 @@
 language: go
+go:
+  - 1.11.x
+  - 1.13.x
+  - 1.14.x
+  - master
+env:
+  - GO111MODULE=on
+  
+services:
+  - docker
 
-install:
-  - go get -d -v .
+before_install:
+  - docker pull gfleury/bb-demo:demo
+  - docker run -e BITBUCKET_HOME=/mnt --rm --name="bitbucket" -d -p 7990:7990 -p 7999:7999 gfleury/bb-demo:demo
+  - docker ps -a
+  - curl http://localhost:7990/mvc/login?nextUrl=/dashboard |grep "Log in"; while [ $? != 0 ]; do sleep 2; curl http://localhost:7990/mvc/login?nextUrl=/dashboard |grep "Log in"; done
+
 
 script:
   - go test
+  - INTEGRATION=TRUE go test
   - go build -v ./
+  - if [[ "$(go version)" =~ "go version go1.11" ]]; then exit 0; else go get -u github.com/golangci/golangci-lint/cmd/golangci-lint && golangci-lint run -v; fi
 

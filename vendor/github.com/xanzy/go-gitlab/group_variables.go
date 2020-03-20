@@ -39,24 +39,32 @@ type GroupVariable struct {
 	Value        string            `json:"value"`
 	VariableType VariableTypeValue `json:"variable_type"`
 	Protected    bool              `json:"protected"`
+	Masked       bool              `json:"masked"`
 }
 
 func (v GroupVariable) String() string {
 	return Stringify(v)
 }
 
+// ListGroupVariablesOptions represents the available options for listing variables
+// for a group.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ee/api/group_level_variables.html#list-group-variables
+type ListGroupVariablesOptions ListOptions
+
 // ListVariables gets a list of all variables for a group.
 //
 // GitLab API docs:
 // https://docs.gitlab.com/ee/api/group_level_variables.html#list-group-variables
-func (s *GroupVariablesService) ListVariables(gid interface{}, options ...OptionFunc) ([]*GroupVariable, *Response, error) {
+func (s *GroupVariablesService) ListVariables(gid interface{}, opt *ListGroupVariablesOptions, options ...OptionFunc) ([]*GroupVariable, *Response, error) {
 	group, err := parseID(gid)
 	if err != nil {
 		return nil, nil, err
 	}
 	u := fmt.Sprintf("groups/%s/variables", pathEscape(group))
 
-	req, err := s.client.NewRequest("GET", u, nil, options)
+	req, err := s.client.NewRequest("GET", u, opt, options)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -105,6 +113,7 @@ type CreateGroupVariableOptions struct {
 	Value        *string            `url:"value,omitempty" json:"value,omitempty"`
 	VariableType *VariableTypeValue `url:"variable_type,omitempty" json:"variable_type,omitempty"`
 	Protected    *bool              `url:"protected,omitempty" json:"protected,omitempty"`
+	Masked       *bool              `url:"masked,omitempty" json:"masked,omitempty"`
 }
 
 // CreateVariable creates a new group variable.
@@ -141,6 +150,7 @@ type UpdateGroupVariableOptions struct {
 	Value        *string            `url:"value,omitempty" json:"value,omitempty"`
 	VariableType *VariableTypeValue `url:"variable_type,omitempty" json:"variable_type,omitempty"`
 	Protected    *bool              `url:"protected,omitempty" json:"protected,omitempty"`
+	Masked       *bool              `url:"masked,omitempty" json:"masked,omitempty"`
 }
 
 // UpdateVariable updates the position of an existing

@@ -38,14 +38,17 @@ type PermissionRuleInfo struct {
 //
 // Gerrit API docs: https://gerrit-review.googlesource.com/Documentation/rest-api-access.html#project-access-info
 type ProjectAccessInfo struct {
-	Revision      string                       `json:"revision"`
-	InheritsFrom  ProjectInfo                  `json:"inherits_from"`
-	Local         map[string]AccessSectionInfo `json:"local"`
-	IsOwner       bool                         `json:"is_owner"`
-	OwnerOf       []string                     `json:"owner_of"`
-	CanUpload     bool                         `json:"can_upload"`
-	CanAdd        bool                         `json:"can_add"`
-	ConfigVisible bool                         `json:"config_visible"`
+	Revision       string                       `json:"revision"`
+	InheritsFrom   ProjectInfo                  `json:"inherits_from"`
+	Local          map[string]AccessSectionInfo `json:"local"`
+	IsOwner        bool                         `json:"is_owner"`
+	OwnerOf        []string                     `json:"owner_of"`
+	CanUpload      bool                         `json:"can_upload"`
+	CanAdd         bool                         `json:"can_add"`
+	CanAddTags     bool                         `json:"can_add_tags"`
+	ConfigVisible  bool                         `json:"config_visible"`
+	Groups         map[string]GroupInfo         `json:"groups"`
+	ConfigWebLinks []string                     `json:"configWebLinks"`
 }
 
 // ListAccessRightsOptions specifies the parameters to the AccessService.ListAccessRights.

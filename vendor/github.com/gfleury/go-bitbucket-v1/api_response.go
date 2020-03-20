@@ -6,6 +6,7 @@ package bitbucketv1
 
 import (
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
 	"strings"
 
@@ -102,6 +103,61 @@ type UserWithMetadata struct {
 	Role     string        `json:"role"`
 	Approved bool          `json:"approved"`
 	Status   string        `json:"status"`
+}
+
+// PermissionGlobal are global permissions
+type PermissionGlobal string
+
+const (
+	// PermissionGlobalLicensedUser represents the ability to log into the system
+	PermissionGlobalLicensedUser PermissionGlobal = "LICENSED_USER"
+	// PermissionGlobalProjectCreate allows project creation
+	PermissionGlobalProjectCreate PermissionGlobal = "PROJECT_CREATE"
+	// PermissionGlobalAdmin represents an administrator
+	PermissionGlobalAdmin PermissionGlobal = "ADMIN"
+	// PermissionGlobalSysAdmin represents a system administrator
+	PermissionGlobalSysAdmin PermissionGlobal = "SYS_ADMIN"
+)
+
+// PermissionProject are project level permissions
+type PermissionProject string
+
+const (
+	// PermissionProjectAdmin grants admin priviledges
+	PermissionProjectAdmin PermissionProject = "PROJECT_ADMIN"
+	// PermissionProjectRead grants read priviledges
+	PermissionProjectRead PermissionProject = "PROJECT_READ"
+	// PermissionProjectWrite grants write priviledges
+	PermissionProjectWrite PermissionProject = "PROJECT_WRITE"
+)
+
+// PermissionRepository are repository level permissions
+type PermissionRepository string
+
+const (
+	// PermissionRepositoryAdmin grants admin priviledges
+	PermissionRepositoryAdmin PermissionRepository = "REPO_ADMIN"
+	// PermissionRepositoryRead grants read priviledges
+	PermissionRepositoryRead PermissionRepository = "REPO_READ"
+	// PermissionRepositoryWrite grants write priviledges
+	PermissionRepositoryWrite PermissionRepository = "REPO_WRITE"
+)
+
+// UserPermission contains a user with its permission
+type UserPermission struct {
+	User       User   `json:"user"`
+	Permission string `json:"permission"`
+}
+
+// Group represents a user group
+type Group struct {
+	Name string `json:"name"`
+}
+
+// GroupPermission contains a group with its permission
+type GroupPermission struct {
+	Group      Group  `json:"group"`
+	Permission string `json:"permission"`
 }
 
 type MergeResult struct {
@@ -273,6 +329,64 @@ type Content struct {
 	Revision string `json:"revision"`
 }
 
+type WebhookConfiguration struct {
+	Secret string `json:"secret"`
+}
+
+type Webhook struct {
+	ID            int                  `json:"id"`
+	Name          string               `json:"name"`
+	Events        []string             `json:"events"`
+	Url           string               `json:"url"`
+	Active        bool                 `json:"active"`
+	Configuration WebhookConfiguration `json:"configuration"`
+}
+
+// WebHookCallback contains payload to use while reading handling webhooks from bitbucket
+type WebHookCallback struct {
+	Actor      Actor      `json:"actor"`
+	Repository Repository `json:"repository"`
+	Push       struct {
+		Changes []Change `json:"changes"`
+	} `json:"push"`
+}
+
+// Actor contains the actor of reported changes from a webhook
+type Actor struct {
+	Username    string `json:"username"`
+	DisplayName string `json:"displayName"`
+}
+
+// Change contains changes reported by webhooks
+type Change struct {
+	Created bool        `json:"created"`
+	Closed  bool        `json:"closed"`
+	Old     interface{} `json:"old"`
+	New     struct {
+		Type   string `json:"type"`
+		Name   string `json:"name"`
+		Target struct {
+			Type string `json:"type"`
+			Hash string `json:"hash"`
+		} `json:"target"`
+	} `json:"new"`
+}
+
+// String converts global permission to its string representation
+func (p PermissionGlobal) String() string {
+	return string(p)
+}
+
+// String converts project permission to its string representation
+func (p PermissionProject) String() string {
+	return string(p)
+}
+
+// String converts repository permission to its string representation
+func (p PermissionRepository) String() string {
+	return string(p)
+}
+
 func (k *SSHKey) String() string {
 	parts := make([]string, 1, 2)
 	parts[0] = strings.TrimSpace(k.Text)
@@ -342,6 +456,27 @@ func GetContentResponse(r *APIResponse) (Content, error) {
 	return c, err
 }
 
+// GetUsersPermissionResponse casts user permissions into structure
+func GetUsersPermissionResponse(r *APIResponse) ([]UserPermission, error) {
+	var c []UserPermission
+	err := mapstructure.Decode(r.Values["values"], &c)
+	return c, err
+}
+
+// GetGroupsPermissionResponse casts group permissions into structure
+func GetGroupsPermissionResponse(r *APIResponse) ([]GroupPermission, error) {
+	var c []GroupPermission
+	err := mapstructure.Decode(r.Values["values"], &c)
+	return c, err
+}
+
+// GetWebhooksResponse cast Webhooks into structure
+func GetWebhooksResponse(r *APIResponse) ([]Webhook, error) {
+	var h []Webhook
+	err := mapstructure.Decode(r.Values["values"], &h)
+	return h, err
+}
+
 // NewAPIResponse create new APIResponse from http.Response
 func NewAPIResponse(r *http.Response) *APIResponse {
 
@@ -352,7 +487,7 @@ func NewAPIResponse(r *http.Response) *APIResponse {
 // NewAPIResponseWithError create new erroneous API response from http.response and error
 func NewAPIResponseWithError(r *http.Response, err error) (*APIResponse, error) {
 
-	response := &APIResponse{Response: r, Message: err.Error()}
+	response := &APIResponse{Response: r, Message: strings.Replace(err.Error(), "\"", "", -1)}
 	return response, err
 }
 
@@ -364,4 +499,15 @@ func NewBitbucketAPIResponse(r *http.Response) (*APIResponse, error) {
 		return nil, err
 	}
 	return response, err
+}
+
+func NewRawAPIResponse(r *http.Response) (*APIResponse, error) {
+	response := &APIResponse{Response: r}
+	raw, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	response.Payload = raw
+	return response, nil
 }

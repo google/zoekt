@@ -95,7 +95,7 @@ func selectHeaderAccept(accepts []string) string {
 // contains is a case insenstive match, finding needle in a haystack
 func contains(haystack []string, needle string) bool {
 	for _, a := range haystack {
-		if strings.ToLower(a) == strings.ToLower(needle) {
+		if strings.EqualFold(a, needle) {
 			return true
 		}
 	}
@@ -191,7 +191,10 @@ func (c *APIClient) prepareRequest(
 						return nil, err
 					}
 				} else { // form value
-					w.WriteField(k, iv)
+					err = w.WriteField(k, iv)
+					if err != nil {
+						return nil, err
+					}
 				}
 			}
 		}
@@ -331,7 +334,7 @@ func setBody(body interface{}, contentType string) (bodyBuf *bytes.Buffer, err e
 	} else if jsonCheck.MatchString(contentType) {
 		err = json.NewEncoder(bodyBuf).Encode(body)
 	} else if xmlCheck.MatchString(contentType) {
-		xml.NewEncoder(bodyBuf).Encode(body)
+		err = xml.NewEncoder(bodyBuf).Encode(body)
 	}
 
 	if err != nil {
@@ -401,8 +404,9 @@ func CacheExpires(r *http.Response) time.Time {
 		lifetime, err := time.ParseDuration(maxAge + "s")
 		if err != nil {
 			expires = now
+		} else {
+			expires = now.Add(lifetime)
 		}
-		expires = now.Add(lifetime)
 	} else {
 		expiresHeader := r.Header.Get("Expires")
 		if expiresHeader != "" {
