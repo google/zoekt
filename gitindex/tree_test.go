@@ -44,6 +44,8 @@ mkdir subdir
 echo acont > afile
 echo sub-cont > subdir/sub-file
 git add afile subdir/sub-file
+git config user.email "you@example.com"
+git config user.name "Your Name"
 git commit -am amsg
 
 cd ..
@@ -51,6 +53,8 @@ cd bdir
 git init
 echo bcont > bfile
 git add bfile
+git config user.email "you@example.com"
+git config user.name "Your Name"
 git commit -am bmsg
 
 cd ../adir
@@ -301,6 +305,8 @@ mkdir subdir
 echo acont > afile
 echo sub-cont > subdir/sub-file
 git add afile subdir/sub-file
+git config user.email "you@example.com"
+git config user.name "Your Name"
 git commit -am amsg
 
 git branch branchdir/a
