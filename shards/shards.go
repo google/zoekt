@@ -34,88 +34,88 @@ import (
 )
 
 var (
-	shardsLoaded = promauto.NewGauge(prometheus.GaugeOpts{
+	metricShardsLoaded = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "zoekt_shards_loaded",
 		Help: "The number of shards currently loaded",
 	})
-	shardsLoadedTotal = promauto.NewCounter(prometheus.CounterOpts{
+	metricShardsLoadedTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "zoekt_shards_loaded_total",
 		Help: "The total number of shards loaded",
 	})
-	shardsLoadFailedTotal = promauto.NewCounter(prometheus.CounterOpts{
+	metricShardsLoadFailedTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "zoekt_shards_load_failed_total",
 		Help: "The total number of shard loads that failed",
 	})
 
-	searchRunning = promauto.NewGauge(prometheus.GaugeOpts{
+	metricSearchRunning = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "zoekt_search_running",
 		Help: "The number of concurrent search requests running",
 	})
-	searchShardRunning = promauto.NewGauge(prometheus.GaugeOpts{
+	metricSearchShardRunning = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "zoekt_search_shard_running",
 		Help: "The number of concurrent search requests in a shard running",
 	})
-	searchFailedTotal = promauto.NewCounter(prometheus.CounterOpts{
+	metricSearchFailedTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "zoekt_search_failed_total",
 		Help: "The total number of search requests that failed",
 	})
-	searchDuration = promauto.NewHistogram(prometheus.HistogramOpts{
+	metricSearchDuration = promauto.NewHistogram(prometheus.HistogramOpts{
 		Name:    "zoekt_search_duration_seconds",
 		Help:    "The duration a search request took in seconds",
 		Buckets: prometheus.DefBuckets, // DefBuckets good for service timings
 	})
 
-	// A Counter per Stat
-	searchContentBytesLoadedTotal = promauto.NewCounter(prometheus.CounterOpts{
+	// A Counter per Stat. Name should match field in zoekt.Stats.
+	metricSearchContentBytesLoadedTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "zoekt_search_content_loaded_bytes_total",
 		Help: "Total amount of I/O for reading contents",
 	})
-	searchIndexBytesLoadedTotal = promauto.NewCounter(prometheus.CounterOpts{
+	metricSearchIndexBytesLoadedTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "zoekt_search_index_loaded_bytes_total",
 		Help: "Total amount of I/O for reading from index",
 	})
-	searchCrashesTotal = promauto.NewCounter(prometheus.CounterOpts{
+	metricSearchCrashesTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "zoekt_search_crashes_total",
 		Help: "Total number of search shards that had a crash",
 	})
-	searchFileCountTotal = promauto.NewCounter(prometheus.CounterOpts{
+	metricSearchFileCountTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "zoekt_search_file_count_total",
 		Help: "Total number of files containing a match",
 	})
-	searchShardFilesConsideredTotal = promauto.NewCounter(prometheus.CounterOpts{
+	metricSearchShardFilesConsideredTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "zoekt_search_shard_files_considered_total",
 		Help: "Total number of files in shards that we considered",
 	})
-	searchFilesConsideredTotal = promauto.NewCounter(prometheus.CounterOpts{
+	metricSearchFilesConsideredTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "zoekt_search_files_considered_total",
 		Help: "Total files that we evaluated. Equivalent to files for which all atom matches (including negations) evaluated to true",
 	})
-	searchFilesLoadedTotal = promauto.NewCounter(prometheus.CounterOpts{
+	metricSearchFilesLoadedTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "zoekt_search_files_loaded_total",
 		Help: "Total files for which we loaded file content to verify substring matches",
 	})
-	searchFilesSkippedTotal = promauto.NewCounter(prometheus.CounterOpts{
+	metricSearchFilesSkippedTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "zoekt_search_files_skipped_total",
 		Help: "Total candidate files whose contents weren't examined because we gathered enough matches",
 	})
-	searchShardsSkippedTotal = promauto.NewCounter(prometheus.CounterOpts{
+	metricSearchShardsSkippedTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "zoekt_search_shards_skipped_total",
 		Help: "Total shards that we did not process because a query was canceled",
 	})
-	searchMatchCountTotal = promauto.NewCounter(prometheus.CounterOpts{
+	metricSearchMatchCountTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "zoekt_search_match_count_total",
 		Help: "Total number of non-overlapping matches",
 	})
-	searchNgramMatchesTotal = promauto.NewCounter(prometheus.CounterOpts{
+	metricSearchNgramMatchesTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "zoekt_search_ngram_matches_total",
 		Help: "Total number of candidate matches as a result of searching ngrams",
 	})
 
-	listRunning = promauto.NewGauge(prometheus.GaugeOpts{
+	metricListRunning = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "zoekt_list_running",
 		Help: "The number of concurrent list requests running",
 	})
-	listShardRunning = promauto.NewGauge(prometheus.GaugeOpts{
+	metricListShardRunning = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "zoekt_list_shard_running",
 		Help: "The number of concurrent list requests in a shard running",
 	})
@@ -182,12 +182,12 @@ func (tl *throttledLoader) load(key string) {
 	shard, err := loadShard(key)
 	<-tl.throttle
 	if err != nil {
-		shardsLoadFailedTotal.Inc()
+		metricShardsLoadFailedTotal.Inc()
 		log.Printf("reloading: %s, err %v ", key, err)
 		return
 	}
 
-	shardsLoadedTotal.Inc()
+	metricShardsLoadedTotal.Inc()
 	tl.ss.replace(key, shard)
 }
 
@@ -245,28 +245,28 @@ func (ss *shardedSearcher) Search(ctx context.Context, q query.Q, opts *zoekt.Se
 	tr.LazyLog(q, true)
 	tr.LazyPrintf("opts: %+v", opts)
 	overallStart := time.Now()
-	searchRunning.Inc()
+	metricSearchRunning.Inc()
 	defer func() {
-		searchRunning.Dec()
-		searchDuration.Observe(time.Since(overallStart).Seconds())
+		metricSearchRunning.Dec()
+		metricSearchDuration.Observe(time.Since(overallStart).Seconds())
 		if sr != nil {
-			searchContentBytesLoadedTotal.Add(float64(sr.Stats.ContentBytesLoaded))
-			searchIndexBytesLoadedTotal.Add(float64(sr.Stats.IndexBytesLoaded))
-			searchCrashesTotal.Add(float64(sr.Stats.Crashes))
-			searchFileCountTotal.Add(float64(sr.Stats.FileCount))
-			searchShardFilesConsideredTotal.Add(float64(sr.Stats.ShardFilesConsidered))
-			searchFilesConsideredTotal.Add(float64(sr.Stats.FilesConsidered))
-			searchFilesLoadedTotal.Add(float64(sr.Stats.FilesLoaded))
-			searchFilesSkippedTotal.Add(float64(sr.Stats.FilesSkipped))
-			searchShardsSkippedTotal.Add(float64(sr.Stats.ShardsSkipped))
-			searchMatchCountTotal.Add(float64(sr.Stats.MatchCount))
-			searchNgramMatchesTotal.Add(float64(sr.Stats.NgramMatches))
+			metricSearchContentBytesLoadedTotal.Add(float64(sr.Stats.ContentBytesLoaded))
+			metricSearchIndexBytesLoadedTotal.Add(float64(sr.Stats.IndexBytesLoaded))
+			metricSearchCrashesTotal.Add(float64(sr.Stats.Crashes))
+			metricSearchFileCountTotal.Add(float64(sr.Stats.FileCount))
+			metricSearchShardFilesConsideredTotal.Add(float64(sr.Stats.ShardFilesConsidered))
+			metricSearchFilesConsideredTotal.Add(float64(sr.Stats.FilesConsidered))
+			metricSearchFilesLoadedTotal.Add(float64(sr.Stats.FilesLoaded))
+			metricSearchFilesSkippedTotal.Add(float64(sr.Stats.FilesSkipped))
+			metricSearchShardsSkippedTotal.Add(float64(sr.Stats.ShardsSkipped))
+			metricSearchMatchCountTotal.Add(float64(sr.Stats.MatchCount))
+			metricSearchNgramMatchesTotal.Add(float64(sr.Stats.NgramMatches))
 
 			tr.LazyPrintf("num files: %d", len(sr.Files))
 			tr.LazyPrintf("stats: %+v", sr.Stats)
 		}
 		if err != nil {
-			searchFailedTotal.Inc()
+			metricSearchFailedTotal.Inc()
 
 			tr.LazyPrintf("error: %v", err)
 			tr.SetError()
@@ -375,9 +375,9 @@ type shardResult struct {
 }
 
 func searchOneShard(ctx context.Context, s zoekt.Searcher, q query.Q, opts *zoekt.SearchOptions, sink chan shardResult) {
-	searchShardRunning.Inc()
+	metricSearchShardRunning.Inc()
 	defer func() {
-		searchShardRunning.Dec()
+		metricSearchShardRunning.Dec()
 		if r := recover(); r != nil {
 			log.Printf("crashed shard: %s: %s, %s", s.String(), r, debug.Stack())
 
@@ -397,9 +397,9 @@ type shardListResult struct {
 }
 
 func listOneShard(ctx context.Context, s zoekt.Searcher, q query.Q, sink chan shardListResult) {
-	listShardRunning.Inc()
+	metricListShardRunning.Inc()
 	defer func() {
-		listShardRunning.Dec()
+		metricListShardRunning.Dec()
 		if r := recover(); r != nil {
 			log.Printf("crashed shard: %s: %s, %s", s.String(), r, debug.Stack())
 			sink <- shardListResult{
@@ -415,9 +415,9 @@ func listOneShard(ctx context.Context, s zoekt.Searcher, q query.Q, sink chan sh
 func (ss *shardedSearcher) List(ctx context.Context, r query.Q) (rl *zoekt.RepoList, err error) {
 	tr := trace.New("shardedSearcher.List", "")
 	tr.LazyLog(r, true)
-	listRunning.Inc()
+	metricListRunning.Inc()
 	defer func() {
-		listRunning.Dec()
+		metricListRunning.Dec()
 		if rl != nil {
 			tr.LazyPrintf("repos size: %d", len(rl.Repos))
 			tr.LazyPrintf("crashes: %d", rl.Crashes)
@@ -566,7 +566,7 @@ func (s *shardedSearcher) replace(key string, shard zoekt.Searcher) {
 	s.rankedVersion++
 	s.ranked = nil
 
-	shardsLoaded.Set(float64(len(s.shards)))
+	metricShardsLoaded.Set(float64(len(s.shards)))
 }
 
 func loadShard(fn string) (zoekt.Searcher, error) {
