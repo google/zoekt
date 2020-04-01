@@ -30,6 +30,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/google/zoekt"
@@ -37,6 +38,7 @@ import (
 	"github.com/google/zoekt/query"
 	"github.com/google/zoekt/shards"
 	"github.com/google/zoekt/web"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/net/trace"
@@ -149,11 +151,13 @@ func main() {
 	}
 
 	// Tune GOMAXPROCS to match Linux container CPU quota.
-	maxprocs.Set()
+	_, _ = maxprocs.Set()
 
 	if err := os.MkdirAll(*index, 0755); err != nil {
 		log.Fatal(err)
 	}
+
+	mustRegisterDiskMonitor(*index)
 
 	searcher, err := shards.NewDirectorySearcher(*index)
 	if err != nil {
@@ -285,6 +289,28 @@ func watchdog(dt time.Duration, addr string) {
 			log.Panicf("watchdog: %v", err)
 		}
 	}
+}
+
+func mustRegisterDiskMonitor(path string) {
+	prometheus.MustRegister(prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+		Name:        "src_disk_space_available_bytes",
+		Help:        "Amount of free space disk space.",
+		ConstLabels: prometheus.Labels{"path": path},
+	}, func() float64 {
+		var stat syscall.Statfs_t
+		_ = syscall.Statfs(path, &stat)
+		return float64(stat.Bavail * uint64(stat.Bsize))
+	}))
+
+	prometheus.MustRegister(prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+		Name:        "src_disk_space_total_bytes",
+		Help:        "Amount of total disk space.",
+		ConstLabels: prometheus.Labels{"path": path},
+	}, func() float64 {
+		var stat syscall.Statfs_t
+		_ = syscall.Statfs(path, &stat)
+		return float64(stat.Blocks * uint64(stat.Bsize))
+	}))
 }
 
 type loggedSearcher struct {
