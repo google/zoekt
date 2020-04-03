@@ -29,14 +29,19 @@ import (
 	"github.com/google/zoekt/shards"
 )
 
-func displayMatches(files []zoekt.FileMatch, pat string, withRepo bool) {
+func displayMatches(files []zoekt.FileMatch, pat string, withRepo bool, list bool) {
 	for _, f := range files {
+		r := ""
+		if withRepo {
+			r = f.Repository + "/"
+		}
+		if list {
+			fmt.Printf("%s%s\n", r, f.FileName)
+			continue
+		}
+
 		for _, m := range f.LineMatches {
-			if withRepo {
-				fmt.Printf("%s/%s:%d:%s\n", f.Repository, f.FileName, m.LineNumber, m.Line)
-			} else {
-				fmt.Printf("%s:%d:%s\n", f.FileName, m.LineNumber, m.Line)
-			}
+			fmt.Printf("%s%s:%d:%s\n", r, f.FileName, m.LineNumber, m.Line)
 		}
 	}
 }
@@ -68,6 +73,7 @@ func main() {
 	profileTime := flag.Duration("profile_time", time.Second, "run this long to gather stats.")
 	verbose := flag.Bool("v", false, "print some background data")
 	withRepo := flag.Bool("r", false, "print the repo before the file name")
+	list := flag.Bool("l", false, "print matching filenames only")
 
 	flag.Usage = func() {
 		name := os.Args[0]
@@ -134,7 +140,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	displayMatches(sres.Files, pat, *withRepo)
+	displayMatches(sres.Files, pat, *withRepo, *list)
 	if *verbose {
 		log.Printf("stats: %#v", sres.Stats)
 	}
