@@ -210,6 +210,13 @@ func main() {
 	handler.Handle("/metrics", promhttp.Handler())
 
 	if *enablePprof {
+		// Zoekt is only available in-cluster for Sourcegraph. So only admins
+		// can reach the endpoint, so we don't need to auth trace
+		// requests. This allows the admin proxy to work.
+		trace.AuthRequest = func(req *http.Request) (any, sensitive bool) {
+			return true, true
+		}
+
 		handler.HandleFunc("/debug/pprof/", pprof.Index)
 		handler.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
 		handler.HandleFunc("/debug/pprof/profile", pprof.Profile)
