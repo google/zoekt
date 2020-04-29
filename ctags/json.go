@@ -45,8 +45,12 @@ func newProcess(bin string) (*ctagsProcess, error) {
 	//  opt = "sandbox"
 	// }
 
-	cmd := exec.Command(bin, "--_interactive="+opt, "--fields=*",
-		"--languages=Basic,C,C#,C++,Clojure,Cobol,CSS,CUDA,D,Elixir,elm,Erlang,Go,haskell,Java,JavaScript,kotlin,Lisp,Lua,MatLab,ObjectiveC,OCaml,Perl,Perl6,PHP,Protobuf,Python,R,Ruby,Rust,scala,Scheme,Sh,swift,Tcl,typescript,tsx,Verilog,Vim",
+	// Sourcegraph default
+	patternLengthLimit := 255
+
+	// Keep in sync with ctags command in sourcegraph
+	cmd := exec.Command(bin, "--_interactive="+opt, "--fields=*", fmt.Sprintf("--pattern-length-limit=%d", patternLengthLimit),
+		"--languages=Basic,C,C#,C++,Clojure,Cobol,CSS,CUDA,D,Elixir,elm,Erlang,Go,GraphQL,Groovy,haskell,Java,JavaScript,Jsonnet,kotlin,Lisp,Lua,MatLab,ObjectiveC,OCaml,Pascal,Perl,Perl6,PHP,Protobuf,Python,R,Ruby,Rust,scala,Scheme,Sh,swift,SystemVerilog,Tcl,Thrift,typescript,tsx,Verilog,VHDL,Vim",
 		"--map-CSS=+.scss", "--map-CSS=+.less", "--map-CSS=+.sass",
 	)
 	in, err := cmd.StdinPipe()
