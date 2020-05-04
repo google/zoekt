@@ -26,7 +26,7 @@ jobs:
     # This is the same tag we used for zoekt in the infrastructure repo.
     - name: version
       id: version
-      run: echo "::set-output name=value::`date -u +'0.0.%Y%m%d%H%M%S'`-`git rev-parse --short HEAD`"
+      run: .github/workflows/docker-version.sh
 
     - name: build-zoekt
       uses: docker/build-push-action@v1
