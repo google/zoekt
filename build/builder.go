@@ -104,12 +104,12 @@ func (o *Options) HashOptions() string {
 type largeFilesFlag struct{ *Options }
 
 func (f largeFilesFlag) String() string {
-	s := append([]string{""}, f.Options.LargeFiles...)
+	s := append([]string{""}, f.LargeFiles...)
 	return strings.Join(s, "-large_file ")
 }
 
 func (f largeFilesFlag) Set(value string) error {
-	f.Options.LargeFiles = append(f.Options.LargeFiles, value)
+	f.LargeFiles = append(f.LargeFiles, value)
 	return nil
 }
 
