@@ -126,7 +126,7 @@ func (o *Options) Flags(fs *flag.FlagSet) {
 	fs.Var(largeFilesFlag{o}, "large_file", "A glob pattern where matching files are to be index regardless of their size. You can add multiple patterns by setting this more than once.")
 
 	// Sourcegraph specific
-	flag.BoolVar(&o.DisableCTags, "disable_ctags", x.DisableCTags, "If set, ctags will not be called.")
+	fs.BoolVar(&o.DisableCTags, "disable_ctags", x.DisableCTags, "If set, ctags will not be called.")
 }
 
 // Builder manages (parallel) creation of uniformly sized shards. The
