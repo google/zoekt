@@ -18,6 +18,7 @@ package build
 
 import (
 	"crypto/sha1"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -93,6 +94,29 @@ func (o *Options) HashOptions() string {
 	hasher.Write([]byte(fmt.Sprintf("%q", o.LargeFiles)))
 
 	return fmt.Sprintf("%x", hasher.Sum(nil))
+}
+
+type largeFilesFlag struct{ *Options }
+
+func (f largeFilesFlag) String() string {
+	s := append([]string{""}, f.LargeFiles...)
+	return strings.Join(s, "-large_file ")
+}
+
+func (f largeFilesFlag) Set(value string) error {
+	f.LargeFiles = append(f.LargeFiles, value)
+	return nil
+}
+
+// Flags adds flags for build options to fs.
+func (o *Options) Flags(fs *flag.FlagSet) {
+	fs.IntVar(&o.SizeMax, "file_limit", 2<<20, "maximum file size")
+	fs.IntVar(&o.TrigramMax, "max_trigram_count", 20000, "maximum number of trigrams per document")
+	fs.IntVar(&o.ShardMax, "shard_limit", 100<<20, "maximum corpus size for a shard")
+	fs.IntVar(&o.Parallelism, "parallelism", 4, "maximum number of parallel indexing processes.")
+	fs.StringVar(&o.IndexDir, "index", DefaultDir, "directory for search indices")
+	fs.BoolVar(&o.CTagsMustSucceed, "require_ctags", false, "If set, ctags calls must succeed.")
+	fs.Var(largeFilesFlag{o}, "large_file", "A glob pattern where matching files are to be index regardless of their size. You can add multiple patterns by setting this more than once.")
 }
 
 // Builder manages (parallel) creation of uniformly sized shards. The
