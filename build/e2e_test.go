@@ -328,9 +328,10 @@ func TestPartialSuccess(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	opts := Options{
-		IndexDir: dir,
-		ShardMax: 1024,
-		SizeMax:  1 << 20,
+		IndexDir:    dir,
+		ShardMax:    1024,
+		SizeMax:     1 << 20,
+		Parallelism: 1,
 	}
 	opts.RepositoryDescription.Name = "repo"
 	opts.SetDefaults()
