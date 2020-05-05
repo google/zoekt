@@ -21,7 +21,7 @@ import (
 	"strings"
 	"sync"
 
-	git "gopkg.in/src-d/go-git.v4"
+	git "github.com/go-git/go-git/v5"
 )
 
 // RepoCache is a set of repositories on the file system, named and

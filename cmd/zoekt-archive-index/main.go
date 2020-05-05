@@ -15,7 +15,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/url"
-	"reflect"
 	"strings"
 
 	"github.com/google/zoekt"
@@ -143,11 +142,8 @@ func do(opts Options, bopts build.Options) error {
 	bopts.RepositoryDescription.Branches = []zoekt.RepositoryBranch{{Name: opts.Branch, Version: opts.Commit}}
 	brs := []string{opts.Branch}
 
-	if opts.Incremental {
-		versions := bopts.IndexVersions()
-		if reflect.DeepEqual(versions, bopts.RepositoryDescription.Branches) {
-			return nil
-		}
+	if opts.Incremental && bopts.IncrementalSkipIndexing() {
+		return nil
 	}
 
 	a, err := openArchive(opts.Archive)

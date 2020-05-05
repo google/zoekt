@@ -52,9 +52,9 @@ func printRegexp(t *testing.T, r *syntax.Regexp, lvl int) {
 
 func TestRegexpParse(t *testing.T) {
 	type testcase struct {
-		in          string
-		query       Q
-		isSymmetric bool
+		in           string
+		query        Q
+		isEquivalent bool
 	}
 
 	cases := []testcase{
@@ -90,14 +90,14 @@ func TestRegexpParse(t *testing.T) {
 			continue
 		}
 
-		query, isSym := RegexpToQuery(r, 3)
+		query, isEq := RegexpToQuery(r, 3)
 		if !reflect.DeepEqual(c.query, query) {
 			printRegexp(t, r, 0)
 			t.Errorf("regexpToQuery(%q): got %v, want %v", c.in, query, c.query)
 		}
-		if isSym != c.isSymmetric {
+		if isEq != c.isEquivalent {
 			printRegexp(t, r, 0)
-			t.Errorf("regexpToQuery(%q): got %v, want %v", c.in, isSym, c.isSymmetric)
+			t.Errorf("regexpToQuery(%q): got %v, want %v", c.in, isEq, c.isEquivalent)
 		}
 	}
 }

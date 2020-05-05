@@ -135,6 +135,15 @@ var TemplateText = map[string]string{
     </div>
   </div>
 </nav>
+<script>
+document.onkeydown=function(e){
+  var e = e || window.event;
+  if (e.key == "/") {
+    document.getElementById("navsearchbox").focus();
+    return false;
+  }
+};
+</script>
 `,
 	// search box for the entry page.
 	"search": `
@@ -323,6 +332,7 @@ var TemplateText = map[string]string{
 <body id="results">
   {{template "navbar" .Last}}
   <div class="container-fluid container-results" >
+     <div><b>{{.Name}}</b></div>
      <div class="table table-hover table-condensed" style="overflow:auto; background: #eef;">
        {{ range $index, $ln := .Lines}}
 	 <pre id="l{{Inc $index}}" class="inline-pre"><span class="noselect"><a href="#l{{Inc $index}}">{{Inc $index}}</a>: </span>{{$ln}}</pre>

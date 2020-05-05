@@ -18,6 +18,7 @@ package build
 
 import (
 	"crypto/sha1"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -26,6 +27,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"runtime"
 	"runtime/pprof"
@@ -97,6 +99,32 @@ func (o *Options) HashOptions() string {
 	hasher.Write([]byte(fmt.Sprintf("%t", o.DisableCTags)))
 
 	return fmt.Sprintf("%x", hasher.Sum(nil))
+}
+
+type largeFilesFlag struct{ *Options }
+
+func (f largeFilesFlag) String() string {
+	s := append([]string{""}, f.LargeFiles...)
+	return strings.Join(s, "-large_file ")
+}
+
+func (f largeFilesFlag) Set(value string) error {
+	f.LargeFiles = append(f.LargeFiles, value)
+	return nil
+}
+
+// Flags adds flags for build options to fs.
+func (o *Options) Flags(fs *flag.FlagSet) {
+	fs.IntVar(&o.SizeMax, "file_limit", 2<<20, "maximum file size")
+	fs.IntVar(&o.TrigramMax, "max_trigram_count", 20000, "maximum number of trigrams per document")
+	fs.IntVar(&o.ShardMax, "shard_limit", 100<<20, "maximum corpus size for a shard")
+	fs.IntVar(&o.Parallelism, "parallelism", 4, "maximum number of parallel indexing processes.")
+	fs.StringVar(&o.IndexDir, "index", DefaultDir, "directory for search indices")
+	fs.BoolVar(&o.CTagsMustSucceed, "require_ctags", false, "If set, ctags calls must succeed.")
+	fs.Var(largeFilesFlag{o}, "large_file", "A glob pattern where matching files are to be index regardless of their size. You can add multiple patterns by setting this more than once.")
+
+	// Sourcegraph specific
+	flag.BoolVar(&o.DisableCTags, "disable_ctags", false, "If set, ctags will not be called.")
 }
 
 // Builder manages (parallel) creation of uniformly sized shards. The
@@ -185,36 +213,36 @@ func (o *Options) shardName(n int) string {
 		fmt.Sprintf("%s_v%d.%05d.zoekt", abs, zoekt.IndexFormatVersion, n))
 }
 
-// IndexVersions returns the versions as present in the index, for
-// implementing incremental indexing.
-func (o *Options) IndexVersions() []zoekt.RepositoryBranch {
+// IncrementalSkipIndexing returns true if the index present on disk matches
+// the build options.
+func (o *Options) IncrementalSkipIndexing() bool {
 	fn := o.shardName(0)
 
 	f, err := os.Open(fn)
 	if err != nil {
-		return nil
+		return false
 	}
 
 	iFile, err := zoekt.NewIndexFile(f)
 	if err != nil {
-		return nil
+		return false
 	}
 	defer iFile.Close()
 
 	repo, index, err := zoekt.ReadMetadata(iFile)
 	if err != nil {
-		return nil
+		return false
 	}
 
 	if index.IndexFeatureVersion != zoekt.FeatureVersion {
-		return nil
+		return false
 	}
 
 	if repo.IndexOptions != o.HashOptions() {
-		return nil
+		return false
 	}
 
-	return repo.Branches
+	return reflect.DeepEqual(repo.Branches, o.RepositoryDescription.Branches)
 }
 
 // IgnoreSizeMax determines whether the max size should be ignored.

@@ -19,39 +19,18 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
 )
 
-type largeFilesFlag []string
-
-func (f *largeFilesFlag) String() string {
-	s := append([]string{""}, *f...)
-	return strings.Join(s, "-large_file ")
-}
-
-func (f *largeFilesFlag) Set(value string) error {
-	*f = append(*f, value)
-	return nil
-}
-
 var (
-	sizeMax     = flag.Int("file_limit", 2<<20, "maximum file size")
-	trigramMax  = flag.Int("max_trigram_count", 20000, "maximum number of trigrams per document")
-	shardLimit  = flag.Int("shard_limit", 100<<20, "maximum corpus size for a shard")
-	parallelism = flag.Int("parallelism", 4, "maximum number of parallel indexing processes.")
-	indexDir    = flag.String("index", build.DefaultDir, "directory for search indices")
-	version     = flag.Bool("version", false, "Print version number")
-	ctags       = flag.Bool("require_ctags", false, "If set, ctags calls must succeed.")
-	largeFiles  = largeFilesFlag{}
-
-	disableCTags = flag.Bool("disable_ctags", false, "If set, ctags will not be called.")
+	version = flag.Bool("version", false, "Print version number")
+	opts    = &build.Options{}
 )
 
 func init() {
-	flag.Var(&largeFiles, "large_file", "A glob pattern where matching files are to be index regardless of their size. You can add multiple patterns by setting this more than once.")
+	opts.Flags(flag.CommandLine)
 }
 
 func OptionsFromFlags() *build.Options {
@@ -61,16 +40,6 @@ func OptionsFromFlags() *build.Options {
 		os.Exit(0)
 	}
 
-	opts := &build.Options{
-		Parallelism:      *parallelism,
-		SizeMax:          *sizeMax,
-		ShardMax:         *shardLimit,
-		IndexDir:         *indexDir,
-		DisableCTags:     *disableCTags,
-		CTagsMustSucceed: *ctags,
-		LargeFiles:       largeFiles,
-		TrigramMax:       *trigramMax,
-	}
 	opts.SetDefaults()
 	return opts
 }

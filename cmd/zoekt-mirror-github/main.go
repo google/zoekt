@@ -36,6 +36,22 @@ import (
 	"github.com/google/zoekt/gitindex"
 )
 
+type topicsFlag []string
+
+func (f *topicsFlag) String() string {
+	return strings.Join(*f, ",")
+}
+
+func (f *topicsFlag) Set(value string) error {
+	*f = append(*f, value)
+	return nil
+}
+
+type reposFilters struct {
+	topics        []string
+	excludeTopics []string
+}
+
 func main() {
 	dest := flag.String("dest", "", "destination directory")
 	githubURL := flag.String("url", "", "GitHub Enterprise url. If not set github.com will be used as the host.")
@@ -48,6 +64,11 @@ func main() {
 	deleteRepos := flag.Bool("delete", false, "delete missing repos")
 	namePattern := flag.String("name", "", "only clone repos whose name matches the given regexp.")
 	excludePattern := flag.String("exclude", "", "don't mirror repos whose names match this regexp.")
+	topics := topicsFlag{}
+	flag.Var(&topics, "topic", "only clone repos whose have one of given topics. You can add multiple topics by setting this more than once.")
+	excludeTopics := topicsFlag{}
+	flag.Var(&excludeTopics, "exclude_topic", "don't clone repos whose have one of given topics. You can add multiple topics by setting this more than once.")
+
 	flag.Parse()
 
 	if *dest == "" {
@@ -106,15 +127,19 @@ func main() {
 		}
 	}
 
+	reposFilters := reposFilters{
+		topics:        topics,
+		excludeTopics: excludeTopics,
+	}
 	var repos []*github.Repository
 	var err error
 	if *org != "" {
-		repos, err = getOrgRepos(client, *org)
+		repos, err = getOrgRepos(client, *org, reposFilters)
 	} else if *user != "" {
-		repos, err = getUserRepos(client, *user)
+		repos, err = getUserRepos(client, *user, reposFilters)
 	} else {
 		log.Printf("no user or org specified, cloning all repos.")
-		repos, err = getUserRepos(client, "")
+		repos, err = getUserRepos(client, "", reposFilters)
 	}
 
 	if err != nil {
@@ -185,7 +210,30 @@ func deleteStaleRepos(destDir string, filter *gitindex.Filter, repos []*github.R
 	return nil
 }
 
-func getOrgRepos(client *github.Client, org string) ([]*github.Repository, error) {
+func hasIntersection(s1, s2 []string) bool {
+	hash := make(map[string]bool)
+	for _, e := range s1 {
+		hash[e] = true
+	}
+	for _, e := range s2 {
+		if hash[e] {
+			return true
+		}
+	}
+	return false
+}
+
+func filterByTopic(repos []*github.Repository, include []string, exclude []string) (filteredRepos []*github.Repository) {
+	for _, repo := range repos {
+		if (len(include) == 0 || hasIntersection(include, repo.Topics)) &&
+			!hasIntersection(exclude, repo.Topics) {
+			filteredRepos = append(filteredRepos, repo)
+		}
+	}
+	return
+}
+
+func getOrgRepos(client *github.Client, org string, reposFilters reposFilters) ([]*github.Repository, error) {
 	var allRepos []*github.Repository
 	opt := &github.RepositoryListByOrgOptions{}
 	for {
@@ -198,6 +246,7 @@ func getOrgRepos(client *github.Client, org string) ([]*github.Repository, error
 		}
 
 		opt.Page = resp.NextPage
+		repos = filterByTopic(repos, reposFilters.topics, reposFilters.excludeTopics)
 		allRepos = append(allRepos, repos...)
 		if resp.NextPage == 0 {
 			break
@@ -206,7 +255,7 @@ func getOrgRepos(client *github.Client, org string) ([]*github.Repository, error
 	return allRepos, nil
 }
 
-func getUserRepos(client *github.Client, user string) ([]*github.Repository, error) {
+func getUserRepos(client *github.Client, user string, reposFilters reposFilters) ([]*github.Repository, error) {
 	var allRepos []*github.Repository
 	opt := &github.RepositoryListOptions{}
 	for {
@@ -219,6 +268,7 @@ func getUserRepos(client *github.Client, user string) ([]*github.Repository, err
 		}
 
 		opt.Page = resp.NextPage
+		repos = filterByTopic(repos, reposFilters.topics, reposFilters.excludeTopics)
 		allRepos = append(allRepos, repos...)
 		if resp.NextPage == 0 {
 			break

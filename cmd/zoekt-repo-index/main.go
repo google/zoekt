@@ -37,7 +37,6 @@ import (
 	"net/url"
 	"path"
 	"path/filepath"
-	"reflect"
 	"sort"
 	"strings"
 
@@ -47,8 +46,8 @@ import (
 	"github.com/google/zoekt/gitindex"
 	"go.uber.org/automaxprocs/maxprocs"
 
-	git "gopkg.in/src-d/go-git.v4"
-	"gopkg.in/src-d/go-git.v4/plumbing"
+	git "github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 )
 
 var _ = log.Println
@@ -255,11 +254,8 @@ func main() {
 		}
 	}
 
-	if *incremental {
-		versions := opts.IndexVersions()
-		if reflect.DeepEqual(versions, opts.RepositoryDescription.Branches) {
-			return
-		}
+	if *incremental && opts.IncrementalSkipIndexing() {
+		return
 	}
 
 	builder, err := build.NewBuilder(opts)

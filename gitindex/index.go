@@ -24,7 +24,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -33,12 +32,12 @@ import (
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
 
-	"gopkg.in/src-d/go-git.v4/config"
-	"gopkg.in/src-d/go-git.v4/plumbing"
-	"gopkg.in/src-d/go-git.v4/plumbing/object"
+	"github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
 
-	git "gopkg.in/src-d/go-git.v4"
-	plumcfg "gopkg.in/src-d/go-git.v4/plumbing/format/config"
+	git "github.com/go-git/go-git/v5"
+	plumcfg "github.com/go-git/go-git/v5/plumbing/format/config"
 )
 
 // RepoModTime returns the time of last fetch of a git repository.
@@ -424,11 +423,8 @@ func IndexGitRepo(opts Options) error {
 		branchVersions[b] = subVersions
 	}
 
-	if opts.Incremental {
-		versions := opts.BuildOptions.IndexVersions()
-		if reflect.DeepEqual(versions, opts.BuildOptions.RepositoryDescription.Branches) {
-			return nil
-		}
+	if opts.Incremental && opts.BuildOptions.IncrementalSkipIndexing() {
+		return nil
 	}
 
 	reposByPath := map[string]BlobLocation{}
