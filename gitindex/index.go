@@ -24,7 +24,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -422,11 +421,8 @@ func IndexGitRepo(opts Options) error {
 		branchVersions[b] = subVersions
 	}
 
-	if opts.Incremental {
-		versions := opts.BuildOptions.IndexVersions()
-		if reflect.DeepEqual(versions, opts.BuildOptions.RepositoryDescription.Branches) {
-			return nil
-		}
+	if opts.Incremental && opts.BuildOptions.IncrementalSkipIndexing() {
+		return nil
 	}
 
 	reposByPath := map[string]BlobLocation{}

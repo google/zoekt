@@ -37,7 +37,6 @@ import (
 	"net/url"
 	"path"
 	"path/filepath"
-	"reflect"
 	"sort"
 	"strings"
 
@@ -255,11 +254,8 @@ func main() {
 		}
 	}
 
-	if *incremental {
-		versions := opts.IndexVersions()
-		if reflect.DeepEqual(versions, opts.RepositoryDescription.Branches) {
-			return
-		}
+	if *incremental && opts.IncrementalSkipIndexing() {
+		return
 	}
 
 	builder, err := build.NewBuilder(opts)

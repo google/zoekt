@@ -27,6 +27,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"runtime"
 	"runtime/pprof"
@@ -198,36 +199,36 @@ func (o *Options) shardName(n int) string {
 		fmt.Sprintf("%s_v%d.%05d.zoekt", abs, zoekt.IndexFormatVersion, n))
 }
 
-// IndexVersions returns the versions as present in the index, for
-// implementing incremental indexing.
-func (o *Options) IndexVersions() []zoekt.RepositoryBranch {
+// IncrementalSkipIndexing returns true if the index present on disk matches
+// the build options.
+func (o *Options) IncrementalSkipIndexing() bool {
 	fn := o.shardName(0)
 
 	f, err := os.Open(fn)
 	if err != nil {
-		return nil
+		return false
 	}
 
 	iFile, err := zoekt.NewIndexFile(f)
 	if err != nil {
-		return nil
+		return false
 	}
 	defer iFile.Close()
 
 	repo, index, err := zoekt.ReadMetadata(iFile)
 	if err != nil {
-		return nil
+		return false
 	}
 
 	if index.IndexFeatureVersion != zoekt.FeatureVersion {
-		return nil
+		return false
 	}
 
 	if repo.IndexOptions != o.HashOptions() {
-		return nil
+		return false
 	}
 
-	return repo.Branches
+	return reflect.DeepEqual(repo.Branches, o.RepositoryDescription.Branches)
 }
 
 // IgnoreSizeMax determines whether the max size should be ignored.
