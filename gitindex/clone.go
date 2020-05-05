@@ -22,8 +22,8 @@ import (
 	"path/filepath"
 	"sort"
 
-	git "gopkg.in/src-d/go-git.v4"
-	"gopkg.in/src-d/go-git.v4/config"
+	git "github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
 )
 
 // CloneRepo clones one repository, adding the given config

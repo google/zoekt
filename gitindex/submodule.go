@@ -17,7 +17,7 @@ package gitindex
 import (
 	"bytes"
 
-	"gopkg.in/src-d/go-git.v4/plumbing/format/config"
+	"github.com/go-git/go-git/v5/plumbing/format/config"
 )
 
 // SubmoduleEntry represent one entry in a .gitmodules file
