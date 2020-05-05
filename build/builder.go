@@ -111,12 +111,14 @@ func (f largeFilesFlag) Set(value string) error {
 
 // Flags adds flags for build options to fs.
 func (o *Options) Flags(fs *flag.FlagSet) {
-	fs.IntVar(&o.SizeMax, "file_limit", 2<<20, "maximum file size")
-	fs.IntVar(&o.TrigramMax, "max_trigram_count", 20000, "maximum number of trigrams per document")
-	fs.IntVar(&o.ShardMax, "shard_limit", 100<<20, "maximum corpus size for a shard")
-	fs.IntVar(&o.Parallelism, "parallelism", 4, "maximum number of parallel indexing processes.")
-	fs.StringVar(&o.IndexDir, "index", DefaultDir, "directory for search indices")
-	fs.BoolVar(&o.CTagsMustSucceed, "require_ctags", false, "If set, ctags calls must succeed.")
+	x := *o
+	x.SetDefaults()
+	fs.IntVar(&o.SizeMax, "file_limit", x.SizeMax, "maximum file size")
+	fs.IntVar(&o.TrigramMax, "max_trigram_count", x.TrigramMax, "maximum number of trigrams per document")
+	fs.IntVar(&o.ShardMax, "shard_limit", x.ShardMax, "maximum corpus size for a shard")
+	fs.IntVar(&o.Parallelism, "parallelism", x.Parallelism, "maximum number of parallel indexing processes.")
+	fs.StringVar(&o.IndexDir, "index", x.IndexDir, "directory for search indices")
+	fs.BoolVar(&o.CTagsMustSucceed, "require_ctags", x.CTagsMustSucceed, "If set, ctags calls must succeed.")
 	fs.Var(largeFilesFlag{o}, "large_file", "A glob pattern where matching files are to be index regardless of their size. You can add multiple patterns by setting this more than once.")
 }
 
@@ -163,13 +165,13 @@ func (o *Options) SetDefaults() {
 		}
 	}
 	if o.Parallelism == 0 {
-		o.Parallelism = 1
+		o.Parallelism = 4
 	}
 	if o.SizeMax == 0 {
-		o.SizeMax = 128 << 10
+		o.SizeMax = 2 << 20
 	}
 	if o.ShardMax == 0 {
-		o.ShardMax = 128 << 20
+		o.ShardMax = 100 << 20
 	}
 	if o.TrigramMax == 0 {
 		o.TrigramMax = 20000
