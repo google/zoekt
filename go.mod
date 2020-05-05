@@ -1,5 +1,7 @@
 module github.com/google/zoekt
 
+go 1.13
+
 require (
 	github.com/andygrunwald/go-gerrit v0.0.0-20191101112536-3f5e365ccf57
 	github.com/fsnotify/fsnotify v1.4.7
