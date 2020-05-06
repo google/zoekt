@@ -36,19 +36,19 @@ import (
 )
 
 var (
-	resolveRevisionsDuration = promauto.NewHistogram(prometheus.HistogramOpts{
+	metricResolveRevisionsDuration = promauto.NewHistogram(prometheus.HistogramOpts{
 		Name:    "resolve_revisions_seconds",
 		Help:    "A histogram of latencies for resolving all repository revisions.",
 		Buckets: prometheus.ExponentialBuckets(1, 10, 6), // 1s -> 27min
 	})
 
-	resolveRevisionDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+	metricResolveRevisionDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "resolve_revision_seconds",
 		Help:    "A histogram of latencies for resolving a repository revision.",
 		Buckets: prometheus.ExponentialBuckets(.25, 2, 4), // 250ms -> 2s
 	}, []string{"success"}) // success=true|false
 
-	indexDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+	metricIndexDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "index_repo_seconds",
 		Help:    "A histogram of latencies for indexing a repository.",
 		Buckets: prometheus.ExponentialBuckets(.1, 10, 7), // 100ms -> 27min
@@ -154,17 +154,17 @@ func (s *Server) Run() {
 					start := time.Now()
 					commit, err := resolveRevision(s.Root, name, "HEAD")
 					if err != nil && !os.IsNotExist(err) {
-						resolveRevisionDuration.WithLabelValues("false").Observe(time.Since(start).Seconds())
+						metricResolveRevisionDuration.WithLabelValues("false").Observe(time.Since(start).Seconds())
 						tr.LazyPrintf("failed resolving HEAD for %v: %v", name, err)
 						tr.SetError()
 						return
 					}
-					resolveRevisionDuration.WithLabelValues("true").Observe(time.Since(start).Seconds())
+					metricResolveRevisionDuration.WithLabelValues("true").Observe(time.Since(start).Seconds())
 					queue.AddOrUpdate(name, commit)
 				}(name)
 			}
 			sem.Wait()
-			resolveRevisionsDuration.Observe(time.Since(start).Seconds())
+			metricResolveRevisionsDuration.Observe(time.Since(start).Seconds())
 			tr.Finish()
 
 			<-t.C
@@ -185,11 +185,11 @@ func (s *Server) Run() {
 		args.Commit = commit
 		err := s.Index(args)
 		if err != nil {
-			indexDuration.WithLabelValues("fail").Observe(time.Since(start).Seconds())
+			metricIndexDuration.WithLabelValues("fail").Observe(time.Since(start).Seconds())
 			log.Printf("error indexing %s: %s", args.String(), err)
 			continue
 		}
-		indexDuration.WithLabelValues("success").Observe(time.Since(start).Seconds())
+		metricIndexDuration.WithLabelValues("success").Observe(time.Since(start).Seconds())
 		queue.SetIndexed(name, commit)
 	}
 }
