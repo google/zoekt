@@ -32,6 +32,7 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -113,7 +114,7 @@ func (f largeFilesFlag) Set(value string) error {
 	return nil
 }
 
-// Flags adds flags for build options to fs.
+// Flags adds flags for build options to fs. It is the "inverse" of Args.
 func (o *Options) Flags(fs *flag.FlagSet) {
 	x := *o
 	x.SetDefaults()
@@ -127,6 +128,46 @@ func (o *Options) Flags(fs *flag.FlagSet) {
 
 	// Sourcegraph specific
 	fs.BoolVar(&o.DisableCTags, "disable_ctags", x.DisableCTags, "If set, ctags will not be called.")
+}
+
+// Args generates command line arguments for o. It is the "inverse" of Flags.
+func (o *Options) Args() []string {
+	var args []string
+
+	if o.SizeMax != 0 {
+		args = append(args, "-file_limit", strconv.Itoa(o.SizeMax))
+	}
+
+	if o.TrigramMax != 0 {
+		args = append(args, "-max_trigram_count", strconv.Itoa(o.TrigramMax))
+	}
+
+	if o.ShardMax != 0 {
+		args = append(args, "-shard_limit", strconv.Itoa(o.ShardMax))
+	}
+
+	if o.Parallelism != 0 {
+		args = append(args, "-parallelism", strconv.Itoa(o.Parallelism))
+	}
+
+	if o.IndexDir != "" {
+		args = append(args, "-index", o.IndexDir)
+	}
+
+	if o.CTagsMustSucceed {
+		args = append(args, "-require_ctags")
+	}
+
+	for _, a := range o.LargeFiles {
+		args = append(args, "-large_file", a)
+	}
+
+	// Sourcegraph specific
+	if o.DisableCTags {
+		args = append(args, "-disable_ctags")
+	}
+
+	return args
 }
 
 // Builder manages (parallel) creation of uniformly sized shards. The

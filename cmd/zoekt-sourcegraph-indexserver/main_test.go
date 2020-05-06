@@ -50,14 +50,14 @@ func TestIndexArgs(t *testing.T) {
 		"-name", "test/repo",
 		"-commit", "deadbeef",
 		"-incremental",
-		"-index", "/data/index",
-		"-parallelism", "4",
-		"-file_limit", "123",
 		"-branch", "HEAD",
 		"-download-limit-mbps", "1000",
+		"-file_limit", "123",
+		"-parallelism", "4",
+		"-index", "/data/index",
+		"-require_ctags",
 		"-large_file", "foo",
 		"-large_file", "bar",
-		"-require_ctags",
 		"http://api.test/.internal/git/test/repo/tar/deadbeef",
 	}
 	if got := all.CmdArgs(root); !cmp.Equal(got, want) {

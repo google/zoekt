@@ -21,7 +21,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
-	"strconv"
 	"sync"
 	"time"
 
@@ -241,18 +240,6 @@ func (o *indexArgs) CmdArgs(root *url.URL) []string {
 		args = append(args, "-incremental")
 	}
 
-	if o.IndexDir != "" {
-		args = append(args, "-index", o.IndexDir)
-	}
-
-	if o.Parallelism != 0 {
-		args = append(args, "-parallelism", strconv.Itoa(o.Parallelism))
-	}
-
-	if o.FileLimit != 0 {
-		args = append(args, "-file_limit", strconv.Itoa(o.FileLimit))
-	}
-
 	if o.Branch != "" {
 		args = append(args, "-branch", o.Branch)
 	}
@@ -261,19 +248,24 @@ func (o *indexArgs) CmdArgs(root *url.URL) []string {
 		args = append(args, "-download-limit-mbps", o.DownloadLimitMBPS)
 	}
 
-	for _, a := range o.LargeFiles {
-		args = append(args, "-large_file", a)
-	}
-
-	if o.Symbols {
-		args = append(args, "-require_ctags")
-	} else {
-		args = append(args, "-disable_ctags")
-	}
+	args = append(args, o.BuildOptions().Args()...)
 
 	args = append(args, root.ResolveReference(&url.URL{Path: fmt.Sprintf("/.internal/git/%s/tar/%s", o.Name, o.Commit)}).String())
 
 	return args
+}
+
+// BuildOptions returns a build.Options represented by indexArgs. Note: it
+// doesn't set fields like repository/branch.
+func (o *indexArgs) BuildOptions() *build.Options {
+	return &build.Options{
+		IndexDir:         o.IndexDir,
+		Parallelism:      o.Parallelism,
+		SizeMax:          o.FileLimit,
+		LargeFiles:       o.LargeFiles,
+		CTagsMustSucceed: o.Symbols,
+		DisableCTags:     !o.Symbols,
+	}
 }
 
 func getIndexOptions(root *url.URL, args *indexArgs) error {
