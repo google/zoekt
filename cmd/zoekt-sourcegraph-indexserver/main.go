@@ -52,7 +52,16 @@ var (
 		Name:    "index_repo_seconds",
 		Help:    "A histogram of latencies for indexing a repository.",
 		Buckets: prometheus.ExponentialBuckets(.1, 10, 7), // 100ms -> 27min
-	}, []string{"state"}) // state=fail|success
+	}, []string{"state"}) // state is an indexState
+)
+
+type indexState string
+
+const (
+	indexStateFail    indexState = "fail"
+	indexStateSuccess            = "success"
+	indexStateNoop               = "noop"  // We didn't need to update index
+	indexStateEmpty              = "empty" // index is empty (empty repo)
 )
 
 // Server is the main functionality of zoekt-sourcegraph-indexserver. It
@@ -183,13 +192,12 @@ func (s *Server) Run() {
 		args := s.defaultArgs()
 		args.Name = name
 		args.Commit = commit
-		err := s.Index(args)
+		state, err := s.Index(args)
+		metricIndexDuration.WithLabelValues(string(state)).Observe(time.Since(start).Seconds())
 		if err != nil {
-			metricIndexDuration.WithLabelValues("fail").Observe(time.Since(start).Seconds())
 			log.Printf("error indexing %s: %s", args.String(), err)
 			continue
 		}
-		metricIndexDuration.WithLabelValues("success").Observe(time.Since(start).Seconds())
 		queue.SetIndexed(name, commit)
 	}
 }
@@ -314,18 +322,27 @@ func getIndexOptions(root *url.URL, args *indexArgs) error {
 }
 
 // Index starts an index job for repo name at commit.
-func (s *Server) Index(args indexArgs) error {
+func (s *Server) Index(args indexArgs) (state indexState, err error) {
 	tr := trace.New("index", args.Name)
-	defer tr.Finish()
+
+	defer func() {
+		if err != nil {
+			tr.SetError()
+			tr.LazyPrintf("error: %v", err)
+			state = indexStateFail
+		}
+		tr.LazyPrintf("state: %s", state)
+		tr.Finish()
+	}()
 
 	tr.LazyPrintf("commit: %v", args.Commit)
 
 	if args.Commit == "" {
-		return s.createEmptyShard(tr, args.Name)
+		return indexStateEmpty, s.createEmptyShard(tr, args.Name)
 	}
 
 	if err := getIndexOptions(s.Root, &args); err != nil {
-		return err
+		return indexStateFail, err
 	}
 
 	if args.Incremental {
@@ -333,14 +350,14 @@ func (s *Server) Index(args indexArgs) error {
 		bo.SetDefaults()
 		if bo.IncrementalSkipIndexing() {
 			debug.Printf("%s index already up to date", args.String())
-			return nil
+			return indexStateNoop, nil
 		}
 	}
 
 	cmd := exec.Command("zoekt-archive-index", args.CmdArgs(s.Root)...)
 	// Prevent prompting
 	cmd.Stdin = &bytes.Buffer{}
-	return s.loggedRun(tr, cmd)
+	return indexStateSuccess, s.loggedRun(tr, cmd)
 }
 
 func (s *Server) defaultArgs() indexArgs {
@@ -407,23 +424,22 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
 		r.ParseForm()
 		name := r.Form.Get("repo")
-		index := func() error {
+		index := func() string {
 			commit, err := resolveRevision(s.Root, name, "HEAD")
 			if err != nil && !os.IsNotExist(err) {
-				return err
+				return fmt.Sprintf("Indexing %s failed: %v", name, err)
 			}
 			args := s.defaultArgs()
 			args.Name = name
 			args.Commit = commit
 			args.Incremental = false // force re-index
-			return s.Index(args)
+			state, err := s.Index(args)
+			if err != nil {
+				return fmt.Sprintf("Indexing %s failed: %s", args.String(), err)
+			}
+			return fmt.Sprintf("Indexed %s with state %s", args.String(), state)
 		}
-		err := index()
-		if err != nil {
-			data.IndexMsg = fmt.Sprintf("Indexing %s failed: %s", name, err)
-		} else {
-			data.IndexMsg = "Indexed " + name
-		}
+		data.IndexMsg = index()
 	}
 
 	s.mu.Lock()
