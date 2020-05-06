@@ -27,6 +27,7 @@ import (
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/net/trace"
 
+	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
 	retryablehttp "github.com/hashicorp/go-retryablehttp"
 	"github.com/prometheus/client_golang/prometheus"
@@ -185,7 +186,7 @@ func (s *Server) Run() {
 		err := s.Index(args)
 		if err != nil {
 			indexDuration.WithLabelValues("fail").Observe(time.Since(start).Seconds())
-			log.Printf("error indexing %s@%s: %s", name, commit, err)
+			log.Printf("error indexing %s: %s", args.String(), err)
 			continue
 		}
 		indexDuration.WithLabelValues("success").Observe(time.Since(start).Seconds())
@@ -236,6 +237,9 @@ func (o *indexArgs) CmdArgs(root *url.URL) []string {
 		"-commit", o.Commit,
 	}
 
+	// Even though we check for incremental in this process, we still pass it
+	// in just in case we regress in how we check in process. We will still
+	// notice thanks to metrics and increased load on gitserver.
 	if o.Incremental {
 		args = append(args, "-incremental")
 	}
@@ -259,12 +263,30 @@ func (o *indexArgs) CmdArgs(root *url.URL) []string {
 // doesn't set fields like repository/branch.
 func (o *indexArgs) BuildOptions() *build.Options {
 	return &build.Options{
+		// It is important that this RepositoryDescription exactly matches
+		// what the indexer we call will produce. This is to ensure that
+		// IncrementalSkipIndexing returns true if nothing needs to be done.
+		RepositoryDescription: zoekt.Repository{
+			Name: o.Name,
+			Branches: []zoekt.RepositoryBranch{{
+				Name:    o.Branch,
+				Version: o.Commit,
+			}},
+		},
 		IndexDir:         o.IndexDir,
 		Parallelism:      o.Parallelism,
 		SizeMax:          o.FileLimit,
 		LargeFiles:       o.LargeFiles,
 		CTagsMustSucceed: o.Symbols,
 		DisableCTags:     !o.Symbols,
+	}
+}
+
+func (o *indexArgs) String() string {
+	if o.Branch != "" {
+		return o.Name + "@" + o.Branch + "=" + o.Commit
+	} else {
+		return o.Name + "@" + o.Commit
 	}
 }
 
@@ -304,6 +326,15 @@ func (s *Server) Index(args indexArgs) error {
 
 	if err := getIndexOptions(s.Root, &args); err != nil {
 		return err
+	}
+
+	if args.Incremental {
+		bo := args.BuildOptions()
+		bo.SetDefaults()
+		if bo.IncrementalSkipIndexing() {
+			debug.Printf("%s index already up to date", args.String())
+			return nil
+		}
 	}
 
 	cmd := exec.Command("zoekt-archive-index", args.CmdArgs(s.Root)...)
