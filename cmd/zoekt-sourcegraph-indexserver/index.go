@@ -16,6 +16,10 @@ import (
 
 // indexArgs represents the arguments we pass to zoekt-archive-index
 type indexArgs struct {
+	// Root is the base URL for the Sourcegraph instance to index. Normally
+	// http://sourcegraph-frontend-internal or http://localhost:3090.
+	Root *url.URL
+
 	// Name is the name of the repository.
 	Name string
 
@@ -51,7 +55,7 @@ type indexArgs struct {
 }
 
 // CmdArgs returns the arguments to pass to the zoekt-archive-index command.
-func (o *indexArgs) CmdArgs(root *url.URL) []string {
+func (o *indexArgs) CmdArgs() []string {
 	args := []string{
 		"-name", o.Name,
 		"-commit", o.Commit,
@@ -74,7 +78,7 @@ func (o *indexArgs) CmdArgs(root *url.URL) []string {
 
 	args = append(args, o.BuildOptions().Args()...)
 
-	args = append(args, root.ResolveReference(&url.URL{Path: fmt.Sprintf("/.internal/git/%s/tar/%s", o.Name, o.Commit)}).String())
+	args = append(args, o.Root.ResolveReference(&url.URL{Path: fmt.Sprintf("/.internal/git/%s/tar/%s", o.Name, o.Commit)}).String())
 
 	return args
 }
@@ -110,8 +114,8 @@ func (o *indexArgs) String() string {
 	}
 }
 
-func getIndexOptions(root *url.URL, args *indexArgs) error {
-	u := root.ResolveReference(&url.URL{Path: "/.internal/search/configuration"})
+func getIndexOptions(args *indexArgs) error {
+	u := args.Root.ResolveReference(&url.URL{Path: "/.internal/search/configuration"})
 	resp, err := client.Get(u.String())
 	if err != nil {
 		return err
@@ -133,8 +137,8 @@ func getIndexOptions(root *url.URL, args *indexArgs) error {
 	return nil
 }
 
-func archiveIndex(args *indexArgs, root *url.URL, runCmd func(*exec.Cmd) error) error {
-	cmd := exec.Command("zoekt-archive-index", args.CmdArgs(root)...)
+func archiveIndex(args *indexArgs, runCmd func(*exec.Cmd) error) error {
+	cmd := exec.Command("zoekt-archive-index", args.CmdArgs()...)
 	// Prevent prompting
 	cmd.Stdin = &bytes.Buffer{}
 	return runCmd(cmd)

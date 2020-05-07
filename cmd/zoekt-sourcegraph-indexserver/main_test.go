@@ -21,6 +21,7 @@ func TestIndexArgs(t *testing.T) {
 	}
 
 	minimal := indexArgs{
+		Root:   root,
 		Name:   "test/repo",
 		Commit: "deadbeef",
 	}
@@ -30,11 +31,12 @@ func TestIndexArgs(t *testing.T) {
 		"-disable_ctags",
 		"http://api.test/.internal/git/test/repo/tar/deadbeef",
 	}
-	if got := minimal.CmdArgs(root); !cmp.Equal(got, want) {
+	if got := minimal.CmdArgs(); !cmp.Equal(got, want) {
 		t.Errorf("all mismatch (-want +got):\n%s", cmp.Diff(want, got))
 	}
 
 	all := indexArgs{
+		Root:              root,
 		Name:              "test/repo",
 		Commit:            "deadbeef",
 		Incremental:       true,
@@ -60,7 +62,7 @@ func TestIndexArgs(t *testing.T) {
 		"-large_file", "bar",
 		"http://api.test/.internal/git/test/repo/tar/deadbeef",
 	}
-	if got := all.CmdArgs(root); !cmp.Equal(got, want) {
+	if got := all.CmdArgs(); !cmp.Equal(got, want) {
 		t.Errorf("all mismatch (-want +got):\n%s", cmp.Diff(want, got))
 	}
 }
@@ -117,14 +119,16 @@ func TestGetIndexOptions(t *testing.T) {
 		response = []byte(r)
 
 		// Test we mix in the response
+		want.Root = u
 		want.Name = "test/repo"
 		want.Commit = "deadbeef"
 		got := indexArgs{
+			Root:   u,
 			Name:   "test/repo",
 			Commit: "deadbeef",
 		}
 
-		if err := getIndexOptions(u, &got); err != nil {
+		if err := getIndexOptions(&got); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 

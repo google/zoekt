@@ -223,7 +223,7 @@ func (s *Server) Index(args indexArgs) (state indexState, err error) {
 		return indexStateEmpty, s.createEmptyShard(tr, args.Name)
 	}
 
-	if err := getIndexOptions(s.Root, &args); err != nil {
+	if err := getIndexOptions(&args); err != nil {
 		return indexStateFail, err
 	}
 
@@ -237,11 +237,12 @@ func (s *Server) Index(args indexArgs) (state indexState, err error) {
 	}
 
 	runCmd := func(cmd *exec.Cmd) error { return s.loggedRun(tr, cmd) }
-	return indexStateSuccess, archiveIndex(&args, s.Root, runCmd)
+	return indexStateSuccess, archiveIndex(&args, runCmd)
 }
 
 func (s *Server) defaultArgs() indexArgs {
 	return indexArgs{
+		Root:        s.Root,
 		IndexDir:    s.IndexDir,
 		Parallelism: s.CPUCount,
 
