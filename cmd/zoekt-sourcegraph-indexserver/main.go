@@ -427,22 +427,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
 		r.ParseForm()
 		name := r.Form.Get("repo")
-		index := func() string {
-			commit, err := resolveRevision(s.Root, name, "HEAD")
-			if err != nil && !os.IsNotExist(err) {
-				return fmt.Sprintf("Indexing %s failed: %v", name, err)
-			}
-			args := s.defaultArgs()
-			args.Name = name
-			args.Commit = commit
-			args.Incremental = false // force re-index
-			state, err := s.Index(args)
-			if err != nil {
-				return fmt.Sprintf("Indexing %s failed: %s", args.String(), err)
-			}
-			return fmt.Sprintf("Indexed %s with state %s", args.String(), state)
-		}
-		data.IndexMsg = index()
+		data.IndexMsg, _ = s.forceIndex(name)
 	}
 
 	s.mu.Lock()
@@ -450,6 +435,24 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.mu.Unlock()
 
 	repoTmpl.Execute(w, data)
+}
+
+// forceIndex will run the index job for repo name now. It will return always
+// return a string explaining what it did, even if it failed.
+func (s *Server) forceIndex(name string) (string, error) {
+	commit, err := resolveRevision(s.Root, name, "HEAD")
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Sprintf("Indexing %s failed: %v", name, err), err
+	}
+	args := s.defaultArgs()
+	args.Name = name
+	args.Commit = commit
+	args.Incremental = false // force re-index
+	state, err := s.Index(args)
+	if err != nil {
+		return fmt.Sprintf("Indexing %s failed: %s", args.String(), err), err
+	}
+	return fmt.Sprintf("Indexed %s with state %s", args.String(), state), nil
 }
 
 func listIndexed(indexDir string) []string {
@@ -584,6 +587,11 @@ func main() {
 		"use this fraction of the cores for indexing.")
 	dbg := flag.Bool("debug", false,
 		"turn on more verbose logging.")
+
+	// non daemon mode for debugging/testing
+	debugList := flag.Bool("debug-list", false, "do not start the indexserver, rather list the repositories owned by this indexserver then quit.")
+	debugIndex := flag.String("debug-index", "", "do not start the indexserver, rather index the repositories then quit.")
+
 	flag.Parse()
 
 	if *cpuFraction <= 0.0 || *cpuFraction > 1.0 {
@@ -615,7 +623,7 @@ func main() {
 		}
 	}
 
-	if *dbg {
+	if *dbg || *debugList || *debugIndex != "" {
 		debug = log.New(os.Stderr, "", log.LstdFlags)
 	}
 	client.Logger = debug
@@ -630,6 +638,26 @@ func main() {
 		Interval: *interval,
 		CPUCount: cpuCount,
 		Hostname: *hostname,
+	}
+
+	if *debugList {
+		repos, err := listRepos(context.Background(), s.Hostname, s.Root, listIndexed(s.IndexDir))
+		if err != nil {
+			log.Fatal(err)
+		}
+		for _, r := range repos {
+			fmt.Println(r)
+		}
+		os.Exit(0)
+	}
+
+	if *debugIndex != "" {
+		msg, err := s.forceIndex(*debugIndex)
+		log.Println(msg)
+		if err != nil {
+			os.Exit(1)
+		}
+		os.Exit(0)
 	}
 
 	if *listen != "" {
