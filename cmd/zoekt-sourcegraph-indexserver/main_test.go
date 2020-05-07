@@ -72,7 +72,7 @@ func TestServer_defaultArgs(t *testing.T) {
 		IndexDir: "/testdata/index",
 		CPUCount: 6,
 	}
-	want := indexArgs{
+	want := &indexArgs{
 		IndexDir:          "/testdata/index",
 		Parallelism:       6,
 		Incremental:       true,
@@ -99,18 +99,18 @@ func TestGetIndexOptions(t *testing.T) {
 	}
 
 	cases := map[string]indexArgs{
-		`{"Symbols": true, "LargeFiles": ["foo","bar"]}`: indexArgs{
+		`{"Symbols": true, "LargeFiles": ["foo","bar"]}`: {
 			Symbols:    true,
 			LargeFiles: []string{"foo", "bar"},
 		},
 
-		`{"Symbols": false, "LargeFiles": ["foo","bar"]}`: indexArgs{
+		`{"Symbols": false, "LargeFiles": ["foo","bar"]}`: {
 			LargeFiles: []string{"foo", "bar"},
 		},
 
-		`{}`: indexArgs{},
+		`{}`: {},
 
-		`{"Symbols": true}`: indexArgs{
+		`{"Symbols": true}`: {
 			Symbols: true,
 		},
 	}
