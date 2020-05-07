@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"html/template"
@@ -27,7 +26,6 @@ import (
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/net/trace"
 
-	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
 	retryablehttp "github.com/hashicorp/go-retryablehttp"
 	"github.com/prometheus/client_golang/prometheus"
@@ -205,125 +203,6 @@ func (s *Server) Run() {
 	}
 }
 
-// indexArgs represents the arguments we pass to zoekt-archive-index
-type indexArgs struct {
-	// Name is the name of the repository.
-	Name string
-
-	// Commit is the absolute commit SHA.
-	Commit string
-
-	// Incremental indicates to skip indexing if already indexed.
-	Incremental bool
-
-	// IndexDir is the index directory to store the shards.
-	IndexDir string
-
-	// Parallelism is the number of shards to compute in parallel.
-	Parallelism int
-
-	// FileLimit is the maximum size of a file
-	FileLimit int
-
-	// Branch is the branch name.
-	Branch string
-
-	// DownloadLimitMBPS is the maximum MB/s to use when downloading the
-	// archive.
-	DownloadLimitMBPS string
-
-	// LargeFiles is a slice of glob patterns where matching files are indexed
-	// regardless of their size.
-	LargeFiles []string
-
-	// Symbols is a boolean that indicates whether to generate ctags metadata
-	// or not
-	Symbols bool
-}
-
-// CmdArgs returns the arguments to pass to the zoekt-archive-index command.
-func (o *indexArgs) CmdArgs(root *url.URL) []string {
-	args := []string{
-		"-name", o.Name,
-		"-commit", o.Commit,
-	}
-
-	// Even though we check for incremental in this process, we still pass it
-	// in just in case we regress in how we check in process. We will still
-	// notice thanks to metrics and increased load on gitserver.
-	if o.Incremental {
-		args = append(args, "-incremental")
-	}
-
-	if o.Branch != "" {
-		args = append(args, "-branch", o.Branch)
-	}
-
-	if o.DownloadLimitMBPS != "" {
-		args = append(args, "-download-limit-mbps", o.DownloadLimitMBPS)
-	}
-
-	args = append(args, o.BuildOptions().Args()...)
-
-	args = append(args, root.ResolveReference(&url.URL{Path: fmt.Sprintf("/.internal/git/%s/tar/%s", o.Name, o.Commit)}).String())
-
-	return args
-}
-
-// BuildOptions returns a build.Options represented by indexArgs. Note: it
-// doesn't set fields like repository/branch.
-func (o *indexArgs) BuildOptions() *build.Options {
-	return &build.Options{
-		// It is important that this RepositoryDescription exactly matches
-		// what the indexer we call will produce. This is to ensure that
-		// IncrementalSkipIndexing returns true if nothing needs to be done.
-		RepositoryDescription: zoekt.Repository{
-			Name: o.Name,
-			Branches: []zoekt.RepositoryBranch{{
-				Name:    o.Branch,
-				Version: o.Commit,
-			}},
-		},
-		IndexDir:         o.IndexDir,
-		Parallelism:      o.Parallelism,
-		SizeMax:          o.FileLimit,
-		LargeFiles:       o.LargeFiles,
-		CTagsMustSucceed: o.Symbols,
-		DisableCTags:     !o.Symbols,
-	}
-}
-
-func (o *indexArgs) String() string {
-	if o.Branch != "" {
-		return o.Name + "@" + o.Branch + "=" + o.Commit
-	} else {
-		return o.Name + "@" + o.Commit
-	}
-}
-
-func getIndexOptions(root *url.URL, args *indexArgs) error {
-	u := root.ResolveReference(&url.URL{Path: "/.internal/search/configuration"})
-	resp, err := client.Get(u.String())
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return os.ErrNotExist
-	}
-	if resp.StatusCode != http.StatusOK {
-		return errors.New("failed to get configuration options")
-	}
-
-	err = json.NewDecoder(resp.Body).Decode(&args)
-	if err != nil {
-		return fmt.Errorf("error decoding body: %v", err)
-	}
-
-	return nil
-}
-
 // Index starts an index job for repo name at commit.
 func (s *Server) Index(args indexArgs) (state indexState, err error) {
 	tr := trace.New("index", args.Name)
@@ -357,10 +236,8 @@ func (s *Server) Index(args indexArgs) (state indexState, err error) {
 		}
 	}
 
-	cmd := exec.Command("zoekt-archive-index", args.CmdArgs(s.Root)...)
-	// Prevent prompting
-	cmd.Stdin = &bytes.Buffer{}
-	return indexStateSuccess, s.loggedRun(tr, cmd)
+	runCmd := func(cmd *exec.Cmd) error { return s.loggedRun(tr, cmd) }
+	return indexStateSuccess, archiveIndex(&args, s.Root, runCmd)
 }
 
 func (s *Server) defaultArgs() indexArgs {
