@@ -198,6 +198,9 @@ func (s *Server) Run() {
 			log.Printf("error indexing %s: %s", args.String(), err)
 			continue
 		}
+		if state == indexStateSuccess {
+			log.Printf("updated index %s in %v", args.String(), time.Since(start))
+		}
 		queue.SetIndexed(name, commit)
 	}
 }
