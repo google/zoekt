@@ -100,6 +100,13 @@ func (o *Options) HashOptions() string {
 type largeFilesFlag struct{ *Options }
 
 func (f largeFilesFlag) String() string {
+	// From flag.Value documentation:
+	//
+	// The flag package may call the String method with a zero-valued receiver,
+	// such as a nil pointer.
+	if f.Options == nil {
+		return ""
+	}
 	s := append([]string{""}, f.LargeFiles...)
 	return strings.Join(s, "-large_file ")
 }
