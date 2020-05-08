@@ -12,6 +12,7 @@ require (
 	github.com/hashicorp/go-hclog v0.12.1 // indirect
 	github.com/hashicorp/go-retryablehttp v0.6.4
 	github.com/keegancsmith/rpc v1.1.0
+	github.com/keegancsmith/tmpfriend v0.0.0-20180423180255-86e88902a513
 	github.com/kylelemons/godebug v1.1.0
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 	github.com/prometheus/client_golang v1.5.1

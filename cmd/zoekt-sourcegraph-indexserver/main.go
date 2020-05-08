@@ -28,6 +28,7 @@ import (
 
 	"github.com/google/zoekt/build"
 	retryablehttp "github.com/hashicorp/go-retryablehttp"
+	"github.com/keegancsmith/tmpfriend"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -463,6 +464,20 @@ func hostnameBestEffort() string {
 	return hostname
 }
 
+// setupTmpDir sets up a temporary directory on the same volume as the
+// indexes.
+func setupTmpDir(index string) error {
+	tmpRoot := filepath.Join(index, ".indexserver.tmp")
+	if err := os.MkdirAll(tmpRoot, 0755); err != nil {
+		return err
+	}
+	if !tmpfriend.IsTmpFriendDir(tmpRoot) {
+		_, err := tmpfriend.RootTempDir(tmpRoot)
+		return err
+	}
+	return nil
+}
+
 func main() {
 	defaultIndexDir := os.Getenv("DATA_DIR")
 	if defaultIndexDir == "" {
@@ -512,6 +527,10 @@ func main() {
 		if err := os.MkdirAll(*index, 0755); err != nil {
 			log.Fatalf("MkdirAll %s: %v", *index, err)
 		}
+	}
+
+	if err := setupTmpDir(*index); err != nil {
+		log.Fatalf("failed to setup TMPDIR under %s: %v", *index, err)
 	}
 
 	if *dbg || *debugList || *debugIndex != "" {
