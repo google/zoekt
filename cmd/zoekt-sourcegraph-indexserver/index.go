@@ -2,13 +2,18 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha1"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
+	"path"
+	"path/filepath"
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
@@ -137,4 +142,74 @@ func archiveIndex(o *indexArgs, runCmd func(*exec.Cmd) error) error {
 	// Prevent prompting
 	cmd.Stdin = &bytes.Buffer{}
 	return runCmd(cmd)
+}
+
+func gitIndex(o *indexArgs, runCmd func(*exec.Cmd) error) error {
+	gitDir, err := tmpGitDir(o.Name)
+	if err != nil {
+		return err
+	}
+	// We intentionally leave behind gitdir if indexing failed so we can
+	// investigate. This is only during the experimental phase of indexing a
+	// clone. So don't defer os.RemoveAll here
+
+	cloneURL := o.Root.ResolveReference(&url.URL{Path: path.Join("/.internal/git", o.Name)}).String()
+	cmd := exec.Command("git", "-c", "protocol.version=2", "clone", "--depth=1", "--bare", cloneURL, gitDir)
+	cmd.Stdin = &bytes.Buffer{}
+	if err := runCmd(cmd); err != nil {
+		return err
+	}
+
+	cmd = exec.Command("git", "-C", gitDir, "config", "zoekt.name", o.Name)
+	cmd.Stdin = &bytes.Buffer{}
+	if err := runCmd(cmd); err != nil {
+		return err
+	}
+
+	args := []string{
+		"-submodules=false",
+	}
+
+	// Even though we check for incremental in this process, we still pass it
+	// in just in case we regress in how we check in process. We will still
+	// notice thanks to metrics and increased load on gitserver.
+	if o.Incremental {
+		args = append(args, "-incremental")
+	}
+
+	if o.Branch != "" {
+		args = append(args, "-branches", o.Branch)
+	}
+
+	args = append(args, o.BuildOptions().Args()...)
+	args = append(args, gitDir)
+
+	cmd = exec.Command("zoekt-git-index", args...)
+	cmd.Stdin = &bytes.Buffer{}
+	if err := runCmd(cmd); err != nil {
+		return err
+	}
+
+	// Do not return error, since we have successfully indexed. Just log it
+	if err := os.RemoveAll(gitDir); err != nil {
+		log.Printf("WARN: failed to cleanup %s after successfully indexing %s: %v", gitDir, o.String(), err)
+	}
+
+	return nil
+}
+
+func tmpGitDir(name string) (string, error) {
+	abs := url.QueryEscape(name)
+	if len(abs) > 200 {
+		h := sha1.New()
+		io.WriteString(h, abs)
+		abs = abs[:200] + fmt.Sprintf("%x", h.Sum(nil))[:8]
+	}
+	dir := filepath.Join(os.TempDir(), abs+".git")
+	if _, err := os.Stat(dir); err == nil {
+		if err := os.RemoveAll(dir); err != nil {
+			return "", err
+		}
+	}
+	return dir, nil
 }

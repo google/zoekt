@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 func TestGetIndexOptions(t *testing.T) {
@@ -76,6 +77,7 @@ func TestIndex(t *testing.T) {
 		name        string
 		args        indexArgs
 		wantArchive []string
+		wantGit     []string
 	}{{
 		name: "minimal",
 		args: indexArgs{
@@ -85,6 +87,11 @@ func TestIndex(t *testing.T) {
 		},
 		wantArchive: []string{
 			"zoekt-archive-index -name test/repo -commit deadbeef -disable_ctags http://api.test/.internal/git/test/repo/tar/deadbeef",
+		},
+		wantGit: []string{
+			"git -c protocol.version=2 clone --depth=1 --bare http://api.test/.internal/git/test/repo $TMPDIR/test%2Frepo.git",
+			"git -C $TMPDIR/test%2Frepo.git config zoekt.name test/repo",
+			"zoekt-git-index -submodules=false -disable_ctags $TMPDIR/test%2Frepo.git",
 		},
 	}, {
 		name: "all",
@@ -116,6 +123,13 @@ func TestIndex(t *testing.T) {
 			"-large_file", "bar",
 			"http://api.test/.internal/git/test/repo/tar/deadbeef",
 		}, " ")},
+		wantGit: []string{
+			"git -c protocol.version=2 clone --depth=1 --bare http://api.test/.internal/git/test/repo $TMPDIR/test%2Frepo.git",
+			"git -C $TMPDIR/test%2Frepo.git config zoekt.name test/repo",
+			"zoekt-git-index -submodules=false -incremental -branches HEAD " +
+				"-file_limit 123 -parallelism 4 -index /data/index -require_ctags -large_file foo -large_file bar " +
+				"$TMPDIR/test%2Frepo.git",
+		},
 	}}
 
 	for _, tc := range cases {
@@ -132,8 +146,20 @@ func TestIndex(t *testing.T) {
 				t.Fatal(err)
 			}
 			if !cmp.Equal(got, tc.wantArchive) {
-				t.Errorf("archive mismatch (-want +got):\n%s", cmp.Diff(tc.wantArchive, got))
+				t.Errorf("archive mismatch (-want +got):\n%s", cmp.Diff(tc.wantArchive, got, splitargs))
+			}
+
+			got = nil
+			if err := gitIndex(&tc.args, runCmd); err != nil {
+				t.Fatal(err)
+			}
+			if !cmp.Equal(got, tc.wantGit) {
+				t.Errorf("git mismatch (-want +got):\n%s", cmp.Diff(tc.wantGit, got, splitargs))
 			}
 		})
 	}
 }
+
+var splitargs = cmpopts.AcyclicTransformer("splitargs", func(cmd string) []string {
+	return strings.Split(cmd, " ")
+})

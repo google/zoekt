@@ -83,6 +83,10 @@ type Server struct {
 	// repository.
 	CPUCount int
 
+	// Indexer is the indexer to use. Either archiveIndex (default) or the
+	// experimental gitIndex.
+	Indexer func(*indexArgs, func(*exec.Cmd) error) error
+
 	mu            sync.Mutex
 	lastListRepos []string
 }
@@ -237,7 +241,11 @@ func (s *Server) Index(args *indexArgs) (state indexState, err error) {
 	}
 
 	runCmd := func(cmd *exec.Cmd) error { return s.loggedRun(tr, cmd) }
-	return indexStateSuccess, archiveIndex(args, runCmd)
+	f := s.Indexer
+	if f == nil {
+		f = archiveIndex
+	}
+	return indexStateSuccess, f(args, runCmd)
 }
 
 func (s *Server) defaultArgs() *indexArgs {
@@ -456,7 +464,12 @@ func hostnameBestEffort() string {
 }
 
 func main() {
-	root := flag.String("sourcegraph_url", "", "http://sourcegraph-frontend-internal or http://localhost:3090")
+	rootDefault := os.Getenv("SRC_FRONTEND_INTERNAL")
+	if rootDefault != "" {
+		rootDefault = "http://" + rootDefault
+	}
+
+	root := flag.String("sourcegraph_url", rootDefault, "http://sourcegraph-frontend-internal or http://localhost:3090")
 	interval := flag.Duration("interval", 10*time.Minute, "sync with sourcegraph this often")
 	index := flag.String("index", build.DefaultDir, "set index directory to use")
 	listen := flag.String("listen", "", "listen on this address.")
@@ -469,6 +482,8 @@ func main() {
 	// non daemon mode for debugging/testing
 	debugList := flag.Bool("debug-list", false, "do not start the indexserver, rather list the repositories owned by this indexserver then quit.")
 	debugIndex := flag.String("debug-index", "", "do not start the indexserver, rather index the repositories then quit.")
+
+	expGitIndex := flag.Bool("exp-git-index", os.Getenv("SRC_GIT_INDEX") != "", "use experimental indexing via shallow clones and zoekt-git-index")
 
 	flag.Parse()
 
@@ -516,6 +531,11 @@ func main() {
 		Interval: *interval,
 		CPUCount: cpuCount,
 		Hostname: *hostname,
+		Indexer:  archiveIndex,
+	}
+
+	if *expGitIndex {
+		s.Indexer = gitIndex
 	}
 
 	if *debugList {
