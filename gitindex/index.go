@@ -315,7 +315,9 @@ type Options struct {
 func expandBranches(repo *git.Repository, bs []string, prefix string) ([]string, error) {
 	var result []string
 	for _, b := range bs {
-		if b == "HEAD" {
+		// Sourcegraph: We disable resolving refs. We want to return the exact ref
+		// requested so we can match it up.
+		if b == "HEAD" && false {
 			ref, err := repo.Head()
 			if err != nil {
 				return nil, err

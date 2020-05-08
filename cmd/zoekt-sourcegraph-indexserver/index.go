@@ -170,6 +170,13 @@ func gitIndex(o *indexArgs, runCmd func(*exec.Cmd) error) error {
 		"-submodules=false",
 	}
 
+	// Note: we ignore o.Commit, we just fetch/clone the branch. This means the
+	// commit could be different (due to the branch being updated). This is not
+	// an issue since this commit will be more up to date. Additionally we will
+	// eventually converge thanks to the -incremental check. The only downside
+	// is the log message for indexing may report we indexed a different commit
+	// than we actually did.
+
 	// Even though we check for incremental in this process, we still pass it
 	// in just in case we regress in how we check in process. We will still
 	// notice thanks to metrics and increased load on gitserver.

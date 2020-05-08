@@ -20,7 +20,6 @@ minimal to avoid difficult merge conflicts. Differences:
   which supports cancellation).
 - Query primitive `RepoSet` to efficiently specify a set of repositories to
   search.
-- We vendor in all dependencies.
 - Allow empty shard directories on startup. Needed when starting a fresh
   instance which hasn't indexed anything yet.
 - We can return symbol/ctag data in results. Additionally we can run symbol regex queries.
