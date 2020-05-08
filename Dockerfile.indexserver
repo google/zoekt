@@ -21,5 +21,4 @@ COPY --from=zoekt /usr/local/bin/universal-* /usr/local/bin/zoekt-sourcegraph-in
 # GOGC=100 could be better tuned. https://dave.cheney.net/tag/gogc
 ENV GOGC=50
 
-ENTRYPOINT ["/sbin/tini", "--"]
-CMD zoekt-sourcegraph-indexserver -index $DATA_DIR -sourcegraph_url $SRC_FRONTEND_INTERNAL -listen :6072 -interval 1m -cpu_fraction 1.0
+ENTRYPOINT ["/sbin/tini", "--", "zoekt-sourcegraph-indexserver"]

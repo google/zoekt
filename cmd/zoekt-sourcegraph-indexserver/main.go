@@ -464,20 +464,18 @@ func hostnameBestEffort() string {
 }
 
 func main() {
-	rootDefault := os.Getenv("SRC_FRONTEND_INTERNAL")
-	if rootDefault != "" {
-		rootDefault = "http://" + rootDefault
+	defaultIndexDir := os.Getenv("DATA_DIR")
+	if defaultIndexDir == "" {
+		defaultIndexDir = build.DefaultDir
 	}
 
-	root := flag.String("sourcegraph_url", rootDefault, "http://sourcegraph-frontend-internal or http://localhost:3090")
-	interval := flag.Duration("interval", 10*time.Minute, "sync with sourcegraph this often")
-	index := flag.String("index", build.DefaultDir, "set index directory to use")
-	listen := flag.String("listen", "", "listen on this address.")
+	root := flag.String("sourcegraph_url", os.Getenv("SRC_FRONTEND_INTERNAL"), "http://sourcegraph-frontend-internal or http://localhost:3090")
+	interval := flag.Duration("interval", time.Minute, "sync with sourcegraph this often")
+	index := flag.String("index", defaultIndexDir, "set index directory to use")
+	listen := flag.String("listen", "127.0.0.1:6072", "listen on this address.")
 	hostname := flag.String("hostname", hostnameBestEffort(), "the name we advertise to Sourcegraph when asking for the list of repositories to index. Can also be set via the NODE_NAME environment variable.")
-	cpuFraction := flag.Float64("cpu_fraction", 0.25,
-		"use this fraction of the cores for indexing.")
-	dbg := flag.Bool("debug", false,
-		"turn on more verbose logging.")
+	cpuFraction := flag.Float64("cpu_fraction", 1.0, "use this fraction of the cores for indexing.")
+	dbg := flag.Bool("debug", false, "turn on more verbose logging.")
 
 	// non daemon mode for debugging/testing
 	debugList := flag.Bool("debug-list", false, "do not start the indexserver, rather list the repositories owned by this indexserver then quit.")
