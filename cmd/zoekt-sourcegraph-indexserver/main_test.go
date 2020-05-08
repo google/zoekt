@@ -14,59 +14,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-func TestIndexArgs(t *testing.T) {
-	root, err := url.Parse("http://api.test")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	minimal := indexArgs{
-		Root:   root,
-		Name:   "test/repo",
-		Commit: "deadbeef",
-	}
-	want := []string{
-		"-name", "test/repo",
-		"-commit", "deadbeef",
-		"-disable_ctags",
-		"http://api.test/.internal/git/test/repo/tar/deadbeef",
-	}
-	if got := minimal.CmdArgs(); !cmp.Equal(got, want) {
-		t.Errorf("all mismatch (-want +got):\n%s", cmp.Diff(want, got))
-	}
-
-	all := indexArgs{
-		Root:              root,
-		Name:              "test/repo",
-		Commit:            "deadbeef",
-		Incremental:       true,
-		IndexDir:          "/data/index",
-		Parallelism:       4,
-		FileLimit:         123,
-		Branch:            "HEAD",
-		DownloadLimitMBPS: "1000",
-		LargeFiles:        []string{"foo", "bar"},
-		Symbols:           true,
-	}
-	want = []string{
-		"-name", "test/repo",
-		"-commit", "deadbeef",
-		"-incremental",
-		"-branch", "HEAD",
-		"-download-limit-mbps", "1000",
-		"-file_limit", "123",
-		"-parallelism", "4",
-		"-index", "/data/index",
-		"-require_ctags",
-		"-large_file", "foo",
-		"-large_file", "bar",
-		"http://api.test/.internal/git/test/repo/tar/deadbeef",
-	}
-	if got := all.CmdArgs(); !cmp.Equal(got, want) {
-		t.Errorf("all mismatch (-want +got):\n%s", cmp.Diff(want, got))
-	}
-}
-
 func TestServer_defaultArgs(t *testing.T) {
 	s := &Server{
 		IndexDir: "/testdata/index",
@@ -83,59 +30,6 @@ func TestServer_defaultArgs(t *testing.T) {
 	got := s.defaultArgs()
 	if !cmp.Equal(got, want) {
 		t.Errorf("mismatch (-want +got):\n%s", cmp.Diff(want, got))
-	}
-}
-
-func TestGetIndexOptions(t *testing.T) {
-	var response []byte
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write(response)
-	}))
-	defer server.Close()
-
-	u, err := url.Parse(server.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	cases := map[string]indexArgs{
-		`{"Symbols": true, "LargeFiles": ["foo","bar"]}`: {
-			Symbols:    true,
-			LargeFiles: []string{"foo", "bar"},
-		},
-
-		`{"Symbols": false, "LargeFiles": ["foo","bar"]}`: {
-			LargeFiles: []string{"foo", "bar"},
-		},
-
-		`{}`: {},
-
-		`{"Symbols": true}`: {
-			Symbols: true,
-		},
-	}
-
-	for r, want := range cases {
-		response = []byte(r)
-
-		// Test we mix in the response
-		want.Root = u
-		want.Name = "test/repo"
-		want.Commit = "deadbeef"
-		got := indexArgs{
-			Root:   u,
-			Name:   "test/repo",
-			Commit: "deadbeef",
-		}
-
-		if err := getIndexOptions(&got); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-
-		if !cmp.Equal(got, want) {
-			t.Log("response", r)
-			t.Errorf("mismatch (-want +got):\n%s", cmp.Diff(want, got))
-		}
 	}
 }
 

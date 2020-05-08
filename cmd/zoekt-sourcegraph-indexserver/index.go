@@ -54,35 +54,6 @@ type indexArgs struct {
 	Symbols bool
 }
 
-// CmdArgs returns the arguments to pass to the zoekt-archive-index command.
-func (o *indexArgs) CmdArgs() []string {
-	args := []string{
-		"-name", o.Name,
-		"-commit", o.Commit,
-	}
-
-	// Even though we check for incremental in this process, we still pass it
-	// in just in case we regress in how we check in process. We will still
-	// notice thanks to metrics and increased load on gitserver.
-	if o.Incremental {
-		args = append(args, "-incremental")
-	}
-
-	if o.Branch != "" {
-		args = append(args, "-branch", o.Branch)
-	}
-
-	if o.DownloadLimitMBPS != "" {
-		args = append(args, "-download-limit-mbps", o.DownloadLimitMBPS)
-	}
-
-	args = append(args, o.BuildOptions().Args()...)
-
-	args = append(args, o.Root.ResolveReference(&url.URL{Path: fmt.Sprintf("/.internal/git/%s/tar/%s", o.Name, o.Commit)}).String())
-
-	return args
-}
-
 // BuildOptions returns a build.Options represented by indexArgs. Note: it
 // doesn't set fields like repository/branch.
 func (o *indexArgs) BuildOptions() *build.Options {
@@ -137,8 +108,32 @@ func getIndexOptions(args *indexArgs) error {
 	return nil
 }
 
-func archiveIndex(args *indexArgs, runCmd func(*exec.Cmd) error) error {
-	cmd := exec.Command("zoekt-archive-index", args.CmdArgs()...)
+func archiveIndex(o *indexArgs, runCmd func(*exec.Cmd) error) error {
+	args := []string{
+		"-name", o.Name,
+		"-commit", o.Commit,
+	}
+
+	// Even though we check for incremental in this process, we still pass it
+	// in just in case we regress in how we check in process. We will still
+	// notice thanks to metrics and increased load on gitserver.
+	if o.Incremental {
+		args = append(args, "-incremental")
+	}
+
+	if o.Branch != "" {
+		args = append(args, "-branch", o.Branch)
+	}
+
+	if o.DownloadLimitMBPS != "" {
+		args = append(args, "-download-limit-mbps", o.DownloadLimitMBPS)
+	}
+
+	args = append(args, o.BuildOptions().Args()...)
+
+	args = append(args, o.Root.ResolveReference(&url.URL{Path: fmt.Sprintf("/.internal/git/%s/tar/%s", o.Name, o.Commit)}).String())
+
+	cmd := exec.Command("zoekt-archive-index", args...)
 	// Prevent prompting
 	cmd.Stdin = &bytes.Buffer{}
 	return runCmd(cmd)
