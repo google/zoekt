@@ -46,7 +46,7 @@ func displayMatches(files []zoekt.FileMatch, pat string, withRepo bool, list boo
 	}
 }
 
-func loadShard(fn string) (zoekt.Searcher, error) {
+func loadShard(fn string, verbose bool) (zoekt.Searcher, error) {
 	f, err := os.Open(fn)
 	if err != nil {
 		return nil, err
@@ -56,10 +56,21 @@ func loadShard(fn string) (zoekt.Searcher, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	s, err := zoekt.NewSearcher(iFile)
 	if err != nil {
 		iFile.Close()
 		return nil, fmt.Errorf("NewSearcher(%s): %v", fn, err)
+	}
+
+	if verbose {
+		repo, index, err := zoekt.ReadMetadata(iFile)
+		if err != nil {
+			iFile.Close()
+			return nil, fmt.Errorf("ReadMetadata(%s): %v", fn, err)
+		}
+		log.Printf("repo metadata: %#v", repo)
+		log.Printf("index metadata: %#v", index)
 	}
 
 	return s, nil
@@ -94,7 +105,7 @@ func main() {
 	var searcher zoekt.Searcher
 	var err error
 	if *shard != "" {
-		searcher, err = loadShard(*shard)
+		searcher, err = loadShard(*shard, *verbose)
 	} else {
 		searcher, err = shards.NewDirectorySearcher(*index)
 	}

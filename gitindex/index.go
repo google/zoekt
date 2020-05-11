@@ -16,9 +16,9 @@
 package gitindex
 
 import (
+	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"math"
 	"net/url"
@@ -518,11 +518,13 @@ func blobContents(blob *object.Blob) ([]byte, error) {
 	}
 	defer r.Close()
 
-	c, err := ioutil.ReadAll(r)
+	var buf bytes.Buffer
+	buf.Grow(int(blob.Size))
+	_, err = buf.ReadFrom(r)
 	if err != nil {
 		return nil, err
 	}
-	return c, nil
+	return buf.Bytes(), nil
 }
 
 func uniq(ss []string) []string {
