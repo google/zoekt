@@ -147,7 +147,9 @@ func (s *shardWatcher) watch(quitter <-chan struct{}) error {
 				default:
 				}
 			case err := <-watcher.Errors:
-				if err != nil {
+				// Ignore ErrEventOverflow since we rely on the presence of events so
+				// safe to ignore.
+				if err != nil && err != fsnotify.ErrEventOverflow {
 					log.Println("watcher error:", err)
 				}
 			case <-quitter:
