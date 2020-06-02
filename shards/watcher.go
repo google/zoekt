@@ -174,20 +174,37 @@ func (s *shardWatcher) watch(quitter <-chan struct{}) error {
 		return err
 	}
 
+	// intermediate signal channel so if there are multiple watcher.Events we
+	// only call scan once.
+	signal := make(chan struct{}, 1)
+
 	go func() {
 		for {
 			select {
 			case <-watcher.Events:
-				s.scan()
+				select {
+				case signal <- struct{}{}:
+				default:
+				}
 			case err := <-watcher.Errors:
-				if err != nil {
+				// Ignore ErrEventOverflow since we rely on the presence of events so
+				// safe to ignore.
+				if err != nil && err != fsnotify.ErrEventOverflow {
 					log.Println("watcher error:", err)
 				}
 			case <-quitter:
 				watcher.Close()
+				close(signal)
 				return
 			}
 		}
 	}()
+
+	go func() {
+		for range signal {
+			s.scan()
+		}
+	}()
+
 	return nil
 }
