@@ -12,7 +12,7 @@ RUN go mod download
 COPY . ./
 RUN go install ./cmd/...
 
-FROM alpine AS ctags
+FROM alpine:3.11 AS ctags
 
 RUN apk add --no-cache --virtual build-deps ca-certificates curl jansson-dev \
     libseccomp-dev linux-headers autoconf pkgconfig make automake \
