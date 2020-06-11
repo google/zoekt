@@ -214,23 +214,58 @@ func selectRepoSet(shards []rankedShard, q query.Q) ([]rankedShard, query.Q) {
 		return shards, q
 	}
 
+	// (and (reposet ...) (q))
+	// (and true (q)) with a filtered shards
+	// (and false) // noop
+
+	// (and (repobranches ...) (q))
+	// (and (repobranches ...) (q))
+
+	// TODO RepoBranches
+
+	// TODO implement optimization
 	for i, c := range and.Children {
-		setQuery, ok := c.(*query.RepoSet)
-		if !ok {
+		var setSize int
+		var hasRepo func(string) bool
+
+		switch setQuery := c.(type) {
+		case *query.RepoSet:
+			setSize = len(setQuery.Set)
+			hasRepo = func(name string) bool {
+				return setQuery.Set[name]
+			}
+		case *query.RepoBranches:
+			setSize = len(setQuery.Set)
+			hasRepo = func(name string) bool {
+				return len(setQuery.Set[name]) > 0
+			}
+		default:
 			continue
 		}
 
-		filtered := make([]rankedShard, 0, len(setQuery.Set))
+		filtered := make([]rankedShard, 0, setSize)
 
 		for _, s := range shards {
 			if repositorer, ok := s.Searcher.(repositorer); ok {
 				repo := repositorer.Repository()
-				if setQuery.Set[repo.Name] {
+				if hasRepo(repo.Name) {
 					filtered = append(filtered, s)
 				}
 			}
 		}
-		and.Children[i] = &query.Const{Value: len(filtered) > 0}
+
+		if _, ok := c.(*query.RepoSet); ok {
+			// This optimization allows us to avoid the work done by
+			// indexData.simplify for each shard.
+			//
+			// For example if our query is (and (reposet foo bar) (content baz))
+			// then at this point filtered is [foo bar] and q is the same. For each
+			// shard indexData.simplify will simplify to (and true (content baz)) ->
+			// (content baz). This work can be done now once, rather than per shard.
+			and.Children[i] = &query.Const{Value: len(filtered) > 0}
+		}
+		// TODO the same optimization for RepoBranches in the common case (all
+		// repos are searching HEAD)
 
 		// Stop after first RepoSet, otherwise we might append duplicate
 		// shards to `filtered`

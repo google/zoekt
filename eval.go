@@ -44,6 +44,19 @@ func (d *indexData) simplify(in query.Q) query.Q {
 		switch r := q.(type) {
 		case *query.Repo:
 			return &query.Const{Value: strings.Contains(d.repoMetaData.Name, r.Pattern)}
+		case *query.RepoBranches:
+			branches, ok := r.Set[d.repoMetaData.Name]
+			if !ok {
+				return &query.Const{Value: false}
+			}
+
+			// New sub query is (or (branch branches[0]) ...)
+			qs := make([]query.Q, len(branches))
+			for i, branch := range branches {
+				// TODO we need exact matching, not pattern matching
+				qs[i] = &query.Branch{Pattern: branch}
+			}
+			return query.NewOr(qs...)
 		case *query.RepoSet:
 			return &query.Const{Value: r.Set[d.repoMetaData.Name]}
 		case *query.Language:

@@ -189,25 +189,34 @@ func TestFilteringShardsByRepoSet(t *testing.T) {
 		t.Fatalf("no reposet: got %d results, want %d", len(res.Files), n)
 	}
 
-	set := query.NewRepoSet(repoSetNames...)
-	sub := &query.Substring{Pattern: "bla"}
-	res, err = ss.Search(context.Background(), query.NewAnd(set, sub), &zoekt.SearchOptions{})
-	if err != nil {
-		t.Errorf("Search: %v", err)
-	}
-	// Note: Assertion is based on fact that `rankSearcher` always returns a
-	// result and using repoSet will half the number of results
-	if len(res.Files) != len(repoSetNames) {
-		t.Fatalf("with reposet: got %d results, want %d", len(res.Files), len(repoSetNames))
+	repoBranches := &query.RepoBranches{Set: make(map[string][]string)}
+	for _, name := range repoSetNames {
+		repoBranches.Set[name] = []string{"HEAD"}
 	}
 
-	// With the same reposet multiple times
-	res, err = ss.Search(context.Background(), query.NewAnd(set, set, sub), &zoekt.SearchOptions{})
-	if err != nil {
-		t.Errorf("Search: %v", err)
+	set := query.NewRepoSet(repoSetNames...)
+	sub := &query.Substring{Pattern: "bla"}
+
+	queries := []query.Q{
+		query.NewAnd(set, sub),
+		// Test with the same reposet again
+		query.NewAnd(set, sub),
+
+		query.NewAnd(repoBranches, sub),
+		// Test with the same repoBranches again
+		query.NewAnd(repoBranches, sub),
 	}
-	if len(res.Files) != len(repoSetNames) {
-		t.Fatalf("with reposet multiple times: got %d results, want %d", len(res.Files), len(repoSetNames))
+
+	for _, q := range queries {
+		res, err = ss.Search(context.Background(), q, &zoekt.SearchOptions{})
+		if err != nil {
+			t.Errorf("Search(%s): %v", q, err)
+		}
+		// Note: Assertion is based on fact that `rankSearcher` always returns a
+		// result and using repoSet will half the number of results
+		if len(res.Files) != len(repoSetNames) {
+			t.Fatalf("%s: got %d results, want %d", q, len(res.Files), len(repoSetNames))
+		}
 	}
 }
 

@@ -127,6 +127,7 @@ func registerGob() {
 		gob.Register(&query.Or{})
 		gob.Register(&query.Regexp{})
 		gob.Register(&query.RepoSet{})
+		gob.Register(&query.RepoBranches{})
 		gob.Register(&query.Repo{})
 		gob.Register(&query.Substring{})
 		gob.Register(&query.Symbol{})

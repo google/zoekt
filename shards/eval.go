@@ -81,8 +81,6 @@ func (s *typeRepoSearcher) eval(ctx context.Context, q query.Q) (query.Q, error)
 			return nil
 		}
 
-		// TODO handle branches somehow? Our reposet will need to change to
-		// handle that.
 		rs := &query.RepoSet{Set: make(map[string]bool, len(rl.Repos))}
 		for _, r := range rl.Repos {
 			rs.Set[r.Repository.Name] = true

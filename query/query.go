@@ -124,8 +124,35 @@ func (q *Repo) String() string {
 	return fmt.Sprintf("repo:%s", q.Pattern)
 }
 
+// RepoBranches is a list of branches in repos to match. It is a Sourcegraph
+// addition and only used in the RPC interface for efficient checking of large
+// repo lists.
+type RepoBranches struct {
+	// Set is map reponame -> [branch]
+	Set map[string][]string
+}
+
+func (q *RepoBranches) String() string {
+	var detail string
+	if len(q.Set) > 5 {
+		// Large sets being output are not useful
+		detail = fmt.Sprintf("size=%d", len(q.Set))
+	} else {
+		repos := make([]string, len(q.Set))
+		i := 0
+		for repo, branches := range q.Set {
+			// repo@master:develop:master
+			repos[i] = fmt.Sprintf("%s@%s", repo, strings.Join(branches, ":"))
+			i++
+		}
+		sort.Strings(repos)
+		detail = strings.Join(repos, " ")
+	}
+	return fmt.Sprintf("(reposet %s)", detail)
+}
+
 // RepoSet is a list of repos to match. It is a Sourcegraph addition and only
-// used in the Rest interface for efficient checking of large repo lists.
+// used in the RPC interface for efficient checking of large repo lists.
 type RepoSet struct {
 	Set map[string]bool
 }
