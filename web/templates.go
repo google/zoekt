@@ -139,8 +139,11 @@ var TemplateText = map[string]string{
 document.onkeydown=function(e){
   var e = e || window.event;
   if (e.key == "/") {
-    document.getElementById("navsearchbox").focus();
-    return false;
+    var navbox = document.getElementById("navsearchbox");
+    if (document.activeElement !== navbox) {
+      navbox.focus();
+      return false;
+    }
   }
 };
 </script>
