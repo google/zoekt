@@ -119,3 +119,24 @@ func TestPing(t *testing.T) {
 		t.Fatal("waitForFrontend blocking")
 	}
 }
+
+func TestCodeHostFromName(t *testing.T) {
+	cases := map[string]string{
+		// no codehost
+		"foo":     "unknown",
+		"foo/bar": "unknown",
+		"/foo":    "unknown",
+		"/":       "unknown",
+		"":        "unknown",
+
+		"foo.com":     "foo.com",
+		"foo.com/bar": "foo.com",
+	}
+
+	for repoName, want := range cases {
+		got := codeHostFromName(repoName)
+		if got != want {
+			t.Errorf("codeHostFromName(%q): got %q want %q", repoName, got, want)
+		}
+	}
+}

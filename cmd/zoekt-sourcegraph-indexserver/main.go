@@ -143,12 +143,18 @@ func (s *Server) loggedRun(tr trace.Trace, cmd *exec.Cmd) error {
 }
 
 func codeHostFromName(repoName string) string {
-	parts := strings.Split(repoName, "/")
-	codehost := "unknown"
-	if len(parts) > 1 {
-		codehost = parts[0]
+	if i := strings.Index(repoName, "/"); i >= 0 {
+		repoName = repoName[:i]
 	}
-	return codehost
+
+	// basic check that codehost is a domain. We want to avoid returning high
+	// cardinality fields (for example if Sourcegraph is configured to not
+	// include the hostname in repoName).
+	if !strings.Contains(repoName, ".") {
+		return "unknown"
+	}
+
+	return repoName
 }
 
 // Run the sync loop. This blocks forever.
