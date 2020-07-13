@@ -8,11 +8,11 @@ import (
 type queueItem struct {
 	// repoName is the name of the repo
 	repoName string
-	// indexedCommit is the last known indexed commit
-	indexedCommit string
 	// latestCommit is the latest commit available from gitserver. It is the
-	// commit want to index next. It can be the same as indexedCommit.
+	// commit want to index next.
 	latestCommit string
+	// indexed is true if latestCommit has been indexed.
+	indexed bool
 	// heapIdx is the index of the item in the heap. If < 0 then the item is
 	// not on the heap.
 	heapIdx int
@@ -65,6 +65,9 @@ func (q *Queue) Len() int {
 func (q *Queue) AddOrUpdate(repoName, commit string) {
 	q.mu.Lock()
 	item := q.get(repoName)
+	if item.latestCommit != commit {
+		item.indexed = false
+	}
 	item.latestCommit = commit
 	if item.heapIdx < 0 {
 		q.seq++
@@ -80,7 +83,7 @@ func (q *Queue) AddOrUpdate(repoName, commit string) {
 func (q *Queue) SetIndexed(repoName, indexed string) {
 	q.mu.Lock()
 	item := q.get(repoName)
-	item.indexedCommit = indexed
+	item.indexed = indexed == item.latestCommit
 	if item.heapIdx >= 0 {
 		// We only update the position in the queue, never add it.
 		heap.Fix(&q.pq, item.heapIdx)
@@ -120,11 +123,11 @@ func (pq pqueue) Less(i, j int) bool {
 	// they are either equal priority or y is more urgent.
 	x := pq[i]
 	y := pq[j]
-	if (x.indexedCommit == x.latestCommit) == (y.indexedCommit == y.latestCommit) {
+	if x.indexed == y.indexed {
 		// tie breaker is to prefer the item added to the queue first
 		return x.seq < y.seq
 	}
-	return x.indexedCommit != x.latestCommit
+	return !x.indexed
 }
 
 func (pq pqueue) Swap(i, j int) {
