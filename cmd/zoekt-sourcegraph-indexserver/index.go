@@ -29,6 +29,9 @@ type IndexOptions struct {
 
 	// Symbols if true will make zoekt index the output of ctags.
 	Symbols bool
+
+	// Branches is a slice of branches to index.
+	Branches []zoekt.RepositoryBranch
 }
 
 // indexArgs represents the arguments we pass to zoekt-archive-index
@@ -42,9 +45,6 @@ type indexArgs struct {
 	// Name is the name of the repository.
 	Name string
 
-	// Commit is the absolute commit SHA.
-	Commit string
-
 	// Incremental indicates to skip indexing if already indexed.
 	Incremental bool
 
@@ -56,9 +56,6 @@ type indexArgs struct {
 
 	// FileLimit is the maximum size of a file
 	FileLimit int
-
-	// Branch is the branch name.
-	Branch string
 
 	// DownloadLimitMBPS is the maximum MB/s to use when downloading the
 	// archive.
@@ -73,11 +70,8 @@ func (o *indexArgs) BuildOptions() *build.Options {
 		// what the indexer we call will produce. This is to ensure that
 		// IncrementalSkipIndexing returns true if nothing needs to be done.
 		RepositoryDescription: zoekt.Repository{
-			Name: o.Name,
-			Branches: []zoekt.RepositoryBranch{{
-				Name:    o.Branch,
-				Version: o.Commit,
-			}},
+			Name:     o.Name,
+			Branches: o.Branches,
 		},
 		IndexDir:         o.IndexDir,
 		Parallelism:      o.Parallelism,
@@ -89,11 +83,15 @@ func (o *indexArgs) BuildOptions() *build.Options {
 }
 
 func (o *indexArgs) String() string {
-	if o.Branch != "" {
-		return o.Name + "@" + o.Branch + "=" + o.Commit
-	} else {
-		return o.Name + "@" + o.Commit
+	s := o.Name
+	for i, b := range o.Branches {
+		if i == 0 {
+			s = fmt.Sprintf("%s@%s=%s", s, b.Name, b.Version)
+		} else {
+			s = fmt.Sprintf("%s,%s=%s", s, b.Name, b.Version)
+		}
 	}
+	return s
 }
 
 func getIndexOptions(args *indexArgs) error {
@@ -124,9 +122,15 @@ func getIndexOptions(args *indexArgs) error {
 }
 
 func archiveIndex(o *indexArgs, runCmd func(*exec.Cmd) error) error {
+	if len(o.Branches) != 1 {
+		return fmt.Errorf("zoekt-archive-index only supports 1 branch, got %v", o.Branches)
+	}
+
+	commit := o.Branches[0].Version
 	args := []string{
 		"-name", o.Name,
-		"-commit", o.Commit,
+		"-commit", commit,
+		"-branch", o.Branches[0].Name,
 	}
 
 	// Even though we check for incremental in this process, we still pass it
@@ -136,17 +140,13 @@ func archiveIndex(o *indexArgs, runCmd func(*exec.Cmd) error) error {
 		args = append(args, "-incremental")
 	}
 
-	if o.Branch != "" {
-		args = append(args, "-branch", o.Branch)
-	}
-
 	if o.DownloadLimitMBPS != "" {
 		args = append(args, "-download-limit-mbps", o.DownloadLimitMBPS)
 	}
 
 	args = append(args, o.BuildOptions().Args()...)
 
-	args = append(args, o.Root.ResolveReference(&url.URL{Path: fmt.Sprintf("/.internal/git/%s/tar/%s", o.Name, o.Commit)}).String())
+	args = append(args, o.Root.ResolveReference(&url.URL{Path: fmt.Sprintf("/.internal/git/%s/tar/%s", o.Name, commit)}).String())
 
 	cmd := exec.Command("zoekt-archive-index", args...)
 	// Prevent prompting
@@ -155,6 +155,10 @@ func archiveIndex(o *indexArgs, runCmd func(*exec.Cmd) error) error {
 }
 
 func gitIndex(o *indexArgs, runCmd func(*exec.Cmd) error) error {
+	if len(o.Branches) == 0 {
+		return errors.New("zoekt-git-index requires 1 or more branches")
+	}
+
 	gitDir, err := tmpGitDir(o.Name)
 	if err != nil {
 		return err
@@ -194,9 +198,7 @@ func gitIndex(o *indexArgs, runCmd func(*exec.Cmd) error) error {
 		args = append(args, "-incremental")
 	}
 
-	if o.Branch != "" {
-		args = append(args, "-branches", o.Branch)
-	}
+	args = append(args, "-branches", o.Branches[0].Name)
 
 	args = append(args, o.BuildOptions().Args()...)
 	args = append(args, gitDir)

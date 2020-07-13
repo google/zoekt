@@ -23,7 +23,6 @@ func TestServer_defaultArgs(t *testing.T) {
 		IndexDir:          "/testdata/index",
 		Parallelism:       6,
 		Incremental:       true,
-		Branch:            "HEAD",
 		FileLimit:         1 << 20,
 		DownloadLimitMBPS: "1000",
 	}

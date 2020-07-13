@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/google/zoekt"
 )
 
 func TestGetIndexOptions(t *testing.T) {
@@ -53,9 +54,8 @@ func TestGetIndexOptions(t *testing.T) {
 
 		// Test we mix in the response
 		args := indexArgs{
-			Root:   u,
-			Name:   "test/repo",
-			Commit: "deadbeef",
+			Root: u,
+			Name: "test/repo",
 		}
 
 		if err := getIndexOptions(&args); err != nil {
@@ -84,41 +84,42 @@ func TestIndex(t *testing.T) {
 	}{{
 		name: "minimal",
 		args: indexArgs{
-			Root:   root,
-			Name:   "test/repo",
-			Commit: "deadbeef",
+			Root: root,
+			Name: "test/repo",
+			IndexOptions: IndexOptions{
+				Branches: []zoekt.RepositoryBranch{{Name: "HEAD", Version: "deadbeef"}},
+			},
 		},
 		wantArchive: []string{
-			"zoekt-archive-index -name test/repo -commit deadbeef -disable_ctags http://api.test/.internal/git/test/repo/tar/deadbeef",
+			"zoekt-archive-index -name test/repo -commit deadbeef -branch HEAD -disable_ctags http://api.test/.internal/git/test/repo/tar/deadbeef",
 		},
 		wantGit: []string{
 			"git -c protocol.version=2 clone --depth=1 --bare http://api.test/.internal/git/test/repo $TMPDIR/test%2Frepo.git",
 			"git -C $TMPDIR/test%2Frepo.git config zoekt.name test/repo",
-			"zoekt-git-index -submodules=false -disable_ctags $TMPDIR/test%2Frepo.git",
+			"zoekt-git-index -submodules=false -branches HEAD -disable_ctags $TMPDIR/test%2Frepo.git",
 		},
 	}, {
 		name: "all",
 		args: indexArgs{
 			Root:              root,
 			Name:              "test/repo",
-			Commit:            "deadbeef",
 			Incremental:       true,
 			IndexDir:          "/data/index",
 			Parallelism:       4,
 			FileLimit:         123,
-			Branch:            "HEAD",
 			DownloadLimitMBPS: "1000",
 			IndexOptions: IndexOptions{
 				LargeFiles: []string{"foo", "bar"},
 				Symbols:    true,
+				Branches:   []zoekt.RepositoryBranch{{Name: "HEAD", Version: "deadbeef"}},
 			},
 		},
 		wantArchive: []string{strings.Join([]string{
 			"zoekt-archive-index",
 			"-name", "test/repo",
 			"-commit", "deadbeef",
-			"-incremental",
 			"-branch", "HEAD",
+			"-incremental",
 			"-download-limit-mbps", "1000",
 			"-file_limit", "123",
 			"-parallelism", "4",
