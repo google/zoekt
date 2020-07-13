@@ -574,7 +574,6 @@ func main() {
 		Interval: *interval,
 		CPUCount: cpuCount,
 		Hostname: *hostname,
-		Indexer:  archiveIndex,
 	}
 
 	if *expGitIndex {
