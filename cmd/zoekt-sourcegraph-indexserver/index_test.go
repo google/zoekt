@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -17,6 +18,10 @@ import (
 func TestGetIndexOptions(t *testing.T) {
 	var response []byte
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got, want := r.URL.String(), "/.internal/search/configuration?repo=test%2Frepo"; got != want {
+			http.Error(w, fmt.Sprintf("got URL %v want %v", got, want), http.StatusBadRequest)
+			return
+		}
 		w.Write(response)
 	}))
 	defer server.Close()

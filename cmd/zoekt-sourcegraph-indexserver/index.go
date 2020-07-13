@@ -91,7 +91,11 @@ func (o *indexArgs) String() string {
 }
 
 func getIndexOptions(args *indexArgs) error {
-	u := args.Root.ResolveReference(&url.URL{Path: "/.internal/search/configuration"})
+	u := args.Root.ResolveReference(&url.URL{
+		Path:     "/.internal/search/configuration",
+		RawQuery: "repo=" + url.QueryEscape(args.Name),
+	})
+
 	resp, err := client.Get(u.String())
 	if err != nil {
 		return err
@@ -105,7 +109,7 @@ func getIndexOptions(args *indexArgs) error {
 		return errors.New("failed to get configuration options")
 	}
 
-	err = json.NewDecoder(resp.Body).Decode(&args)
+	err = json.NewDecoder(resp.Body).Decode(args)
 	if err != nil {
 		return fmt.Errorf("error decoding body: %v", err)
 	}
