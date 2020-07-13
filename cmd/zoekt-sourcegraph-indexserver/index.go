@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -14,6 +15,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
@@ -174,13 +176,41 @@ func gitIndex(o *indexArgs, runCmd func(*exec.Cmd) error) error {
 	// investigate. This is only during the experimental phase of indexing a
 	// clone. So don't defer os.RemoveAll here
 
-	cloneURL := o.Root.ResolveReference(&url.URL{Path: path.Join("/.internal/git", o.Name)}).String()
-	cmd := exec.Command("git", "-c", "protocol.version=2", "clone", "--depth=1", "--bare", cloneURL, gitDir)
+	// Create a repo to fetch into
+	cmd := exec.Command("git", "init", "--bare", gitDir)
 	cmd.Stdin = &bytes.Buffer{}
 	if err := runCmd(cmd); err != nil {
 		return err
 	}
 
+	// We shallow fetch each commit specified in zoekt.Branches. This requires
+	// the server to have configured both uploadpack.allowAnySHA1InWant and
+	// uploadpack.allowFilter. (See gitservice.go in the Sourcegraph repository)
+	cloneURL := o.Root.ResolveReference(&url.URL{Path: path.Join("/.internal/git", o.Name)}).String()
+	fetchArgs := []string{"-C", gitDir, "-c", "protocol.version=2", "fetch", "--depth=1", cloneURL}
+	for _, b := range o.Branches {
+		fetchArgs = append(fetchArgs, b.Version)
+	}
+	cmd = exec.Command("git", fetchArgs...)
+	cmd.Stdin = &bytes.Buffer{}
+	if err := runCmd(cmd); err != nil {
+		return err
+	}
+
+	// We then create the relevant refs for each fetched commit.
+	for _, b := range o.Branches {
+		ref := b.Name
+		if ref != "HEAD" {
+			ref = "refs/heads/" + ref
+		}
+		cmd = exec.Command("git", "-C", gitDir, "update-ref", ref, b.Version)
+		cmd.Stdin = &bytes.Buffer{}
+		if err := runCmd(cmd); err != nil {
+			return fmt.Errorf("failed update-ref %s to %s: %w", ref, b.Version, err)
+		}
+	}
+
+	// zoekt.name is used by zoekt-git-index to set the repository name.
 	cmd = exec.Command("git", "-C", gitDir, "config", "zoekt.name", o.Name)
 	cmd.Stdin = &bytes.Buffer{}
 	if err := runCmd(cmd); err != nil {
@@ -191,13 +221,6 @@ func gitIndex(o *indexArgs, runCmd func(*exec.Cmd) error) error {
 		"-submodules=false",
 	}
 
-	// Note: we ignore o.Commit, we just fetch/clone the branch. This means the
-	// commit could be different (due to the branch being updated). This is not
-	// an issue since this commit will be more up to date. Additionally we will
-	// eventually converge thanks to the -incremental check. The only downside
-	// is the log message for indexing may report we indexed a different commit
-	// than we actually did.
-
 	// Even though we check for incremental in this process, we still pass it
 	// in just in case we regress in how we check in process. We will still
 	// notice thanks to metrics and increased load on gitserver.
@@ -205,7 +228,11 @@ func gitIndex(o *indexArgs, runCmd func(*exec.Cmd) error) error {
 		args = append(args, "-incremental")
 	}
 
-	args = append(args, "-branches", o.Branches[0].Name)
+	var branches []string
+	for _, b := range o.Branches {
+		branches = append(branches, b.Name)
+	}
+	args = append(args, "-branches", strings.Join(branches, ","))
 
 	args = append(args, o.BuildOptions().Args()...)
 	args = append(args, gitDir)

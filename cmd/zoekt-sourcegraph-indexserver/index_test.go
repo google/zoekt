@@ -88,7 +88,9 @@ func TestIndex(t *testing.T) {
 			"zoekt-archive-index -name test/repo -commit deadbeef -branch HEAD -disable_ctags http://api.test/.internal/git/test/repo/tar/deadbeef",
 		},
 		wantGit: []string{
-			"git -c protocol.version=2 clone --depth=1 --bare http://api.test/.internal/git/test/repo $TMPDIR/test%2Frepo.git",
+			"git init --bare $TMPDIR/test%2Frepo.git",
+			"git -C $TMPDIR/test%2Frepo.git -c protocol.version=2 fetch --depth=1 http://api.test/.internal/git/test/repo deadbeef",
+			"git -C $TMPDIR/test%2Frepo.git update-ref HEAD deadbeef",
 			"git -C $TMPDIR/test%2Frepo.git config zoekt.name test/repo",
 			"zoekt-git-index -submodules=false -branches HEAD -disable_ctags $TMPDIR/test%2Frepo.git",
 		},
@@ -105,7 +107,10 @@ func TestIndex(t *testing.T) {
 			IndexOptions: IndexOptions{
 				LargeFiles: []string{"foo", "bar"},
 				Symbols:    true,
-				Branches:   []zoekt.RepositoryBranch{{Name: "HEAD", Version: "deadbeef"}},
+				Branches: []zoekt.RepositoryBranch{
+					{Name: "HEAD", Version: "deadbeef"},
+					{Name: "dev", Version: "feebdaed"}, // ignored for archive
+				},
 			},
 		},
 		wantArchive: []string{strings.Join([]string{
@@ -124,9 +129,12 @@ func TestIndex(t *testing.T) {
 			"http://api.test/.internal/git/test/repo/tar/deadbeef",
 		}, " ")},
 		wantGit: []string{
-			"git -c protocol.version=2 clone --depth=1 --bare http://api.test/.internal/git/test/repo $TMPDIR/test%2Frepo.git",
+			"git init --bare $TMPDIR/test%2Frepo.git",
+			"git -C $TMPDIR/test%2Frepo.git -c protocol.version=2 fetch --depth=1 http://api.test/.internal/git/test/repo deadbeef feebdaed",
+			"git -C $TMPDIR/test%2Frepo.git update-ref HEAD deadbeef",
+			"git -C $TMPDIR/test%2Frepo.git update-ref refs/heads/dev feebdaed",
 			"git -C $TMPDIR/test%2Frepo.git config zoekt.name test/repo",
-			"zoekt-git-index -submodules=false -incremental -branches HEAD " +
+			"zoekt-git-index -submodules=false -incremental -branches HEAD,dev " +
 				"-file_limit 123 -parallelism 4 -index /data/index -require_ctags -large_file foo -large_file bar " +
 				"$TMPDIR/test%2Frepo.git",
 		},
@@ -142,6 +150,8 @@ func TestIndex(t *testing.T) {
 				return nil
 			}
 
+			branches := tc.args.Branches
+			tc.args.Branches = branches[:1]
 			if err := archiveIndex(&tc.args, runCmd); err != nil {
 				t.Fatal(err)
 			}
@@ -150,6 +160,7 @@ func TestIndex(t *testing.T) {
 			}
 
 			got = nil
+			tc.args.Branches = branches
 			if err := gitIndex(&tc.args, runCmd); err != nil {
 				t.Fatal(err)
 			}
