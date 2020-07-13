@@ -31,7 +31,7 @@ func TestGetIndexOptions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cases := map[string]indexArgs{
+	cases := map[string]IndexOptions{
 		`{"Symbols": true, "LargeFiles": ["foo","bar"]}`: {
 			Symbols:    true,
 			LargeFiles: []string{"foo", "bar"},
@@ -52,19 +52,17 @@ func TestGetIndexOptions(t *testing.T) {
 		response = []byte(r)
 
 		// Test we mix in the response
-		want.Root = u
-		want.Name = "test/repo"
-		want.Commit = "deadbeef"
-		got := indexArgs{
+		args := indexArgs{
 			Root:   u,
 			Name:   "test/repo",
 			Commit: "deadbeef",
 		}
 
-		if err := getIndexOptions(&got); err != nil {
+		if err := getIndexOptions(&args); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
+		got := args.IndexOptions
 		if !cmp.Equal(got, want) {
 			t.Log("response", r)
 			t.Errorf("mismatch (-want +got):\n%s", cmp.Diff(want, got))
@@ -110,8 +108,10 @@ func TestIndex(t *testing.T) {
 			FileLimit:         123,
 			Branch:            "HEAD",
 			DownloadLimitMBPS: "1000",
-			LargeFiles:        []string{"foo", "bar"},
-			Symbols:           true,
+			IndexOptions: IndexOptions{
+				LargeFiles: []string{"foo", "bar"},
+				Symbols:    true,
+			},
 		},
 		wantArchive: []string{strings.Join([]string{
 			"zoekt-archive-index",

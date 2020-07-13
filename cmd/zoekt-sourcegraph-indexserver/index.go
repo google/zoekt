@@ -19,8 +19,22 @@ import (
 	"github.com/google/zoekt/build"
 )
 
+// IndexOptions are the options that Sourcegraph can set via it's search
+// configuration endpoint.
+type IndexOptions struct {
+	// LargeFiles is a slice of glob patterns where matching file paths should
+	// be indexed regardless of their size. The pattern syntax can be found
+	// here: https://golang.org/pkg/path/filepath/#Match.
+	LargeFiles []string
+
+	// Symbols if true will make zoekt index the output of ctags.
+	Symbols bool
+}
+
 // indexArgs represents the arguments we pass to zoekt-archive-index
 type indexArgs struct {
+	IndexOptions
+
 	// Root is the base URL for the Sourcegraph instance to index. Normally
 	// http://sourcegraph-frontend-internal or http://localhost:3090.
 	Root *url.URL
@@ -49,14 +63,6 @@ type indexArgs struct {
 	// DownloadLimitMBPS is the maximum MB/s to use when downloading the
 	// archive.
 	DownloadLimitMBPS string
-
-	// LargeFiles is a slice of glob patterns where matching files are indexed
-	// regardless of their size.
-	LargeFiles []string
-
-	// Symbols is a boolean that indicates whether to generate ctags metadata
-	// or not
-	Symbols bool
 }
 
 // BuildOptions returns a build.Options represented by indexArgs. Note: it
@@ -109,7 +115,7 @@ func getIndexOptions(args *indexArgs) error {
 		return errors.New("failed to get configuration options")
 	}
 
-	err = json.NewDecoder(resp.Body).Decode(args)
+	err = json.NewDecoder(resp.Body).Decode(&args.IndexOptions)
 	if err != nil {
 		return fmt.Errorf("error decoding body: %v", err)
 	}
