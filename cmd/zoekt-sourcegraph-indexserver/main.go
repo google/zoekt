@@ -28,7 +28,6 @@ import (
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/net/trace"
 
-	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
 	retryablehttp "github.com/hashicorp/go-retryablehttp"
 	"github.com/keegancsmith/tmpfriend"
@@ -182,7 +181,7 @@ func (s *Server) Run() {
 
 			debug.Printf("updating index queue with %d repositories", len(repos))
 
-			// ResolveRevision is IO bound on the gitserver service. So we do
+			// getIndexOptions is IO bound on the gitserver service. So we do
 			// them concurrently.
 			sem := newSemaphore(32)
 
@@ -193,23 +192,23 @@ func (s *Server) Run() {
 				cleanup(s.IndexDir, repos, time.Now())
 			}()
 
-			tr := trace.New("resolveRevisions", "")
-			tr.LazyPrintf("resolving HEAD for %d repos", len(repos))
+			tr := trace.New("getIndexOptions", "")
+			tr.LazyPrintf("getting index options for %d repos", len(repos))
 			start := time.Now()
 			for _, name := range repos {
 				sem.Acquire()
 				go func(name string) {
 					defer sem.Release()
 					start := time.Now()
-					commit, err := resolveRevision(s.Root, name, "HEAD")
-					if err != nil && !os.IsNotExist(err) {
+					opts, err := getIndexOptions(s.Root, name)
+					if err != nil {
 						metricResolveRevisionDuration.WithLabelValues("false").Observe(time.Since(start).Seconds())
-						tr.LazyPrintf("failed resolving HEAD for %v: %v", name, err)
+						tr.LazyPrintf("failed fetching options for %v: %v", name, err)
 						tr.SetError()
 						return
 					}
 					metricResolveRevisionDuration.WithLabelValues("true").Observe(time.Since(start).Seconds())
-					queue.AddOrUpdate(name, commit)
+					queue.AddOrUpdate(name, opts)
 				}(name)
 			}
 			sem.Wait()
@@ -222,7 +221,7 @@ func (s *Server) Run() {
 
 	// In the current goroutine process the queue forever.
 	for {
-		name, commit, ok := queue.Pop()
+		name, opts, ok := queue.Pop()
 		if !ok {
 			time.Sleep(time.Second)
 			continue
@@ -230,9 +229,7 @@ func (s *Server) Run() {
 		start := time.Now()
 		args := s.defaultArgs()
 		args.Name = name
-		if commit != "" {
-			args.Branches = []zoekt.RepositoryBranch{{Name: "HEAD", Version: commit}}
-		}
+		args.IndexOptions = opts
 		state, err := s.Index(args)
 		metricIndexDuration.WithLabelValues(string(state)).Observe(time.Since(start).Seconds())
 		if err != nil {
@@ -242,7 +239,7 @@ func (s *Server) Run() {
 		if state == indexStateSuccess {
 			log.Printf("updated index %s in %v", args.String(), time.Since(start))
 		}
-		queue.SetIndexed(name, commit)
+		queue.SetIndexed(name, opts)
 	}
 }
 
@@ -265,10 +262,6 @@ func (s *Server) Index(args *indexArgs) (state indexState, err error) {
 
 	if len(args.Branches) == 0 {
 		return indexStateEmpty, s.createEmptyShard(tr, args.Name)
-	}
-
-	if err := getIndexOptions(args); err != nil {
-		return indexStateFail, err
 	}
 
 	if args.Incremental {
@@ -366,15 +359,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // forceIndex will run the index job for repo name now. It will return always
 // return a string explaining what it did, even if it failed.
 func (s *Server) forceIndex(name string) (string, error) {
-	commit, err := resolveRevision(s.Root, name, "HEAD")
-	if err != nil && !os.IsNotExist(err) {
+	opts, err := getIndexOptions(s.Root, name)
+	if err != nil {
 		return fmt.Sprintf("Indexing %s failed: %v", name, err), err
 	}
 	args := s.defaultArgs()
 	args.Name = name
-	if commit != "" {
-		args.Branches = []zoekt.RepositoryBranch{{Name: "HEAD", Version: commit}}
-	}
+	args.IndexOptions = opts
 	args.Incremental = false // force re-index
 	state, err := s.Index(args)
 	if err != nil {
@@ -439,29 +430,6 @@ func listRepos(ctx context.Context, hostname string, root *url.URL, indexed []st
 		metricNumAssigned.WithLabelValues(codeHost).Set(float64(count))
 	}
 	return data.RepoNames, nil
-}
-
-func resolveRevision(root *url.URL, repo, spec string) (string, error) {
-	u := root.ResolveReference(&url.URL{Path: fmt.Sprintf("/.internal/git/%s/resolve-revision/%s", repo, spec)})
-	resp, err := client.Get(u.String())
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return "", os.ErrNotExist
-	}
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to resolve revision %s@%s: status %s", repo, spec, resp.Status)
-	}
-
-	var b bytes.Buffer
-	_, err = b.ReadFrom(resp.Body)
-	if err != nil {
-		return "", err
-	}
-	return b.String(), nil
 }
 
 func ping(root *url.URL) error {

@@ -2,16 +2,16 @@ package main
 
 import (
 	"container/heap"
+	"reflect"
 	"sync"
 )
 
 type queueItem struct {
 	// repoName is the name of the repo
 	repoName string
-	// latestCommit is the latest commit available from gitserver. It is the
-	// commit want to index next.
-	latestCommit string
-	// indexed is true if latestCommit has been indexed.
+	// opts are the options to use when indexing repoName.
+	opts IndexOptions
+	// indexed is true if opts has been indexed.
 	indexed bool
 	// heapIdx is the index of the item in the heap. If < 0 then the item is
 	// not on the heap.
@@ -24,7 +24,7 @@ type queueItem struct {
 // Queue is a priority queue which returns the next repo to index. It is safe
 // to use concurrently. It is a min queue on:
 //
-//    (indexed commit != latest commit, time added to the queue)
+//    (!indexed, time added to the queue)
 //
 // We use the above since:
 //
@@ -37,19 +37,19 @@ type Queue struct {
 	seq   int64
 }
 
-// Pop returns the repoName and commit of the next repo to index. If the queue
+// Pop returns the repoName and opts of the next repo to index. If the queue
 // is empty ok is false.
-func (q *Queue) Pop() (repoName string, commit string, ok bool) {
+func (q *Queue) Pop() (repoName string, opts IndexOptions, ok bool) {
 	q.mu.Lock()
 	if len(q.pq) == 0 {
 		q.mu.Unlock()
-		return "", "", false
+		return "", IndexOptions{}, false
 	}
 	item := heap.Pop(&q.pq).(*queueItem)
 	repoName = item.repoName
-	commit = item.latestCommit
+	opts = item.opts
 	q.mu.Unlock()
-	return repoName, commit, true
+	return repoName, opts, true
 }
 
 // Len returns the number of items in the queue.
@@ -60,15 +60,15 @@ func (q *Queue) Len() int {
 	return l
 }
 
-// AddOrUpdate sets which commit to index next for repoName. If repoName is
+// AddOrUpdate sets which opts to index next for repoName. If repoName is
 // already in the queue, it is updated.
-func (q *Queue) AddOrUpdate(repoName, commit string) {
+func (q *Queue) AddOrUpdate(repoName string, opts IndexOptions) {
 	q.mu.Lock()
 	item := q.get(repoName)
-	if item.latestCommit != commit {
+	if !reflect.DeepEqual(item.opts, opts) {
 		item.indexed = false
+		item.opts = opts
 	}
-	item.latestCommit = commit
 	if item.heapIdx < 0 {
 		q.seq++
 		item.seq = q.seq
@@ -79,11 +79,11 @@ func (q *Queue) AddOrUpdate(repoName, commit string) {
 	q.mu.Unlock()
 }
 
-// SetIndexed sets what the currently indexed commit is for repoName.
-func (q *Queue) SetIndexed(repoName, indexed string) {
+// SetIndexed sets what the currently indexed options are for repoName.
+func (q *Queue) SetIndexed(repoName string, opts IndexOptions) {
 	q.mu.Lock()
 	item := q.get(repoName)
-	item.indexed = indexed == item.latestCommit
+	item.indexed = reflect.DeepEqual(opts, item.opts)
 	if item.heapIdx >= 0 {
 		// We only update the position in the queue, never add it.
 		heap.Fix(&q.pq, item.heapIdx)

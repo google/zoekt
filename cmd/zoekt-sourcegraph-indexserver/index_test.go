@@ -52,17 +52,11 @@ func TestGetIndexOptions(t *testing.T) {
 	for r, want := range cases {
 		response = []byte(r)
 
-		// Test we mix in the response
-		args := indexArgs{
-			Root: u,
-			Name: "test/repo",
-		}
-
-		if err := getIndexOptions(&args); err != nil {
+		got, err := getIndexOptions(u, "test/repo")
+		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		got := args.IndexOptions
 		if !cmp.Equal(got, want) {
 			t.Log("response", r)
 			t.Errorf("mismatch (-want +got):\n%s", cmp.Diff(want, got))

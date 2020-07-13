@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -94,31 +94,38 @@ func (o *indexArgs) String() string {
 	return s
 }
 
-func getIndexOptions(args *indexArgs) error {
-	u := args.Root.ResolveReference(&url.URL{
+func getIndexOptions(root *url.URL, repoName string) (IndexOptions, error) {
+	u := root.ResolveReference(&url.URL{
 		Path:     "/.internal/search/configuration",
-		RawQuery: "repo=" + url.QueryEscape(args.Name),
+		RawQuery: "repo=" + url.QueryEscape(repoName),
 	})
 
 	resp, err := client.Get(u.String())
 	if err != nil {
-		return err
+		return IndexOptions{}, err
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusNotFound {
-		return os.ErrNotExist
-	}
 	if resp.StatusCode != http.StatusOK {
-		return errors.New("failed to get configuration options")
+		b, err := ioutil.ReadAll(io.LimitReader(resp.Body, 1024))
+		_ = resp.Body.Close()
+		if err != nil {
+			return IndexOptions{}, err
+		}
+		return IndexOptions{}, &url.Error{
+			Op:  "Get",
+			URL: u.String(),
+			Err: fmt.Errorf("%s: %s", resp.Status, string(b)),
+		}
 	}
 
-	err = json.NewDecoder(resp.Body).Decode(&args.IndexOptions)
+	var opts IndexOptions
+	err = json.NewDecoder(resp.Body).Decode(&opts)
 	if err != nil {
-		return fmt.Errorf("error decoding body: %v", err)
+		return IndexOptions{}, fmt.Errorf("error decoding body: %w", err)
 	}
 
-	return nil
+	return opts, nil
 }
 
 func archiveIndex(o *indexArgs, runCmd func(*exec.Cmd) error) error {
