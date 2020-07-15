@@ -7,11 +7,11 @@ jobs:
     - name: go
       uses: actions/setup-go@v1
       with:
-        go-version: 1.14.4
+        go-version: 1.14.x
     - name: checkout
       uses: actions/checkout@v2
     - name: test
-      run: CGO_ENABLED=0 go test ./...
+      run: go test ./...
 
   # We build a shared docker image called "zoekt". This is not pushed, but is
   # used for creating the indexserver and webserver images.
