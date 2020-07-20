@@ -20,9 +20,9 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -152,15 +152,18 @@ func (s *shardWatcher) scan() error {
 		s.loader.drop(t)
 	}
 
-	var wg sync.WaitGroup
+	// Limit amount of concurrent shard loads.
+	throttle := make(chan struct{}, runtime.GOMAXPROCS(0))
 	for _, t := range toLoad {
-		wg.Add(1)
+		throttle <- struct{}{}
 		go func(k string) {
 			s.loader.load(k)
-			wg.Done()
+			<-throttle
 		}(t)
 	}
-	wg.Wait()
+	for i := 0; i < cap(throttle); i++ {
+		throttle <- struct{}{}
+	}
 
 	return nil
 }
