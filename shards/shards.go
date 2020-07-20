@@ -153,9 +153,8 @@ func newShardedSearcher(n int64) *shardedSearcher {
 // shards corresponding to a glob into memory.
 func NewDirectorySearcher(dir string) (zoekt.Searcher, error) {
 	ss := newShardedSearcher(int64(runtime.GOMAXPROCS(0)))
-	tl := &throttledLoader{
-		ss:       ss,
-		throttle: make(chan struct{}, runtime.GOMAXPROCS(0)),
+	tl := &loader{
+		ss: ss,
 	}
 	_, err := NewDirectoryWatcher(dir, tl)
 	if err != nil {
@@ -165,16 +164,12 @@ func NewDirectorySearcher(dir string) (zoekt.Searcher, error) {
 	return ss, nil
 }
 
-// throttledLoader tries to load up to throttle shards in parallel.
-type throttledLoader struct {
-	ss       *shardedSearcher
-	throttle chan struct{}
+type loader struct {
+	ss *shardedSearcher
 }
 
-func (tl *throttledLoader) load(key string) {
-	tl.throttle <- struct{}{}
+func (tl *loader) load(key string) {
 	shard, err := loadShard(key)
-	<-tl.throttle
 	if err != nil {
 		metricShardsLoadFailedTotal.Inc()
 		log.Printf("reloading: %s, err %v ", key, err)
@@ -185,7 +180,7 @@ func (tl *throttledLoader) load(key string) {
 	tl.ss.replace(key, shard)
 }
 
-func (tl *throttledLoader) drop(key string) {
+func (tl *loader) drop(key string) {
 	tl.ss.replace(key, nil)
 }
 
