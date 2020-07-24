@@ -4,6 +4,9 @@ import (
 	"container/heap"
 	"reflect"
 	"sync"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 type queueItem struct {
@@ -48,6 +51,10 @@ func (q *Queue) Pop() (repoName string, opts IndexOptions, ok bool) {
 	item := heap.Pop(&q.pq).(*queueItem)
 	repoName = item.repoName
 	opts = item.opts
+
+	metricQueueLen.Set(float64(len(q.pq)))
+	metricQueueCap.Set(float64(len(q.items)))
+
 	q.mu.Unlock()
 	return repoName, opts, true
 }
@@ -73,6 +80,8 @@ func (q *Queue) AddOrUpdate(repoName string, opts IndexOptions) {
 		q.seq++
 		item.seq = q.seq
 		heap.Push(&q.pq, item)
+		metricQueueLen.Set(float64(len(q.pq)))
+		metricQueueCap.Set(float64(len(q.items)))
 	} else {
 		heap.Fix(&q.pq, item.heapIdx)
 	}
@@ -130,6 +139,9 @@ func (q *Queue) MaybeRemoveMissing(names []string) int {
 		delete(q.items, name)
 		count++
 	}
+
+	metricQueueLen.Set(float64(len(q.pq)))
+	metricQueueCap.Set(float64(len(q.items)))
 
 	return count
 }
@@ -194,3 +206,14 @@ func (pq *pqueue) Pop() interface{} {
 	*pq = old[0 : n-1]
 	return item
 }
+
+var (
+	metricQueueLen = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "index_queue_len",
+		Help: "The number of repositories in the index queue.",
+	})
+	metricQueueCap = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "index_queue_cap",
+		Help: "The number of repositories tracked by the index queue, including popped items. Should be the same as index_num_assigned.",
+	})
+)
