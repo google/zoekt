@@ -71,6 +71,23 @@ func TestQueueFIFO(t *testing.T) {
 	}
 }
 
+func TestQueue_MaybeRemoveMissing(t *testing.T) {
+	queue := &Queue{}
+
+	queue.AddOrUpdate("foo", mkHEADIndexOptions("foo"))
+	queue.AddOrUpdate("bar", mkHEADIndexOptions("bar"))
+	queue.MaybeRemoveMissing([]string{"bar"})
+
+	name, _, _ := queue.Pop()
+	if name != "bar" {
+		t.Fatalf("queue should only contain bar, pop returned %v", name)
+	}
+	_, _, ok := queue.Pop()
+	if ok {
+		t.Fatal("queue should be empty")
+	}
+}
+
 func mkHEADIndexOptions(version string) IndexOptions {
 	return IndexOptions{
 		Branches: []zoekt.RepositoryBranch{{Name: "HEAD", Version: version}},

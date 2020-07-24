@@ -181,6 +181,12 @@ func (s *Server) Run() {
 
 			debug.Printf("updating index queue with %d repositories", len(repos))
 
+			// Stop indexing repos we don't need to track anymore
+			count := queue.MaybeRemoveMissing(repos)
+			if count > 0 {
+				log.Printf("stopped tracking %d repositories", count)
+			}
+
 			// getIndexOptions is IO bound on the gitserver service. So we do
 			// them concurrently.
 			sem := newSemaphore(32)

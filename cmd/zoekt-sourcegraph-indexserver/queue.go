@@ -91,6 +91,49 @@ func (q *Queue) SetIndexed(repoName string, opts IndexOptions) {
 	q.mu.Unlock()
 }
 
+// MaybeRemoveMissing will remove all queue items not in names. It will
+// heuristically not run to conserve resources and return -1. Otherwise it
+// will return the number of names removed from the queue.
+//
+// In the server's steady state we expect that the list of names is equal to
+// the items in queue. As such in the steady state this function should do no
+// removals. Removal requires memory allocation and coarse locking. To avoid
+// that we use a heuristic which can falsely decide it doesn't need to
+// remove. However, we will converge onto removing items.
+func (q *Queue) MaybeRemoveMissing(names []string) int {
+	q.mu.Lock()
+	sameSize := len(q.items) == len(names)
+	q.mu.Unlock()
+
+	// heuristically skip expensive work
+	if sameSize {
+		return -1
+	}
+
+	set := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		set[name] = struct{}{}
+	}
+
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	count := 0
+	for name, item := range q.items {
+		if _, ok := set[name]; ok {
+			continue
+		}
+
+		if item.heapIdx >= 0 {
+			heap.Remove(&q.pq, item.heapIdx)
+		}
+		delete(q.items, name)
+		count++
+	}
+
+	return count
+}
+
 // get returns the item for repoName. If the repoName hasn't been seen before,
 // it is added to q.items.
 //
