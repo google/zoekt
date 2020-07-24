@@ -4,9 +4,6 @@ import (
 	"container/heap"
 	"reflect"
 	"sync"
-
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 type queueItem struct {
@@ -16,8 +13,6 @@ type queueItem struct {
 	opts IndexOptions
 	// indexed is true if opts has been indexed.
 	indexed bool
-	// indexState is the indexState of the last attempt at indexing repoName.
-	indexState indexState
 	// heapIdx is the index of the item in the heap. If < 0 then the item is
 	// not on the heap.
 	heapIdx int
@@ -53,10 +48,6 @@ func (q *Queue) Pop() (repoName string, opts IndexOptions, ok bool) {
 	item := heap.Pop(&q.pq).(*queueItem)
 	repoName = item.repoName
 	opts = item.opts
-
-	metricQueueLen.Set(float64(len(q.pq)))
-	metricQueueCap.Set(float64(len(q.items)))
-
 	q.mu.Unlock()
 	return repoName, opts, true
 }
@@ -82,8 +73,6 @@ func (q *Queue) AddOrUpdate(repoName string, opts IndexOptions) {
 		q.seq++
 		item.seq = q.seq
 		heap.Push(&q.pq, item)
-		metricQueueLen.Set(float64(len(q.pq)))
-		metricQueueCap.Set(float64(len(q.items)))
 	} else {
 		heap.Fix(&q.pq, item.heapIdx)
 	}
@@ -91,71 +80,15 @@ func (q *Queue) AddOrUpdate(repoName string, opts IndexOptions) {
 }
 
 // SetIndexed sets what the currently indexed options are for repoName.
-func (q *Queue) SetIndexed(repoName string, opts IndexOptions, state indexState) {
+func (q *Queue) SetIndexed(repoName string, opts IndexOptions) {
 	q.mu.Lock()
 	item := q.get(repoName)
 	item.indexed = reflect.DeepEqual(opts, item.opts)
-	item.setIndexState(state)
 	if item.heapIdx >= 0 {
 		// We only update the position in the queue, never add it.
 		heap.Fix(&q.pq, item.heapIdx)
 	}
 	q.mu.Unlock()
-}
-
-// SetLastIndexFailed will update our metrics to track that this repository is
-// not up to date.
-func (q *Queue) SetLastIndexFailed(repoName string) {
-	q.mu.Lock()
-	q.get(repoName).setIndexState(indexStateFail)
-	q.mu.Unlock()
-}
-
-// MaybeRemoveMissing will remove all queue items not in names. It will
-// heuristically not run to conserve resources and return -1. Otherwise it
-// will return the number of names removed from the queue.
-//
-// In the server's steady state we expect that the list of names is equal to
-// the items in queue. As such in the steady state this function should do no
-// removals. Removal requires memory allocation and coarse locking. To avoid
-// that we use a heuristic which can falsely decide it doesn't need to
-// remove. However, we will converge onto removing items.
-func (q *Queue) MaybeRemoveMissing(names []string) int {
-	q.mu.Lock()
-	sameSize := len(q.items) == len(names)
-	q.mu.Unlock()
-
-	// heuristically skip expensive work
-	if sameSize {
-		return -1
-	}
-
-	set := make(map[string]struct{}, len(names))
-	for _, name := range names {
-		set[name] = struct{}{}
-	}
-
-	q.mu.Lock()
-	defer q.mu.Unlock()
-
-	count := 0
-	for name, item := range q.items {
-		if _, ok := set[name]; ok {
-			continue
-		}
-
-		if item.heapIdx >= 0 {
-			heap.Remove(&q.pq, item.heapIdx)
-		}
-		item.setIndexState("")
-		delete(q.items, name)
-		count++
-	}
-
-	metricQueueLen.Set(float64(len(q.pq)))
-	metricQueueCap.Set(float64(len(q.items)))
-
-	return count
 }
 
 // get returns the item for repoName. If the repoName hasn't been seen before,
@@ -178,21 +111,6 @@ func (q *Queue) get(repoName string) *queueItem {
 	}
 
 	return item
-}
-
-// setIndexedState will set indexedState and update the corresponding metrics
-// if the state is changing.
-func (item *queueItem) setIndexState(state indexState) {
-	if state == item.indexState {
-		return
-	}
-	if item.indexState != "" {
-		metricIndexState.WithLabelValues(string(item.indexState)).Dec()
-	}
-	item.indexState = state
-	if item.indexState != "" {
-		metricIndexState.WithLabelValues(string(item.indexState)).Inc()
-	}
 }
 
 // pqueue implements a priority queue via the interface for container/heap
@@ -233,18 +151,3 @@ func (pq *pqueue) Pop() interface{} {
 	*pq = old[0 : n-1]
 	return item
 }
-
-var (
-	metricQueueLen = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "index_queue_len",
-		Help: "The number of repositories in the index queue.",
-	})
-	metricQueueCap = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "index_queue_cap",
-		Help: "The number of repositories tracked by the index queue, including popped items. Should be the same as index_num_assigned.",
-	})
-	metricIndexState = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "index_state_count",
-		Help: "The count of repositories per the state of the last index.",
-	}, []string{"state"})
-)
