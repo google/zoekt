@@ -181,6 +181,12 @@ func (s *Server) Run() {
 
 			debug.Printf("updating index queue with %d repositories", len(repos))
 
+			// Stop indexing repos we don't need to track anymore
+			count := queue.MaybeRemoveMissing(repos)
+			if count > 0 {
+				log.Printf("stopped tracking %d repositories", count)
+			}
+
 			// getIndexOptions is IO bound on the gitserver service. So we do
 			// them concurrently.
 			sem := newSemaphore(32)
@@ -234,12 +240,13 @@ func (s *Server) Run() {
 		metricIndexDuration.WithLabelValues(string(state)).Observe(time.Since(start).Seconds())
 		if err != nil {
 			log.Printf("error indexing %s: %s", args.String(), err)
+			queue.SetLastIndexFailed(name)
 			continue
 		}
 		if state == indexStateSuccess {
 			log.Printf("updated index %s in %v", args.String(), time.Since(start))
 		}
-		queue.SetIndexed(name, opts)
+		queue.SetIndexed(name, opts, state)
 	}
 }
 
