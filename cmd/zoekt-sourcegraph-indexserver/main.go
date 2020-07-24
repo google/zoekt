@@ -240,12 +240,13 @@ func (s *Server) Run() {
 		metricIndexDuration.WithLabelValues(string(state)).Observe(time.Since(start).Seconds())
 		if err != nil {
 			log.Printf("error indexing %s: %s", args.String(), err)
+			queue.SetLastIndexFailed(name)
 			continue
 		}
 		if state == indexStateSuccess {
 			log.Printf("updated index %s in %v", args.String(), time.Since(start))
 		}
-		queue.SetIndexed(name, opts)
+		queue.SetIndexed(name, opts, state)
 	}
 }
 
