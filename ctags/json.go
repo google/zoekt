@@ -114,24 +114,34 @@ func (p *ctagsProcess) read(rep *reply) error {
 	return nil
 }
 
-func (p *ctagsProcess) post(req *request, content []byte) error {
+// universal-ctags line buffer size is only 1024.
+const ctagsLineBufferSize = 1024
+
+func (p *ctagsProcess) post(req *request, content []byte) (bool, error) {
 	body, err := json.Marshal(req)
 	if err != nil {
-		return err
+		return false, err
 	}
 	body = append(body, '\n')
+
+	// -1 for c-style string
+	if len(body) > ctagsLineBufferSize-1 {
+		return false, nil
+	}
+
 	if debug {
 		log.Printf("post %q", body)
 	}
 
 	if _, err = p.in.Write(body); err != nil {
-		return err
+		return false, err
 	}
+
 	_, err = p.in.Write(content)
 	if debug {
 		log.Println(string(content))
 	}
-	return err
+	return err == nil, err
 }
 
 type request struct {
@@ -148,6 +158,9 @@ type reply struct {
 
 	// completed
 	Command string `json:"command"`
+
+	// error
+	Message string `json:"message"`
 
 	// Ignore pattern: we don't use it and universal-ctags
 	// sometimes generates 'false' as value.
@@ -169,8 +182,11 @@ func (p *ctagsProcess) Parse(name string, content []byte) ([]*Entry, error) {
 		Filename: path.Base(name),
 	}
 
-	if err := p.post(&req, content); err != nil {
+	if ok, err := p.post(&req, content); err != nil {
 		return nil, err
+	} else if !ok {
+		log.Printf("ctags skipping file due to long filename: %s", name)
+		return nil, nil
 	}
 
 	var es []*Entry
