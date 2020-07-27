@@ -23,6 +23,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path"
 	"strings"
 	"sync"
 )
@@ -165,7 +166,7 @@ func (p *ctagsProcess) Parse(name string, content []byte) ([]*Entry, error) {
 	req := request{
 		Command:  "generate-tags",
 		Size:     len(content),
-		Filename: name,
+		Filename: path.Base(name),
 	}
 
 	if err := p.post(&req, content); err != nil {
