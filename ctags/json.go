@@ -195,24 +195,25 @@ func (p *ctagsProcess) Parse(name string, content []byte) ([]*Entry, error) {
 		if err := p.read(&rep); err != nil {
 			return nil, err
 		}
-		if rep.Typ == "completed" {
-			break
+		switch rep.Typ {
+		case "completed":
+			return es, nil
+		case "error":
+			return nil, fmt.Errorf("fatal ctags error for %s: %s", name, rep.Message)
+		case "tag":
+			es = append(es, &Entry{
+				Sym:        rep.Name,
+				Path:       rep.Path,
+				Parent:     rep.Scope,
+				ParentKind: rep.ScopeKind,
+				Line:       rep.Line,
+				Kind:       rep.Kind,
+				Language:   rep.Language,
+			})
+		default:
+			return nil, fmt.Errorf("ctags unexpected response %s for %s", rep.Typ, name)
 		}
-
-		e := Entry{
-			Sym:        rep.Name,
-			Path:       rep.Path,
-			Parent:     rep.Scope,
-			ParentKind: rep.ScopeKind,
-			Line:       rep.Line,
-			Kind:       rep.Kind,
-			Language:   rep.Language,
-		}
-
-		es = append(es, &e)
 	}
-
-	return es, nil
 }
 
 // scanner is like bufio.Scanner but skips long lines instead of returning
