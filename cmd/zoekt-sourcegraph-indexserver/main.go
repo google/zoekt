@@ -120,26 +120,86 @@ func init() {
 	client.Logger = debug
 }
 
-func (s *Server) loggedRun(tr trace.Trace, cmd *exec.Cmd) error {
-	out := &bytes.Buffer{}
-	errOut := &bytes.Buffer{}
+// our index commands should output something every 100mb they process. This
+// should be rather quick so 5m is more than enough time.
+const noOutputTimeout = 5 * time.Minute
+
+func (s *Server) loggedRun(tr trace.Trace, cmd *exec.Cmd) (err error) {
+	out := &synchronizedBuffer{}
 	cmd.Stdout = out
-	cmd.Stderr = errOut
+	cmd.Stderr = out
 
 	tr.LazyPrintf("%s", cmd.Args)
-	if err := cmd.Run(); err != nil {
-		outS := out.String()
-		errS := errOut.String()
-		tr.LazyPrintf("failed: %v", err)
-		tr.LazyPrintf("stdout: %s", outS)
-		tr.LazyPrintf("stderr: %s", errS)
-		tr.SetError()
-		return fmt.Errorf("command %s failed: %v\nOUT: %s\nERR: %s",
-			cmd.Args, err, outS, errS)
+
+	defer func() {
+		if err != nil {
+			outS := out.String()
+			tr.LazyPrintf("failed: %v", err)
+			tr.LazyPrintf("output: %s", out)
+			tr.SetError()
+			err = fmt.Errorf("command %s failed: %v\nOUT: %s", cmd.Args, err, outS)
+		}
+	}()
+
+	if err := cmd.Start(); err != nil {
+		return err
 	}
-	tr.LazyPrintf("success")
-	debug.Printf("ran successfully %s", cmd.Args)
-	return nil
+
+	errC := make(chan error)
+	go func() {
+		errC <- cmd.Wait()
+	}()
+
+	lastLen := 0
+	for {
+		select {
+		case <-time.After(noOutputTimeout):
+			// Periodically check if we have had output. If not kill the process.
+			if out.Len() != lastLen {
+				lastLen = out.Len()
+				log.Printf("still running %s", cmd.Args)
+			} else {
+				log.Printf("no output for %s, killing %s", noOutputTimeout, cmd.Args)
+				if err := cmd.Process.Kill(); err != nil {
+					log.Println("kill failed:", err)
+				}
+			}
+
+		case err := <-errC:
+			if err != nil {
+				return err
+			}
+
+			tr.LazyPrintf("success")
+			debug.Printf("ran successfully %s", cmd.Args)
+			return nil
+		}
+	}
+}
+
+// synchronizedBuffer wraps a strings.Builder with a mutex. Used so we can
+// monitor the buffer while it is being written to.
+type synchronizedBuffer struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (sb *synchronizedBuffer) Write(p []byte) (int, error) {
+	sb.mu.Lock()
+	defer sb.mu.Unlock()
+	return sb.b.Write(p)
+}
+
+func (sb *synchronizedBuffer) Len() int {
+	sb.mu.Lock()
+	defer sb.mu.Unlock()
+	return sb.b.Len()
+}
+
+func (sb *synchronizedBuffer) String() string {
+	sb.mu.Lock()
+	defer sb.mu.Unlock()
+	return sb.b.String()
 }
 
 func codeHostFromName(repoName string) string {
