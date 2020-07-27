@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha1"
 	"encoding/json"
 	"errors"
@@ -16,6 +17,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
@@ -131,6 +133,10 @@ func getIndexOptions(root *url.URL, repoName string) (IndexOptions, error) {
 }
 
 func archiveIndex(o *indexArgs, runCmd func(*exec.Cmd) error) error {
+	// An index should never take longer than an hour.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
+	defer cancel()
+
 	if len(o.Branches) != 1 {
 		return fmt.Errorf("zoekt-archive-index only supports 1 branch, got %v", o.Branches)
 	}
@@ -157,7 +163,7 @@ func archiveIndex(o *indexArgs, runCmd func(*exec.Cmd) error) error {
 
 	args = append(args, o.Root.ResolveReference(&url.URL{Path: fmt.Sprintf("/.internal/git/%s/tar/%s", o.Name, commit)}).String())
 
-	cmd := exec.Command("zoekt-archive-index", args...)
+	cmd := exec.CommandContext(ctx, "zoekt-archive-index", args...)
 	// Prevent prompting
 	cmd.Stdin = &bytes.Buffer{}
 	return runCmd(cmd)
@@ -168,6 +174,10 @@ func gitIndex(o *indexArgs, runCmd func(*exec.Cmd) error) error {
 		return errors.New("zoekt-git-index requires 1 or more branches")
 	}
 
+	// An index should never take longer than an hour.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
+	defer cancel()
+
 	gitDir, err := tmpGitDir(o.Name)
 	if err != nil {
 		return err
@@ -177,7 +187,7 @@ func gitIndex(o *indexArgs, runCmd func(*exec.Cmd) error) error {
 	// clone. So don't defer os.RemoveAll here
 
 	// Create a repo to fetch into
-	cmd := exec.Command("git", "init", "--bare", gitDir)
+	cmd := exec.CommandContext(ctx, "git", "init", "--bare", gitDir)
 	cmd.Stdin = &bytes.Buffer{}
 	if err := runCmd(cmd); err != nil {
 		return err
@@ -191,7 +201,7 @@ func gitIndex(o *indexArgs, runCmd func(*exec.Cmd) error) error {
 	for _, b := range o.Branches {
 		fetchArgs = append(fetchArgs, b.Version)
 	}
-	cmd = exec.Command("git", fetchArgs...)
+	cmd = exec.CommandContext(ctx, "git", fetchArgs...)
 	cmd.Stdin = &bytes.Buffer{}
 	if err := runCmd(cmd); err != nil {
 		return err
@@ -203,7 +213,7 @@ func gitIndex(o *indexArgs, runCmd func(*exec.Cmd) error) error {
 		if ref != "HEAD" {
 			ref = "refs/heads/" + ref
 		}
-		cmd = exec.Command("git", "-C", gitDir, "update-ref", ref, b.Version)
+		cmd = exec.CommandContext(ctx, "git", "-C", gitDir, "update-ref", ref, b.Version)
 		cmd.Stdin = &bytes.Buffer{}
 		if err := runCmd(cmd); err != nil {
 			return fmt.Errorf("failed update-ref %s to %s: %w", ref, b.Version, err)
@@ -211,7 +221,7 @@ func gitIndex(o *indexArgs, runCmd func(*exec.Cmd) error) error {
 	}
 
 	// zoekt.name is used by zoekt-git-index to set the repository name.
-	cmd = exec.Command("git", "-C", gitDir, "config", "zoekt.name", o.Name)
+	cmd = exec.CommandContext(ctx, "git", "-C", gitDir, "config", "zoekt.name", o.Name)
 	cmd.Stdin = &bytes.Buffer{}
 	if err := runCmd(cmd); err != nil {
 		return err
@@ -237,7 +247,7 @@ func gitIndex(o *indexArgs, runCmd func(*exec.Cmd) error) error {
 	args = append(args, o.BuildOptions().Args()...)
 	args = append(args, gitDir)
 
-	cmd = exec.Command("zoekt-git-index", args...)
+	cmd = exec.CommandContext(ctx, "zoekt-git-index", args...)
 	cmd.Stdin = &bytes.Buffer{}
 	if err := runCmd(cmd); err != nil {
 		return err
