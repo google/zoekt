@@ -318,9 +318,15 @@ func NewOr(qs ...Q) Q {
 // Branch limits search to a specific branch.
 type Branch struct {
 	Pattern string
+
+	// exact is true if we want to Pattern to equal branch.
+	Exact bool
 }
 
 func (q *Branch) String() string {
+	if q.Exact {
+		return fmt.Sprintf("branch=%q", q.Pattern)
+	}
 	return fmt.Sprintf("branch:%q", q.Pattern)
 }
 

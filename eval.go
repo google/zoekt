@@ -53,8 +53,7 @@ func (d *indexData) simplify(in query.Q) query.Q {
 			// New sub query is (or (branch branches[0]) ...)
 			qs := make([]query.Q, len(branches))
 			for i, branch := range branches {
-				// TODO we need exact matching, not pattern matching
-				qs[i] = &query.Branch{Pattern: branch}
+				qs[i] = &query.Branch{Pattern: branch, Exact: true}
 			}
 			return query.NewOr(qs...)
 		case *query.RepoSet:

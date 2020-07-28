@@ -736,7 +736,7 @@ func (d *indexData) newMatchTree(q query.Q) (matchTree, error) {
 			mask = 1
 		} else {
 			for nm, m := range d.branchIDs {
-				if strings.Contains(nm, s.Pattern) {
+				if (s.Exact && nm == s.Pattern) || (!s.Exact && strings.Contains(nm, s.Pattern)) {
 					mask |= uint64(m)
 				}
 			}
