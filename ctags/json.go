@@ -161,6 +161,7 @@ type reply struct {
 
 	// error
 	Message string `json:"message"`
+	Fatal   bool   `json:"fatal"`
 
 	// Ignore pattern: we don't use it and universal-ctags
 	// sometimes generates 'false' as value.
@@ -199,7 +200,11 @@ func (p *ctagsProcess) Parse(name string, content []byte) ([]*Entry, error) {
 		case "completed":
 			return es, nil
 		case "error":
-			return nil, fmt.Errorf("fatal ctags error for %s: %s", name, rep.Message)
+			if rep.Fatal {
+				return nil, fmt.Errorf("fatal ctags error for %s: %s", name, rep.Message)
+			} else {
+				log.Printf("ignoring non-fatal ctags error for %s: %s", name, rep.Message)
+			}
 		case "tag":
 			es = append(es, &Entry{
 				Sym:        rep.Name,
