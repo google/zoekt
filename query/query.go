@@ -148,7 +148,22 @@ func (q *RepoBranches) String() string {
 		sort.Strings(repos)
 		detail = strings.Join(repos, " ")
 	}
-	return fmt.Sprintf("(reposet %s)", detail)
+	return fmt.Sprintf("(repobranches %s)", detail)
+}
+
+// Branches returns a query representing the branches to search for name.
+func (q *RepoBranches) Branches(name string) Q {
+	branches, ok := q.Set[name]
+	if !ok {
+		return &Const{Value: false}
+	}
+
+	// New sub query is (or (branch branches[0]) ...)
+	qs := make([]Q, len(branches))
+	for i, branch := range branches {
+		qs[i] = &Branch{Pattern: branch, Exact: true}
+	}
+	return NewOr(qs...)
 }
 
 // MarshalBinary implements a specialized encoder for RepoBranches.

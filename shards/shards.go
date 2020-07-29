@@ -216,9 +216,6 @@ func selectRepoSet(shards []rankedShard, q query.Q) ([]rankedShard, query.Q) {
 	// (and (repobranches ...) (q))
 	// (and (repobranches ...) (q))
 
-	// TODO RepoBranches
-
-	// TODO implement optimization
 	for i, c := range and.Children {
 		var setSize int
 		var hasRepo func(string) bool
@@ -238,33 +235,55 @@ func selectRepoSet(shards []rankedShard, q query.Q) ([]rankedShard, query.Q) {
 			continue
 		}
 
+		// setSize may be larger than the number of shards we have. The size of
+		// filtered is bounded by min(len(set), len(shards))
+		if setSize > len(shards) {
+			setSize = len(shards)
+		}
+
 		filtered := make([]rankedShard, 0, setSize)
 
 		for _, s := range shards {
-			if repositorer, ok := s.Searcher.(repositorer); ok {
-				repo := repositorer.Repository()
-				if hasRepo(repo.Name) {
-					filtered = append(filtered, s)
-				}
+			if hasRepo(s.name) {
+				filtered = append(filtered, s)
 			}
 		}
 
-		if _, ok := c.(*query.RepoSet); ok {
-			// This optimization allows us to avoid the work done by
-			// indexData.simplify for each shard.
-			//
-			// For example if our query is (and (reposet foo bar) (content baz))
-			// then at this point filtered is [foo bar] and q is the same. For each
-			// shard indexData.simplify will simplify to (and true (content baz)) ->
-			// (content baz). This work can be done now once, rather than per shard.
-			and.Children[i] = &query.Const{Value: len(filtered) > 0}
+		// We don't need to adjust the query since we are returning an empty set
+		// of shards to search.
+		if len(filtered) == 0 {
+			return filtered, and
 		}
-		// TODO the same optimization for RepoBranches in the common case (all
-		// repos are searching HEAD)
+
+		// This optimization allows us to avoid the work done by
+		// indexData.simplify for each shard.
+		//
+		// For example if our query is (and (reposet foo bar) (content baz))
+		// then at this point filtered is [foo bar] and q is the same. For each
+		// shard indexData.simplify will simplify to (and true (content baz)) ->
+		// (content baz). This work can be done now once, rather than per shard.
+		if _, ok := c.(*query.RepoSet); ok {
+			and.Children[i] = &query.Const{Value: true}
+			return filtered, query.Simplify(and)
+		}
+		if b, ok := c.(*query.RepoBranches); ok {
+			// We can only replace if all the repos want the same branches.
+			want := b.Set[filtered[0].name]
+			for _, s := range filtered[1:] {
+				if !strSliceEqual(want, b.Set[s.name]) {
+					return filtered, and
+				}
+			}
+
+			// Every repo wants the same branches, so we can replace RepoBranches
+			// with a list of branch queries.
+			and.Children[i] = b.Branches(filtered[0].name)
+			return filtered, query.Simplify(and)
+		}
 
 		// Stop after first RepoSet, otherwise we might append duplicate
 		// shards to `filtered`
-		return filtered, query.Simplify(and)
+		return filtered, and
 	}
 
 	return shards, and
@@ -322,7 +341,9 @@ func (ss *shardedSearcher) Search(ctx context.Context, q query.Q, opts *zoekt.Se
 	start = time.Now()
 
 	shards := ss.getShards()
+	tr.LazyPrintf("before selectRepoSet shards:%d", len(shards))
 	shards, q = selectRepoSet(shards, q)
+	tr.LazyPrintf("after selectRepoSet shards:%d %s", len(shards), q)
 
 	all := make(chan shardResult, len(shards))
 
@@ -616,4 +637,16 @@ func loadShard(fn string) (zoekt.Searcher, error) {
 	}
 
 	return s, nil
+}
+
+func strSliceEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
