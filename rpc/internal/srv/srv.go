@@ -8,6 +8,10 @@ import (
 	"github.com/google/zoekt/query"
 )
 
+// defaultTimeout is the maximum amount of time a search request should
+// take. This is the same default used by Sourcegraph.
+const defaultTimeout = 20 * time.Second
+
 type SearchArgs struct {
 	Q    query.Q
 	Opts *zoekt.SearchOptions
@@ -30,8 +34,13 @@ type Searcher struct {
 }
 
 func (s *Searcher) Search(ctx context.Context, args *SearchArgs, reply *SearchReply) error {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
+	// Set a timeout if the user hasn't specified one.
+	if args.Opts != nil && args.Opts.MaxWallTime == 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, defaultTimeout)
+		defer cancel()
+	}
+
 	r, err := s.Searcher.Search(ctx, args.Q, args.Opts)
 	if err != nil {
 		return err
@@ -41,7 +50,7 @@ func (s *Searcher) Search(ctx context.Context, args *SearchArgs, reply *SearchRe
 }
 
 func (s *Searcher) List(ctx context.Context, args *ListArgs, reply *ListReply) error {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 	r, err := s.Searcher.List(ctx, args.Q)
 	if err != nil {
