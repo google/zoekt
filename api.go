@@ -316,6 +316,13 @@ type SearchOptions struct {
 	// Trim the number of results after collating and sorting the
 	// results
 	MaxDocDisplayCount int
+
+	// Trace turns on opentracing for this request if true and if the Jaeger address was provided as
+	// a command-line flag
+	Trace bool
+
+	// SpanContext is the opentracing span context, if it exists, from the zoekt client
+	SpanContext map[string]string
 }
 
 func (s *SearchOptions) String() string {

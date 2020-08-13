@@ -21,9 +21,8 @@ import (
 	"sort"
 	"strings"
 
-	"golang.org/x/net/trace"
-
 	"github.com/google/zoekt/query"
+	"golang.org/x/net/trace"
 )
 
 const maxUInt16 = 0xffff
