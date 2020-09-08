@@ -31,6 +31,7 @@ import (
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
+	"github.com/google/zoekt/ignore"
 
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -413,11 +414,19 @@ func IndexGitRepo(opts Options) error {
 			return err
 		}
 
+		ig, err := newIgnoreMatcher(tree)
+		if err != nil {
+			return err
+		}
+
 		files, subVersions, err := TreeToFiles(repo, tree, opts.BuildOptions.RepositoryDescription.URL, repoCache)
 		if err != nil {
 			return err
 		}
 		for k, v := range files {
+			if ig.Match(k.Path) {
+				continue
+			}
 			repos[k] = v
 			branchMap[k] = append(branchMap[k], b)
 		}
@@ -509,6 +518,21 @@ func IndexGitRepo(opts Options) error {
 		}
 	}
 	return builder.Finish()
+}
+
+func newIgnoreMatcher(tree *object.Tree) (*ignore.Matcher, error) {
+	ignoreFile, err := tree.File(ignore.IgnoreFile)
+	if err == object.ErrFileNotFound {
+		return &ignore.Matcher{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	content, err := ignoreFile.Contents()
+	if err != nil {
+		return nil, err
+	}
+	return ignore.ParseIgnoreFile(strings.NewReader(content))
 }
 
 func blobContents(blob *object.Blob) ([]byte, error) {
