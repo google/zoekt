@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 func TestFlags(t *testing.T) {
@@ -34,6 +35,11 @@ func TestFlags(t *testing.T) {
 		},
 	}}
 
+	ignored := []cmp.Option{
+		// depends on $PATH setting.
+		cmpopts.IgnoreFields(Options{}, "CTags"),
+	}
+
 	for _, c := range cases {
 		c.want.SetDefaults()
 
@@ -42,8 +48,8 @@ func TestFlags(t *testing.T) {
 		got.Flags(fs)
 		if err := fs.Parse(c.args); err != nil {
 			t.Errorf("failed to parse args %v: %v", c.args, err)
-		} else if !cmp.Equal(got, c.want) {
-			t.Errorf("mismatch for %v (-want +got):\n%s", c.args, cmp.Diff(c.want, got))
+		} else if d := cmp.Diff(c.want, got, ignored...); d != "" {
+			t.Errorf("mismatch for %v (-want +got):\n%s", c.args, d)
 		}
 	}
 }
