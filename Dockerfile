@@ -31,7 +31,6 @@ FROM alpine AS zoekt
 
 RUN apk add --no-cache git ca-certificates bind-tools tini
 
-COPY .ctags.d /.ctags.d
 COPY --from=ctags /usr/local/bin/universal-* /usr/local/bin/
 COPY --from=builder /go/bin/* /usr/local/bin/
 

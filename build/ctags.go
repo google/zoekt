@@ -102,7 +102,7 @@ func runCTags(bin string, inputs map[string][]byte) ([]*ctags.Entry, error) {
 			return nil, err
 		}
 
-		if len(e.Sym) == 1 {
+		if len(e.Name) == 1 {
 			continue
 		}
 		entries = append(entries, e)
@@ -243,7 +243,7 @@ func tagsToSections(content []byte, tags []*ctags.Entry) ([]zoekt.DocumentSectio
 			lastIntraEnd = 0
 		}
 
-		intraOff := lastIntraEnd + bytes.Index(line, []byte(t.Sym))
+		intraOff := lastIntraEnd + bytes.Index(line, []byte(t.Name))
 		if intraOff < 0 {
 			// for Go code, this is very common, since
 			// ctags barfs on multi-line declarations
@@ -256,21 +256,21 @@ func tagsToSections(content []byte, tags []*ctags.Entry) ([]zoekt.DocumentSectio
 			continue
 		}
 
-		endSym := start + uint32(len(t.Sym))
+		endSym := start + uint32(len(t.Name))
 
 		symOffsets = append(symOffsets, zoekt.DocumentSection{
 			Start: start,
 			End:   endSym,
 		})
 		symMetaData = append(symMetaData, &zoekt.Symbol{
-			Sym:        t.Sym,
+			Sym:        t.Name,
 			Kind:       t.Kind,
 			Parent:     t.Parent,
 			ParentKind: t.ParentKind,
 		})
 		lastEnd = endSym
 		lastLine = lineIdx
-		lastIntraEnd = intraOff + len(t.Sym)
+		lastIntraEnd = intraOff + len(t.Name)
 	}
 
 	return symOffsets, symMetaData, nil

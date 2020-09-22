@@ -8,7 +8,7 @@ require (
 	github.com/go-git/go-git/v5 v5.0.0
 	github.com/gobwas/glob v0.2.3
 	github.com/golang/protobuf v1.3.5 // indirect
-	github.com/google/go-cmp v0.4.0
+	github.com/google/go-cmp v0.5.2
 	github.com/google/go-github/v27 v27.0.6
 	github.com/google/slothfs v0.0.0-20190417171004-6b42407d9230
 	github.com/hashicorp/go-hclog v0.12.1 // indirect
@@ -20,6 +20,7 @@ require (
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/prometheus/client_golang v1.5.1
 	github.com/prometheus/procfs v0.0.10 // indirect
+	github.com/sourcegraph/go-ctags v0.0.0-20200922194603-960b260ecab0
 	github.com/uber/jaeger-client-go v2.25.0+incompatible
 	github.com/uber/jaeger-lib v2.2.0+incompatible
 	github.com/xanzy/go-gitlab v0.28.0

@@ -28,7 +28,7 @@ func TestTagsToSections(t *testing.T) {
 
 	tags := []*ctags.Entry{
 		{
-			Sym:  "bar",
+			Name: "bar",
 			Line: 2,
 		}}
 
@@ -48,11 +48,11 @@ func TestTagsToSectionsMultiple(t *testing.T) {
 
 	tags := []*ctags.Entry{
 		{
-			Sym:  "x",
+			Name: "x",
 			Line: 1,
 		},
 		{
-			Sym:  "b",
+			Name: "b",
 			Line: 1,
 		},
 	}
@@ -77,7 +77,7 @@ func TestTagsToSectionsEOF(t *testing.T) {
 
 	tags := []*ctags.Entry{
 		{
-			Sym:  "bar",
+			Name: "bar",
 			Line: 2,
 		}}
 

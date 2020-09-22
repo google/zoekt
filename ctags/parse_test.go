@@ -27,7 +27,7 @@ func TestParse(t *testing.T) {
 	cases := []testcase{
 		{`ABBREV_SHA	./gitiles-servlet/src/main/java/com/google/gitiles/CommitData.java	59;"	e	enum:CommitData.Field	file:`,
 			&Entry{
-				Sym:         "ABBREV_SHA",
+				Name:        "ABBREV_SHA",
 				Path:        "./gitiles-servlet/src/main/java/com/google/gitiles/CommitData.java",
 				Line:        59,
 				Kind:        "e",
@@ -38,7 +38,7 @@ func TestParse(t *testing.T) {
 		},
 		{`ACCESS_ATTRIBUTE	./gitiles-servlet/src/main/java/com/google/gitiles/CommitData.java	55;"	f	class:BaseServlet	file:`,
 			&Entry{
-				Sym:         "ACCESS_ATTRIBUTE",
+				Name:        "ACCESS_ATTRIBUTE",
 				Path:        "./gitiles-servlet/src/main/java/com/google/gitiles/CommitData.java",
 				Line:        55,
 				Kind:        "f",
