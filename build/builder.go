@@ -23,6 +23,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"math"
 	"net/url"
 	"os"
 	"os/exec"
@@ -351,17 +352,23 @@ func (b *Builder) AddFile(name string, content []byte) error {
 }
 
 func (b *Builder) Add(doc zoekt.Document) error {
-	// We could pass the document on to the shardbuilder, but if
-	// we pass through a part of the source tree with binary/large
-	// files, the corresponding shard would be mostly empty, so
-	// insert a reason here too.
-	if !b.opts.IgnoreSizeMax(doc.Name) {
-		if len(doc.Content) > b.opts.SizeMax {
-			doc.SkipReason = fmt.Sprintf("document size %d larger than limit %d", len(doc.Content), b.opts.SizeMax)
-		} else if err := zoekt.CheckText(doc.Content, b.opts.TrigramMax); err != nil {
-			doc.SkipReason = err.Error()
-			doc.Language = "binary"
-		}
+	allowLargeFile := b.opts.IgnoreSizeMax(doc.Name)
+
+	// Adjust trigramMax for allowed large files so we don't exclude them.
+	trigramMax := b.opts.TrigramMax
+	if allowLargeFile {
+		trigramMax = math.MaxInt64
+	}
+
+	if len(doc.Content) > b.opts.SizeMax && !allowLargeFile {
+		// We could pass the document on to the shardbuilder, but if
+		// we pass through a part of the source tree with binary/large
+		// files, the corresponding shard would be mostly empty, so
+		// insert a reason here too.
+		doc.SkipReason = fmt.Sprintf("document size %d larger than limit %d", len(doc.Content), b.opts.SizeMax)
+	} else if err := zoekt.CheckText(doc.Content, trigramMax); err != nil {
+		doc.SkipReason = err.Error()
+		doc.Language = "binary"
 	}
 
 	b.todo = append(b.todo, &doc)
