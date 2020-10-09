@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"log"
 	"math"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
@@ -231,12 +232,10 @@ func (s *Server) Run() {
 
 	// Start a goroutine which updates the queue with commits to index.
 	go func() {
-		t := time.NewTicker(s.Interval)
-		for {
+		for range jitterTicker(s.Interval) {
 			repos, err := listRepos(context.Background(), s.Hostname, s.Root, listIndexed(s.IndexDir))
 			if err != nil {
 				log.Println(err)
-				<-t.C
 				continue
 			}
 
@@ -288,8 +287,6 @@ func (s *Server) Run() {
 			tr.Finish()
 
 			<-cleanupDone
-
-			<-t.C
 		}
 	}()
 
@@ -331,6 +328,23 @@ func batched(slice []string, size int) <-chan []string {
 		close(c)
 	}()
 	return c
+}
+
+// jitterTicker returns a ticker which ticks with a jitter. Each tick is
+// uniformly selected from the range (d/2, d + d/2). It will tick on creation.
+func jitterTicker(d time.Duration) <-chan struct{} {
+	ticker := make(chan struct{})
+
+	go func() {
+		for {
+			ticker <- struct{}{}
+			ns := int64(d)
+			jitter := rand.Int63n(ns)
+			time.Sleep(time.Duration(ns/2 + jitter))
+		}
+	}()
+
+	return ticker
 }
 
 // Index starts an index job for repo name at commit.
