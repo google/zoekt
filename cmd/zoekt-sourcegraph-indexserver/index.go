@@ -36,6 +36,9 @@ type IndexOptions struct {
 
 	// Branches is a slice of branches to index.
 	Branches []zoekt.RepositoryBranch
+
+	// Error if not-empty indicates we failed to get the index options.
+	Error string
 }
 
 // indexArgs represents the arguments we pass to zoekt-archive-index
@@ -98,15 +101,14 @@ func (o *indexArgs) String() string {
 	return s
 }
 
-func getIndexOptions(root *url.URL, repoName string) (IndexOptions, error) {
+func getIndexOptions(root *url.URL, repos ...string) ([]IndexOptions, error) {
 	u := root.ResolveReference(&url.URL{
-		Path:     "/.internal/search/configuration",
-		RawQuery: "repo=" + url.QueryEscape(repoName),
+		Path: "/.internal/search/configuration",
 	})
 
-	resp, err := client.Get(u.String())
+	resp, err := client.PostForm(u.String(), url.Values{"repo": repos})
 	if err != nil {
-		return IndexOptions{}, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
@@ -114,19 +116,21 @@ func getIndexOptions(root *url.URL, repoName string) (IndexOptions, error) {
 		b, err := ioutil.ReadAll(io.LimitReader(resp.Body, 1024))
 		_ = resp.Body.Close()
 		if err != nil {
-			return IndexOptions{}, err
+			return nil, err
 		}
-		return IndexOptions{}, &url.Error{
+		return nil, &url.Error{
 			Op:  "Get",
 			URL: u.String(),
 			Err: fmt.Errorf("%s: %s", resp.Status, string(b)),
 		}
 	}
 
-	var opts IndexOptions
-	err = json.NewDecoder(resp.Body).Decode(&opts)
-	if err != nil {
-		return IndexOptions{}, fmt.Errorf("error decoding body: %w", err)
+	opts := make([]IndexOptions, len(repos))
+	dec := json.NewDecoder(resp.Body)
+	for i := range opts {
+		if err := dec.Decode(&opts[i]); err != nil {
+			return nil, fmt.Errorf("error decoding body: %w", err)
+		}
 	}
 
 	return opts, nil

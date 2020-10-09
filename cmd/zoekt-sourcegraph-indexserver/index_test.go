@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -19,7 +20,15 @@ import (
 func TestGetIndexOptions(t *testing.T) {
 	var response []byte
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if got, want := r.URL.String(), "/.internal/search/configuration?repo=test%2Frepo"; got != want {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if got, want := r.URL.String(), "/.internal/search/configuration"; got != want {
+			http.Error(w, fmt.Sprintf("got URL %v want %v", got, want), http.StatusBadRequest)
+			return
+		}
+		if got, want := r.Form, (url.Values{"repo": []string{"test/repo"}}); !reflect.DeepEqual(got, want) {
 			http.Error(w, fmt.Sprintf("got URL %v want %v", got, want), http.StatusBadRequest)
 			return
 		}
@@ -57,9 +66,9 @@ func TestGetIndexOptions(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		if !cmp.Equal(got, want) {
+		if d := cmp.Diff(want, got[0]); d != "" {
 			t.Log("response", r)
-			t.Errorf("mismatch (-want +got):\n%s", cmp.Diff(want, got))
+			t.Errorf("mismatch (-want +got):\n%s", d)
 		}
 	}
 }

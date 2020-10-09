@@ -48,6 +48,11 @@ var (
 		Buckets: prometheus.ExponentialBuckets(.25, 2, 4), // 250ms -> 2s
 	}, []string{"success"}) // success=true|false
 
+	metricGetIndexOptionsError = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "get_index_options_error_total",
+		Help: "The total number of times we failed to get index options for a repository.",
+	})
+
 	metricIndexDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "index_repo_seconds",
 		Help:    "A histogram of latencies for indexing a repository.",
@@ -247,39 +252,42 @@ func (s *Server) Run() {
 				log.Printf("stopped tracking %d repositories", count)
 			}
 
-			// getIndexOptions is IO bound on the gitserver service. So we do
-			// them concurrently.
-			sem := newSemaphore(32)
-
-			// Cleanup job to trash unused shards
-			sem.Acquire()
+			cleanupDone := make(chan struct{})
 			go func() {
-				defer sem.Release()
+				defer close(cleanupDone)
 				cleanup(s.IndexDir, repos, time.Now())
 			}()
 
+			start := time.Now()
 			tr := trace.New("getIndexOptions", "")
 			tr.LazyPrintf("getting index options for %d repos", len(repos))
-			start := time.Now()
-			for _, name := range repos {
-				sem.Acquire()
-				go func(name string) {
-					defer sem.Release()
-					start := time.Now()
-					opts, err := getIndexOptions(s.Root, name)
-					if err != nil {
-						metricResolveRevisionDuration.WithLabelValues("false").Observe(time.Since(start).Seconds())
-						tr.LazyPrintf("failed fetching options for %v: %v", name, err)
+
+			// We ask the frontend to get index options in batches.
+			for repos := range batched(repos, 1000) {
+				start := time.Now()
+				opts, err := getIndexOptions(s.Root, repos...)
+				if err != nil {
+					metricResolveRevisionDuration.WithLabelValues("false").Observe(time.Since(start).Seconds())
+					tr.LazyPrintf("failed fetching options batch: %v", err)
+					tr.SetError()
+					continue
+				}
+				metricResolveRevisionDuration.WithLabelValues("true").Observe(time.Since(start).Seconds())
+				for i, opt := range opts {
+					name := repos[i]
+					if opt.Error != "" {
+						metricGetIndexOptionsError.Inc()
+						tr.LazyPrintf("failed fetching options for %v: %v", name, opt.Error)
 						tr.SetError()
-						return
+						continue
 					}
-					metricResolveRevisionDuration.WithLabelValues("true").Observe(time.Since(start).Seconds())
-					queue.AddOrUpdate(name, opts)
-				}(name)
+					queue.AddOrUpdate(name, opt)
+				}
 			}
-			sem.Wait()
 			metricResolveRevisionsDuration.Observe(time.Since(start).Seconds())
 			tr.Finish()
+
+			<-cleanupDone
 
 			<-t.C
 		}
@@ -308,6 +316,21 @@ func (s *Server) Run() {
 		}
 		queue.SetIndexed(name, opts, state)
 	}
+}
+
+func batched(slice []string, size int) <-chan []string {
+	c := make(chan []string)
+	go func() {
+		for len(slice) > 0 {
+			if size > len(slice) {
+				size = len(slice)
+			}
+			c <- slice[:size]
+			slice = slice[size:]
+		}
+		close(c)
+	}()
+	return c
 }
 
 // Index starts an index job for repo name at commit.
@@ -437,7 +460,7 @@ func (s *Server) forceIndex(name string) (string, error) {
 	}
 	args := s.defaultArgs()
 	args.Name = name
-	args.IndexOptions = opts
+	args.IndexOptions = opts[0]
 	args.Incremental = false // force re-index
 	state, err := s.Index(args)
 	if err != nil {
