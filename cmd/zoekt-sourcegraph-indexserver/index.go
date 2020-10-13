@@ -36,9 +36,6 @@ type IndexOptions struct {
 
 	// Branches is a slice of branches to index.
 	Branches []zoekt.RepositoryBranch
-
-	// Error if not-empty indicates we failed to get the index options.
-	Error string
 }
 
 // indexArgs represents the arguments we pass to zoekt-archive-index
@@ -101,7 +98,14 @@ func (o *indexArgs) String() string {
 	return s
 }
 
-func getIndexOptions(root *url.URL, repos ...string) ([]IndexOptions, error) {
+// indexOptionsItem wraps IndexOptions to also include an error returned by
+// the API.
+type indexOptionsItem struct {
+	IndexOptions
+	Error string
+}
+
+func getIndexOptions(root *url.URL, repos ...string) ([]indexOptionsItem, error) {
 	u := root.ResolveReference(&url.URL{
 		Path: "/.internal/search/configuration",
 	})
@@ -125,7 +129,7 @@ func getIndexOptions(root *url.URL, repos ...string) ([]IndexOptions, error) {
 		}
 	}
 
-	opts := make([]IndexOptions, len(repos))
+	opts := make([]indexOptionsItem, len(repos))
 	dec := json.NewDecoder(resp.Body)
 	for i := range opts {
 		if err := dec.Decode(&opts[i]); err != nil {

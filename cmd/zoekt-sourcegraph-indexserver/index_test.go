@@ -41,7 +41,7 @@ func TestGetIndexOptions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cases := map[string]IndexOptions{
+	cases := map[string]*IndexOptions{
 		`{"Symbols": true, "LargeFiles": ["foo","bar"]}`: {
 			Symbols:    true,
 			LargeFiles: []string{"foo", "bar"},
@@ -56,17 +56,22 @@ func TestGetIndexOptions(t *testing.T) {
 		`{"Symbols": true}`: {
 			Symbols: true,
 		},
+
+		`{"Error": "boom"}`: nil,
 	}
 
 	for r, want := range cases {
 		response = []byte(r)
 
 		got, err := getIndexOptions(u, "test/repo")
-		if err != nil {
+		if err != nil && want != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
+		if want == nil {
+			continue
+		}
 
-		if d := cmp.Diff(want, got[0]); d != "" {
+		if d := cmp.Diff(*want, got[0].IndexOptions); d != "" {
 			t.Log("response", r)
 			t.Errorf("mismatch (-want +got):\n%s", d)
 		}

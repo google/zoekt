@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"html/template"
@@ -280,7 +281,7 @@ func (s *Server) Run() {
 						tr.SetError()
 						continue
 					}
-					queue.AddOrUpdate(name, opt)
+					queue.AddOrUpdate(name, opt.IndexOptions)
 				}
 			}
 			metricResolveRevisionsDuration.Observe(time.Since(start).Seconds())
@@ -472,9 +473,13 @@ func (s *Server) forceIndex(name string) (string, error) {
 	if err != nil {
 		return fmt.Sprintf("Indexing %s failed: %v", name, err), err
 	}
+	if errS := opts[0].Error; errS != "" {
+		return fmt.Sprintf("Indexing %s failed: %s", name, errS), errors.New(errS)
+	}
+
 	args := s.defaultArgs()
 	args.Name = name
-	args.IndexOptions = opts[0]
+	args.IndexOptions = opts[0].IndexOptions
 	args.Incremental = false // force re-index
 	state, err := s.Index(args)
 	if err != nil {
