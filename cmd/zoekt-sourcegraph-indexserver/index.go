@@ -16,6 +16,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -36,6 +37,9 @@ type IndexOptions struct {
 
 	// Branches is a slice of branches to index.
 	Branches []zoekt.RepositoryBranch
+
+	// RepoID is the Sourcegraph Repository ID.
+	RepoID int32
 }
 
 // indexArgs represents the arguments we pass to zoekt-archive-index
@@ -233,6 +237,19 @@ func gitIndex(o *indexArgs, runCmd func(*exec.Cmd) error) error {
 	cmd.Stdin = &bytes.Buffer{}
 	if err := runCmd(cmd); err != nil {
 		return err
+	}
+
+	// zoekt.repoid will store the Sourcegraph repository ID under
+	// zoekt.Repository.RawConfig.
+	//
+	// NOTE(keegan): 2020-08-13 This is currently not read anywhere. We are
+	// setting it so in a few releases all indexes should have it set.
+	if o.IndexOptions.RepoID > 0 {
+		cmd = exec.CommandContext(ctx, "git", "-C", gitDir, "config", "zoekt.repoid", strconv.Itoa(int(o.IndexOptions.RepoID)))
+		cmd.Stdin = &bytes.Buffer{}
+		if err := runCmd(cmd); err != nil {
+			return err
+		}
 	}
 
 	args := []string{

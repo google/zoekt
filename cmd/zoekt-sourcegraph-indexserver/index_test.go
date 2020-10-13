@@ -57,6 +57,10 @@ func TestGetIndexOptions(t *testing.T) {
 			Symbols: true,
 		},
 
+		`{"RepoID": 123}`: {
+			RepoID: 123,
+		},
+
 		`{"Error": "boom"}`: nil,
 	}
 
@@ -106,6 +110,27 @@ func TestIndex(t *testing.T) {
 			"git -C $TMPDIR/test%2Frepo.git -c protocol.version=2 fetch --depth=1 http://api.test/.internal/git/test/repo deadbeef",
 			"git -C $TMPDIR/test%2Frepo.git update-ref HEAD deadbeef",
 			"git -C $TMPDIR/test%2Frepo.git config zoekt.name test/repo",
+			"zoekt-git-index -submodules=false -branches HEAD -disable_ctags $TMPDIR/test%2Frepo.git",
+		},
+	}, {
+		name: "minimal-id",
+		args: indexArgs{
+			Root: root,
+			Name: "test/repo",
+			IndexOptions: IndexOptions{
+				Branches: []zoekt.RepositoryBranch{{Name: "HEAD", Version: "deadbeef"}},
+				RepoID:   123,
+			},
+		},
+		wantArchive: []string{
+			"zoekt-archive-index -name test/repo -commit deadbeef -branch HEAD -disable_ctags http://api.test/.internal/git/test/repo/tar/deadbeef",
+		},
+		wantGit: []string{
+			"git init --bare $TMPDIR/test%2Frepo.git",
+			"git -C $TMPDIR/test%2Frepo.git -c protocol.version=2 fetch --depth=1 http://api.test/.internal/git/test/repo deadbeef",
+			"git -C $TMPDIR/test%2Frepo.git update-ref HEAD deadbeef",
+			"git -C $TMPDIR/test%2Frepo.git config zoekt.name test/repo",
+			"git -C $TMPDIR/test%2Frepo.git config zoekt.repoid 123",
 			"zoekt-git-index -submodules=false -branches HEAD -disable_ctags $TMPDIR/test%2Frepo.git",
 		},
 	}, {
