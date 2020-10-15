@@ -73,13 +73,21 @@ type indexArgs struct {
 // BuildOptions returns a build.Options represented by indexArgs. Note: it
 // doesn't set fields like repository/branch.
 func (o *indexArgs) BuildOptions() *build.Options {
+	rawConfig := map[string]string{}
+	if o.IndexOptions.RepoID > 0 {
+		// NOTE(keegan): 2020-08-13 This is currently not read anywhere. We are
+		// setting it so in a few releases all indexes should have it set.
+		rawConfig["repoid"] = strconv.Itoa(int(o.IndexOptions.RepoID))
+	}
+
 	return &build.Options{
 		// It is important that this RepositoryDescription exactly matches
 		// what the indexer we call will produce. This is to ensure that
 		// IncrementalSkipIndexing returns true if nothing needs to be done.
 		RepositoryDescription: zoekt.Repository{
-			Name:     o.Name,
-			Branches: o.Branches,
+			Name:      o.Name,
+			Branches:  o.Branches,
+			RawConfig: rawConfig,
 		},
 		IndexDir:         o.IndexDir,
 		Parallelism:      o.Parallelism,
@@ -186,6 +194,8 @@ func gitIndex(o *indexArgs, runCmd func(*exec.Cmd) error) error {
 		return errors.New("zoekt-git-index requires 1 or more branches")
 	}
 
+	buildOptions := o.BuildOptions()
+
 	// An index should never take longer than an hour.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 	defer cancel()
@@ -239,13 +249,8 @@ func gitIndex(o *indexArgs, runCmd func(*exec.Cmd) error) error {
 		return err
 	}
 
-	// zoekt.repoid will store the Sourcegraph repository ID under
-	// zoekt.Repository.RawConfig.
-	//
-	// NOTE(keegan): 2020-08-13 This is currently not read anywhere. We are
-	// setting it so in a few releases all indexes should have it set.
-	if o.IndexOptions.RepoID > 0 {
-		cmd = exec.CommandContext(ctx, "git", "-C", gitDir, "config", "zoekt.repoid", strconv.Itoa(int(o.IndexOptions.RepoID)))
+	for key, value := range buildOptions.RepositoryDescription.RawConfig {
+		cmd = exec.CommandContext(ctx, "git", "-C", gitDir, "config", "zoekt."+key, value)
 		cmd.Stdin = &bytes.Buffer{}
 		if err := runCmd(cmd); err != nil {
 			return err
@@ -269,7 +274,7 @@ func gitIndex(o *indexArgs, runCmd func(*exec.Cmd) error) error {
 	}
 	args = append(args, "-branches", strings.Join(branches, ","))
 
-	args = append(args, o.BuildOptions().Args()...)
+	args = append(args, buildOptions.Args()...)
 	args = append(args, gitDir)
 
 	cmd = exec.CommandContext(ctx, "zoekt-git-index", args...)
