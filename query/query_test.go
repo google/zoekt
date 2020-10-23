@@ -27,7 +27,7 @@ func TestQueryString(t *testing.T) {
 		&And{[]Q{
 			&Substring{Pattern: "hoi"},
 			&Not{&Substring{Pattern: "hai"}},
-		}}}}
+		}, true}}}
 	got := q.String()
 	want := `(or (and substr:"hoi" (not substr:"hai")))`
 

@@ -49,12 +49,12 @@ func LowerRegexp(r *syntax.Regexp) *syntax.Regexp {
 // it returns true. An equivalent query has the same behaviour as the original
 // regexp and can be used instead.
 func RegexpToQuery(r *syntax.Regexp, minTextSize int) (query Q, isEquivalent bool) {
-	q, isEq := regexpToQueryRecursive(r, minTextSize)
+	q, isEq, _ := regexpToQueryRecursive(r, minTextSize)
 	q = Simplify(q)
 	return q, isEq
 }
 
-func regexpToQueryRecursive(r *syntax.Regexp, minTextSize int) (query Q, isEquivalent bool) {
+func regexpToQueryRecursive(r *syntax.Regexp, minTextSize int) (query Q, isEquivalent bool, noNewline bool) {
 	// TODO - we could perhaps transform Begin/EndText in '\n'?
 	// TODO - we could perhaps transform CharClass in (OrQuery )
 	// if there are just a few runes, and part of a OpConcat?
@@ -62,7 +62,7 @@ func regexpToQueryRecursive(r *syntax.Regexp, minTextSize int) (query Q, isEquiv
 	case syntax.OpLiteral:
 		s := string(r.Rune)
 		if len(s) >= minTextSize {
-			return &Substring{Pattern: s}, true
+			return &Substring{Pattern: s}, true, true
 		}
 	case syntax.OpCapture:
 		return regexpToQueryRecursive(r.Sub[0], minTextSize)
@@ -78,21 +78,27 @@ func regexpToQueryRecursive(r *syntax.Regexp, minTextSize int) (query Q, isEquiv
 	case syntax.OpConcat, syntax.OpAlternate:
 		var qs []Q
 		isEq := true
+		noNewline = true
 		for _, sr := range r.Sub {
-			if sq, sm := regexpToQueryRecursive(sr, minTextSize); sq != nil {
+			if sq, sm, subNoNewline := regexpToQueryRecursive(sr, minTextSize); sq != nil {
 				if !sm {
 					isEq = false
 				}
 				qs = append(qs, sq)
+				noNewline = noNewline && subNoNewline
 			}
 		}
 		if r.Op == syntax.OpConcat {
 			if len(qs) > 1 {
 				isEq = false
 			}
-			return &And{qs}, isEq
+			return &And{qs, noNewline}, isEq, noNewline
 		}
-		return &Or{qs}, isEq
+		return &Or{qs}, isEq, false
+	case syntax.OpStar:
+		if r.Sub[0].Op == syntax.OpAnyCharNotNL {
+			return &Const{true}, false, true
+		}
 	}
-	return &Const{true}, false
+	return &Const{true}, false, false
 }

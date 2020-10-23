@@ -67,20 +67,28 @@ func TestRegexpParse(t *testing.T) {
 			}},
 			&Substring{Pattern: "baz"},
 			&Substring{Pattern: "bla"},
-		}}, false},
+		}, false}, false},
 		{"^[a-z](People)+barrabas$",
 			&And{[]Q{
 				&Substring{Pattern: "People"},
 				&Substring{Pattern: "barrabas"},
-			}}, false},
+			}, false}, false},
 		{"foo", &Substring{Pattern: "foo"}, true},
 		{"^foo", &Substring{Pattern: "foo"}, false},
-		{"(foo) (bar)", &And{[]Q{&Substring{Pattern: "foo"}, &Substring{Pattern: "bar"}}}, false},
+		{"(foo) (bar)", &And{[]Q{&Substring{Pattern: "foo"}, &Substring{Pattern: "bar"}}, false}, false},
 		{"(thread|needle|haystack)", &Or{[]Q{
 			&Substring{Pattern: "thread"},
 			&Substring{Pattern: "needle"},
 			&Substring{Pattern: "haystack"},
 		}}, true},
+		{"(foo)(?-s:.)*?(bar)", &And{[]Q{
+			&Substring{Pattern: "foo"},
+			&Substring{Pattern: "bar"},
+		}, true}, false},
+		{"(foo)(?-s:.)*?[[:space:]](?-s:.)*?(bar)", &And{[]Q{
+			&Substring{Pattern: "foo"},
+			&Substring{Pattern: "bar"},
+		}, false}, false},
 	}
 
 	for _, c := range cases {
@@ -98,6 +106,15 @@ func TestRegexpParse(t *testing.T) {
 		if isEq != c.isEquivalent {
 			printRegexp(t, r, 0)
 			t.Errorf("regexpToQuery(%q): got %v, want %v", c.in, isEq, c.isEquivalent)
+		}
+		if want, ok := c.query.(*And); ok {
+			got, ok := query.(*And)
+			if !ok {
+				t.Errorf("regexpToQuery(%q): got %s, want %s", c.in, reflect.TypeOf(query), reflect.TypeOf(c.query))
+			}
+			if want.NoNewline != got.NoNewline {
+				t.Errorf("regexpToQuery(%q): got %t, want %t", c.in, got.NoNewline, want.NoNewline)
+			}
 		}
 	}
 }
