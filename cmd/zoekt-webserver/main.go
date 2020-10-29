@@ -220,11 +220,27 @@ func main() {
 	debugserver.AddHandlers(handler, *enablePprof)
 	handler.HandleFunc("/healthz", healthz)
 
+	// Sourcegraph: We use environment variables to configure watchdog since
+	// they are more convenient than flags in containerized environments.
+	watchdogTick := 30 * time.Second
+	if v := os.Getenv("ZOEKT_WATCHDOG_TICK"); v != "" {
+		watchdogTick, _ = time.ParseDuration(v)
+		log.Printf("custom ZOEKT_WATCHDOG_TICK=%v", watchdogTick)
+	}
+	watchdogErrCount := 3
+	if v := os.Getenv("ZOEKT_WATCHDOG_ERRORS"); v != "" {
+		watchdogErrCount, _ = strconv.Atoi(v)
+		log.Printf("custom ZOEKT_WATCHDOG_ERRORS=%d", watchdogErrCount)
+	}
 	watchdogAddr := "http://" + *listen
 	if *sslCert != "" || *sslKey != "" {
 		watchdogAddr = "https://" + *listen
 	}
-	go watchdog(30*time.Second, watchdogAddr)
+	if watchdogErrCount > 0 && watchdogTick > 0 {
+		go watchdog(watchdogTick, watchdogErrCount, watchdogAddr)
+	} else {
+		log.Println("watchdog disabled")
+	}
 
 	srv := &http.Server{Addr: *listen, Handler: handler}
 
@@ -327,7 +343,7 @@ func watchdogOnce(ctx context.Context, client *http.Client, addr string) error {
 	return nil
 }
 
-func watchdog(dt time.Duration, addr string) {
+func watchdog(dt time.Duration, maxErrCount int, addr string) {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
@@ -337,7 +353,6 @@ func watchdog(dt time.Duration, addr string) {
 	tick := time.NewTicker(dt)
 
 	errCount := 0
-	maxErrCount := 3
 	for range tick.C {
 		err := watchdogOnce(context.Background(), client, addr)
 		if err != nil {
