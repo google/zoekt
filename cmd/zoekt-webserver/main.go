@@ -43,6 +43,7 @@ import (
 	"github.com/google/zoekt/web"
 	"github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"go.uber.org/automaxprocs/maxprocs"
 
 	"github.com/uber/jaeger-client-go"
@@ -303,6 +304,8 @@ func healthz(w http.ResponseWriter, req *http.Request) {
 }
 
 func watchdogOnce(ctx context.Context, client *http.Client, addr string) error {
+	defer metricWatchdogTotal.Inc()
+
 	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(30*time.Second))
 	defer cancel()
 
@@ -334,15 +337,22 @@ func watchdog(dt time.Duration, addr string) {
 	tick := time.NewTicker(dt)
 
 	errCount := 0
+	maxErrCount := 3
 	for range tick.C {
 		err := watchdogOnce(context.Background(), client, addr)
 		if err != nil {
 			errCount++
-		} else {
+			metricWatchdogErrors.Set(float64(errCount))
+			metricWatchdogErrorsTotal.Inc()
+			if errCount >= maxErrCount {
+				log.Panicf("watchdog: %v", err)
+			} else {
+				log.Printf("watchdog: failed, will try %d more times: %v", maxErrCount-errCount, err)
+			}
+		} else if errCount > 0 {
 			errCount = 0
-		}
-		if errCount == 3 {
-			log.Panicf("watchdog: %v", err)
+			metricWatchdogErrors.Set(float64(errCount))
+			log.Printf("watchdog: success, resetting error count")
 		}
 	}
 }
@@ -419,3 +429,18 @@ func initializeJaeger() {
 	}
 	opentracing.SetGlobalTracer(tracer)
 }
+
+var (
+	metricWatchdogErrors = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "zoekt_webserver_watchdog_errors",
+		Help: "The current error count for zoekt watchdog.",
+	})
+	metricWatchdogTotal = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "zoekt_webserver_watchdog_total",
+		Help: "The total number of requests done by zoekt watchdog.",
+	})
+	metricWatchdogErrorsTotal = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "zoekt_webserver_watchdog_errors_total",
+		Help: "The total number of errors from zoekt watchdog.",
+	})
+)
