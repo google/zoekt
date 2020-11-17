@@ -215,3 +215,5 @@ gopkg.in/yaml.v2 v2.2.5/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=
 gopkg.in/yaml.v2 v2.2.8 h1:obN1ZagJSUGI0Ek/LBmuj4SNLPfIny3KsKFopxRdj10=
 gopkg.in/yaml.v2 v2.2.8/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=
 honnef.co/go/tools v0.0.1-2019.2.3/go.mod h1:a3bituU0lyd329TUQxRnasdCoJDkEUEAqEt0JzvZhAg=
+humungus.tedunangst.com/r/gerc v0.1.2 h1:eW5yTbRLFFWSu/RpTdkLxaVPlNlFUzxc02VQsftzg64=
+humungus.tedunangst.com/r/gerc v0.1.2/go.mod h1:tuYnDVV3WEGI9NEX5/3Iz5xVNimFzN4+83qZvFf/GUg=
