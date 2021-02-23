@@ -162,12 +162,30 @@ func NewDirectorySearcher(dir string) (zoekt.Searcher, error) {
 	tl := &loader{
 		ss: ss,
 	}
-	_, err := NewDirectoryWatcher(dir, tl)
+	dw, err := NewDirectoryWatcher(dir, tl)
 	if err != nil {
 		return nil, err
 	}
 
-	return &typeRepoSearcher{ss}, nil
+	ds := &directorySearcher{
+		Searcher:         ss,
+		directoryWatcher: dw,
+	}
+
+	return &typeRepoSearcher{Searcher: ds}, nil
+}
+
+type directorySearcher struct {
+	zoekt.Searcher
+
+	directoryWatcher Stopper
+}
+
+func (s *directorySearcher) Close() {
+	// We need to Stop directoryWatcher first since it calls load/unload on
+	// Searcher.
+	s.directoryWatcher.Stop()
+	s.Searcher.Close()
 }
 
 type loader struct {
@@ -201,6 +219,7 @@ func (ss *shardedSearcher) Close() {
 	for _, s := range ss.shards {
 		s.Close()
 	}
+	ss.shards = make(map[string]rankedShard)
 }
 
 func selectRepoSet(shards []rankedShard, q query.Q) ([]rankedShard, query.Q) {
