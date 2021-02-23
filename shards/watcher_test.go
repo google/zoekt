@@ -65,7 +65,7 @@ func TestDirWatcherUnloadOnce(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewDirectoryWatcher: %v", err)
 	}
-	defer dw.Close()
+	defer dw.Stop()
 
 	if got := <-logger.loads; got != shard {
 		t.Fatalf("got load event %v, want %v", got, shard)
@@ -95,7 +95,7 @@ func TestDirWatcherUnloadOnce(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	dw.Close()
+	dw.Stop()
 
 	select {
 	case k := <-logger.loads:

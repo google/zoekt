@@ -156,12 +156,28 @@ func NewDirectorySearcher(dir string) (zoekt.Searcher, error) {
 	tl := &loader{
 		ss: ss,
 	}
-	_, err := NewDirectoryWatcher(dir, tl)
+	dw, err := NewDirectoryWatcher(dir, tl)
 	if err != nil {
 		return nil, err
 	}
 
-	return ss, nil
+	return &directorySearcher{
+		Searcher:         ss,
+		directoryWatcher: dw,
+	}, nil
+}
+
+type directorySearcher struct {
+	zoekt.Searcher
+
+	directoryWatcher Stopper
+}
+
+func (s *directorySearcher) Close() {
+	// We need to Stop directoryWatcher first since it calls load/unload on
+	// Searcher.
+	s.directoryWatcher.Stop()
+	s.Searcher.Close()
 }
 
 type loader struct {
