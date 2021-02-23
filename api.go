@@ -157,6 +157,7 @@ func (s *Stats) Add(o Stats) {
 	s.NgramMatches += o.NgramMatches
 	s.ShardFilesConsidered += o.ShardFilesConsidered
 	s.ShardsSkipped += o.ShardsSkipped
+	s.Wait += o.Wait
 }
 
 // SearchResult contains search matches and extra data
@@ -358,4 +359,15 @@ type SearchOptions struct {
 
 func (s *SearchOptions) String() string {
 	return fmt.Sprintf("%#v", s)
+}
+
+// Sender is the interface that wraps the basic Send method.
+type Sender interface {
+	Send(*SearchResult)
+}
+
+// Streamer adds the method StreamSearch to the Searcher interface.
+type Streamer interface {
+	Searcher
+	StreamSearch(ctx context.Context, q query.Q, opts *SearchOptions, sender Sender) (err error)
 }

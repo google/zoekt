@@ -22,12 +22,15 @@ import (
 	"runtime"
 	"runtime/debug"
 	"sort"
+	"sync"
 	"time"
 
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/query"
+	"github.com/google/zoekt/stream"
 	"github.com/google/zoekt/trace"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -157,7 +160,7 @@ func newShardedSearcher(n int64) *shardedSearcher {
 
 // NewDirectorySearcher returns a searcher instance that loads all
 // shards corresponding to a glob into memory.
-func NewDirectorySearcher(dir string) (zoekt.Searcher, error) {
+func NewDirectorySearcher(dir string) (zoekt.Streamer, error) {
 	ss := newShardedSearcher(int64(runtime.GOMAXPROCS(0)))
 	tl := &loader{
 		ss: ss,
@@ -310,6 +313,100 @@ func selectRepoSet(shards []rankedShard, q query.Q) ([]rankedShard, query.Q) {
 
 func (ss *shardedSearcher) Search(ctx context.Context, q query.Q, opts *zoekt.SearchOptions) (sr *zoekt.SearchResult, err error) {
 	tr, ctx := trace.New(ctx, "shardedSearcher.Search", "")
+	defer func() {
+		if sr != nil {
+			tr.LazyPrintf("num files: %d", len(sr.Files))
+			tr.LazyPrintf("stats: %+v", sr.Stats)
+		}
+	}()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	aggregate := struct {
+		sync.Mutex
+		*zoekt.SearchResult
+	}{
+		SearchResult: &zoekt.SearchResult{
+			RepoURLs:      map[string]string{},
+			LineFragments: map[string]string{},
+		},
+	}
+
+	start := time.Now()
+	if err := ss.rlock(ctx); err != nil {
+		return nil, err
+	}
+	defer ss.runlock()
+	tr.LazyPrintf("acquired lock")
+	aggregate.Wait = time.Since(start)
+	start = time.Now()
+
+	err = ss.streamSearch(ctx, q, opts, stream.SenderFunc(func(r *zoekt.SearchResult) {
+		aggregate.Lock()
+		defer aggregate.Unlock()
+
+		aggregate.Stats.Add(r.Stats)
+
+		if len(r.Files) > 0 {
+			aggregate.Files = append(aggregate.Files, r.Files...)
+
+			for k, v := range r.RepoURLs {
+				aggregate.RepoURLs[k] = v
+			}
+			for k, v := range r.LineFragments {
+				aggregate.LineFragments[k] = v
+			}
+		}
+
+		if cancel != nil && opts.TotalMaxMatchCount > 0 && aggregate.Stats.MatchCount > opts.TotalMaxMatchCount {
+			cancel()
+			cancel = nil
+		}
+	}))
+	if err != nil {
+		return nil, err
+	}
+
+	zoekt.SortFilesByScore(aggregate.Files)
+	if max := opts.MaxDocDisplayCount; max > 0 && len(aggregate.Files) > max {
+		aggregate.Files = aggregate.Files[:max]
+	}
+	copyFiles(aggregate.SearchResult)
+
+	aggregate.Duration = time.Since(start)
+	return aggregate.SearchResult, nil
+}
+
+func (ss *shardedSearcher) StreamSearch(ctx context.Context, q query.Q, opts *zoekt.SearchOptions, sender zoekt.Sender) (err error) {
+	tr, ctx := trace.New(ctx, "shardedSearcher.StreamSearch", "")
+	defer func() {
+		if err != nil {
+			tr.LazyPrintf("error: %v", err)
+			tr.SetError(err)
+		}
+		tr.Finish()
+	}()
+
+	start := time.Now()
+	if err := ss.rlock(ctx); err != nil {
+		return err
+	}
+	defer ss.runlock()
+	tr.LazyPrintf("acquired lock")
+	sender.Send(&zoekt.SearchResult{
+		Stats: zoekt.Stats{
+			Wait: time.Since(start),
+		},
+	})
+
+	return ss.streamSearch(ctx, q, opts, stream.SenderFunc(func(event *zoekt.SearchResult) {
+		copyFiles(event)
+		sender.Send(event)
+	}))
+}
+
+func (ss *shardedSearcher) streamSearch(ctx context.Context, q query.Q, opts *zoekt.SearchOptions, sender zoekt.Sender) (err error) {
+	tr, ctx := trace.New(ctx, "shardedSearcher.streamSearch", "")
 	tr.LazyLog(q, true)
 	tr.LazyPrintf("opts: %+v", opts)
 	overallStart := time.Now()
@@ -317,22 +414,6 @@ func (ss *shardedSearcher) Search(ctx context.Context, q query.Q, opts *zoekt.Se
 	defer func() {
 		metricSearchRunning.Dec()
 		metricSearchDuration.Observe(time.Since(overallStart).Seconds())
-		if sr != nil {
-			metricSearchContentBytesLoadedTotal.Add(float64(sr.Stats.ContentBytesLoaded))
-			metricSearchIndexBytesLoadedTotal.Add(float64(sr.Stats.IndexBytesLoaded))
-			metricSearchCrashesTotal.Add(float64(sr.Stats.Crashes))
-			metricSearchFileCountTotal.Add(float64(sr.Stats.FileCount))
-			metricSearchShardFilesConsideredTotal.Add(float64(sr.Stats.ShardFilesConsidered))
-			metricSearchFilesConsideredTotal.Add(float64(sr.Stats.FilesConsidered))
-			metricSearchFilesLoadedTotal.Add(float64(sr.Stats.FilesLoaded))
-			metricSearchFilesSkippedTotal.Add(float64(sr.Stats.FilesSkipped))
-			metricSearchShardsSkippedTotal.Add(float64(sr.Stats.ShardsSkipped))
-			metricSearchMatchCountTotal.Add(float64(sr.Stats.MatchCount))
-			metricSearchNgramMatchesTotal.Add(float64(sr.Stats.NgramMatches))
-
-			tr.LazyPrintf("num files: %d", len(sr.Files))
-			tr.LazyPrintf("stats: %+v", sr.Stats)
-		}
 		if err != nil {
 			metricSearchFailedTotal.Inc()
 
@@ -342,29 +423,10 @@ func (ss *shardedSearcher) Search(ctx context.Context, q query.Q, opts *zoekt.Se
 		tr.Finish()
 	}()
 
-	start := time.Now()
-
-	aggregate := &zoekt.SearchResult{
-		RepoURLs:      map[string]string{},
-		LineFragments: map[string]string{},
-	}
-
-	// This critical section is large, but we don't want to deal with
-	// searches on shards that have just been closed.
-	if err := ss.rlock(ctx); err != nil {
-		return aggregate, err
-	}
-	defer ss.runlock()
-	tr.LazyPrintf("acquired lock")
-	aggregate.Wait = time.Since(start)
-	start = time.Now()
-
 	shards := ss.getShards()
 	tr.LazyPrintf("before selectRepoSet shards:%d", len(shards))
 	shards, q = selectRepoSet(shards, q)
 	tr.LazyPrintf("after selectRepoSet shards:%d %s", len(shards), q)
-
-	all := make(chan shardResult, len(shards))
 
 	var childCtx context.Context
 	var cancel context.CancelFunc
@@ -386,51 +448,33 @@ func (ss *shardedSearcher) Search(ctx context.Context, q query.Q, opts *zoekt.Se
 		feeder <- s
 	}
 	close(feeder)
+	g, ctx := errgroup.WithContext(childCtx)
 	for i := 0; i < runtime.GOMAXPROCS(0); i++ {
-		go func() {
+		g.Go(func() error {
 			for s := range feeder {
-				searchOneShard(childCtx, s, q, opts, all)
+				err := searchOneShard(ctx, s, q, opts, stream.SenderFunc(func(sr *zoekt.SearchResult) {
+					metricSearchContentBytesLoadedTotal.Add(float64(sr.Stats.ContentBytesLoaded))
+					metricSearchIndexBytesLoadedTotal.Add(float64(sr.Stats.IndexBytesLoaded))
+					metricSearchCrashesTotal.Add(float64(sr.Stats.Crashes))
+					metricSearchFileCountTotal.Add(float64(sr.Stats.FileCount))
+					metricSearchShardFilesConsideredTotal.Add(float64(sr.Stats.ShardFilesConsidered))
+					metricSearchFilesConsideredTotal.Add(float64(sr.Stats.FilesConsidered))
+					metricSearchFilesLoadedTotal.Add(float64(sr.Stats.FilesLoaded))
+					metricSearchFilesSkippedTotal.Add(float64(sr.Stats.FilesSkipped))
+					metricSearchShardsSkippedTotal.Add(float64(sr.Stats.ShardsSkipped))
+					metricSearchMatchCountTotal.Add(float64(sr.Stats.MatchCount))
+					metricSearchNgramMatchesTotal.Add(float64(sr.Stats.NgramMatches))
+
+					sender.Send(sr)
+				}))
+				if err != nil {
+					return err
+				}
 			}
-		}()
+			return nil
+		})
 	}
-
-	for range shards {
-		r := <-all
-		if r.err != nil {
-			return nil, r.err
-		}
-		aggregate.Files = append(aggregate.Files, r.sr.Files...)
-		aggregate.Stats.Add(r.sr.Stats)
-
-		if len(r.sr.Files) > 0 {
-			for k, v := range r.sr.RepoURLs {
-				aggregate.RepoURLs[k] = v
-			}
-			for k, v := range r.sr.LineFragments {
-				aggregate.LineFragments[k] = v
-			}
-		}
-
-		if cancel != nil && opts.TotalMaxMatchCount > 0 && aggregate.Stats.MatchCount > opts.TotalMaxMatchCount {
-			cancel()
-			cancel = nil
-		}
-	}
-
-	zoekt.SortFilesByScore(aggregate.Files)
-	if max := opts.MaxDocDisplayCount; max > 0 && len(aggregate.Files) > max {
-		aggregate.Files = aggregate.Files[:max]
-	}
-	for i := range aggregate.Files {
-		copySlice(&aggregate.Files[i].Content)
-		copySlice(&aggregate.Files[i].Checksum)
-		for l := range aggregate.Files[i].LineMatches {
-			copySlice(&aggregate.Files[i].LineMatches[l].Line)
-		}
-	}
-
-	aggregate.Duration = time.Since(start)
-	return aggregate, nil
+	return g.Wait()
 }
 
 func copySlice(src *[]byte) {
@@ -439,12 +483,18 @@ func copySlice(src *[]byte) {
 	*src = dst
 }
 
-type shardResult struct {
-	sr  *zoekt.SearchResult
-	err error
+// copyFiles must be protected by shardedSearcher.rlock().
+func copyFiles(sr *zoekt.SearchResult) {
+	for i := range sr.Files {
+		copySlice(&sr.Files[i].Content)
+		copySlice(&sr.Files[i].Checksum)
+		for l := range sr.Files[i].LineMatches {
+			copySlice(&sr.Files[i].LineMatches[l].Line)
+		}
+	}
 }
 
-func searchOneShard(ctx context.Context, s zoekt.Searcher, q query.Q, opts *zoekt.SearchOptions, sink chan shardResult) {
+func searchOneShard(ctx context.Context, s zoekt.Searcher, q query.Q, opts *zoekt.SearchOptions, sender zoekt.Sender) error {
 	metricSearchShardRunning.Inc()
 	defer func() {
 		metricSearchShardRunning.Dec()
@@ -453,12 +503,17 @@ func searchOneShard(ctx context.Context, s zoekt.Searcher, q query.Q, opts *zoek
 
 			var r zoekt.SearchResult
 			r.Stats.Crashes = 1
-			sink <- shardResult{&r, nil}
+			sender.Send(&r)
 		}
 	}()
 
 	ms, err := s.Search(ctx, q, opts)
-	sink <- shardResult{ms, err}
+
+	if err != nil {
+		return err
+	}
+	sender.Send(ms)
+	return nil
 }
 
 type shardListResult struct {

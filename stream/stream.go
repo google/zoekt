@@ -29,9 +29,9 @@ func (e eventType) string() string {
 }
 
 // Server returns an http.Handler which is the server side of StreamSearch.
-func Server(searcher zoekt.Searcher) http.Handler {
+func Server(searcher zoekt.Streamer) http.Handler {
 	registerGob()
-	return &streamHandler{Searcher: searcher}
+	return &handler{Searcher: searcher}
 }
 
 type searchArgs struct {
@@ -44,11 +44,11 @@ type searchReply struct {
 	Data  interface{}
 }
 
-type streamHandler struct {
-	Searcher zoekt.Searcher
+type handler struct {
+	Searcher zoekt.Streamer
 }
 
-func (h *streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	// Decode payload.
@@ -73,45 +73,21 @@ func (h *streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	// Kick-off search (in batch-mode for now).
-	searchResults, err := h.Searcher.Search(ctx, args.Q, args.Opts)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	// mu protects possibly concurrent writes to the stream.
+	mu := sync.Mutex{}
 
-	// We simulate streaming by sending searchResults in chunks over the wire. Later
-	// we want Searcher.Search to take a channel, buffer here and send chunks over
-	// the network.
-	var chunk *zoekt.SearchResult
-	// We send stats first. We don't send RepoURLs or LineFragments because we don't
-	// use them in Sourcegraph.
-	chunk = &zoekt.SearchResult{
-		Stats: searchResults.Stats,
-	}
-	// Send event.
-	err = eventWriter.event(eventMatches, chunk)
-	if err != nil {
-		_ = eventWriter.event(eventError, err)
-		return
-	}
-
-	chunkSize := 100
-	numFiles := len(searchResults.Files)
-	for i := 0; i < numFiles; i = i + chunkSize {
-		right := i + chunkSize
-		if right >= numFiles {
-			right = numFiles
-		}
-		chunk = &zoekt.SearchResult{
-			Files: searchResults.Files[i:right],
-		}
-		// Send event.
-		err = eventWriter.event(eventMatches, chunk)
+	err = h.Searcher.StreamSearch(ctx, args.Q, args.Opts, SenderFunc(func(event *zoekt.SearchResult) {
+		mu.Lock()
+		defer mu.Unlock()
+		err := eventWriter.event(eventMatches, event)
 		if err != nil {
 			_ = eventWriter.event(eventError, err)
 			return
 		}
+	}))
+	if err != nil {
+		_ = eventWriter.event(eventError, err)
+		return
 	}
 }
 

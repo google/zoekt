@@ -33,9 +33,13 @@ type client struct {
 	httpClient *http.Client
 }
 
-// Streamer is the interface that wraps the basic Send method.
-type Streamer interface {
-	Send(*zoekt.SearchResult)
+// SenderFunc is an adapter to allow the use of ordinary functions as Sender.
+// If f is a function with the appropriate signature, SenderFunc(f) is a Sender
+// that calls f.
+type SenderFunc func(result *zoekt.SearchResult)
+
+func (f SenderFunc) Send(result *zoekt.SearchResult) {
+	f(result)
 }
 
 // StreamSearch returns search results as stream by calling streamer.Send(event)
@@ -43,7 +47,7 @@ type Streamer interface {
 //
 // Error events returned by the server are returned as error. Context errors are
 // recreated and returned on a best-efforts basis.
-func (c *client) StreamSearch(ctx context.Context, q query.Q, opts *zoekt.SearchOptions, streamer Streamer) error {
+func (c *client) StreamSearch(ctx context.Context, q query.Q, opts *zoekt.SearchOptions, streamer zoekt.Sender) error {
 	// Encode query and opts.
 	buf := new(bytes.Buffer)
 	args := &searchArgs{
