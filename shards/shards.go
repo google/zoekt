@@ -195,6 +195,7 @@ func (ss *shardedSearcher) Close() {
 	for _, s := range ss.shards {
 		s.Close()
 	}
+	ss.shards = make(map[string]rankedShard)
 }
 
 func (ss *shardedSearcher) Search(ctx context.Context, q query.Q, opts *zoekt.SearchOptions) (sr *zoekt.SearchResult, err error) {
