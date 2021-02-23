@@ -32,7 +32,7 @@ type shardLoader interface {
 	drop(filename string)
 }
 
-type shardWatcher struct {
+type DirectoryWatcher struct {
 	dir        string
 	timestamps map[string]time.Time
 	loader     shardLoader
@@ -44,19 +44,15 @@ type shardWatcher struct {
 	stopped chan struct{}
 }
 
-func (sw *shardWatcher) Stop() {
+func (sw *DirectoryWatcher) Stop() {
 	sw.closeOnce.Do(func() {
 		close(sw.quit)
 		<-sw.stopped
 	})
 }
 
-type Stopper interface {
-	Stop()
-}
-
-func NewDirectoryWatcher(dir string, loader shardLoader) (Stopper, error) {
-	sw := &shardWatcher{
+func NewDirectoryWatcher(dir string, loader shardLoader) (*DirectoryWatcher, error) {
+	sw := &DirectoryWatcher{
 		dir:        dir,
 		timestamps: map[string]time.Time{},
 		loader:     loader,
@@ -74,11 +70,11 @@ func NewDirectoryWatcher(dir string, loader shardLoader) (Stopper, error) {
 	return sw, nil
 }
 
-func (s *shardWatcher) String() string {
+func (s *DirectoryWatcher) String() string {
 	return fmt.Sprintf("shardWatcher(%s)", s.dir)
 }
 
-func (s *shardWatcher) scan() error {
+func (s *DirectoryWatcher) scan() error {
 	fs, err := filepath.Glob(filepath.Join(s.dir, "*.zoekt"))
 	if err != nil {
 		return err
@@ -152,7 +148,7 @@ func (s *shardWatcher) scan() error {
 	return nil
 }
 
-func (s *shardWatcher) watch() error {
+func (s *DirectoryWatcher) watch() error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return err

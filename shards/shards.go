@@ -170,7 +170,7 @@ func NewDirectorySearcher(dir string) (zoekt.Searcher, error) {
 type directorySearcher struct {
 	zoekt.Searcher
 
-	directoryWatcher Stopper
+	directoryWatcher *DirectoryWatcher
 }
 
 func (s *directorySearcher) Close() {
