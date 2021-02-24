@@ -14,18 +14,20 @@ import (
 
 // NewClient returns a client which implements StreamSearch. If httpClient is
 // nil, http.DefaultClient is used.
-func NewClient(address string, httpClient *http.Client) *client {
+func NewClient(address string, httpClient *http.Client) *Client {
 	registerGob()
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
-	return &client{
+	return &Client{
 		address:    address,
 		httpClient: httpClient,
 	}
 }
 
-type client struct {
+// Client is an HTTP client for StreamSearch. Do not create directly, call
+// NewClient.
+type Client struct {
 	// HTTP address of zoekt-webserver. Will query against address + "/stream".
 	address string
 
@@ -47,7 +49,7 @@ func (f SenderFunc) Send(result *zoekt.SearchResult) {
 //
 // Error events returned by the server are returned as error. Context errors are
 // recreated and returned on a best-efforts basis.
-func (c *client) StreamSearch(ctx context.Context, q query.Q, opts *zoekt.SearchOptions, streamer zoekt.Sender) error {
+func (c *Client) StreamSearch(ctx context.Context, q query.Q, opts *zoekt.SearchOptions, streamer zoekt.Sender) error {
 	// Encode query and opts.
 	buf := new(bytes.Buffer)
 	args := &searchArgs{
