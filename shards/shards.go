@@ -318,6 +318,7 @@ func (ss *shardedSearcher) Search(ctx context.Context, q query.Q, opts *zoekt.Se
 			tr.LazyPrintf("num files: %d", len(sr.Files))
 			tr.LazyPrintf("stats: %+v", sr.Stats)
 		}
+		tr.Finish()
 	}()
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
