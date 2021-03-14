@@ -42,6 +42,7 @@ func TestClientServer(t *testing.T) {
 		t.Fatal(err)
 	}
 	client := rpc.Client(u.Host)
+	defer client.Close()
 
 	r, err := client.Search(context.Background(), mock.WantSearch, &zoekt.SearchOptions{})
 	if err != nil {
@@ -58,6 +59,10 @@ func TestClientServer(t *testing.T) {
 	if !reflect.DeepEqual(l, mock.RepoList) {
 		t.Fatalf("got %+v, want %+v", l, mock.RepoList)
 	}
+
+	// Test closing a client we never dial.
+	noopClient := rpc.Client(u.Host)
+	noopClient.Close()
 }
 
 func mustParse(s string) query.Q {

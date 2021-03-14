@@ -108,7 +108,11 @@ func (c *client) getRPCClient(ctx context.Context, gen int) (*rpc.Client, int, e
 }
 
 func (c *client) Close() {
-	c.cl.Close()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.cl != nil {
+		c.cl.Close()
+	}
 }
 
 func (c *client) String() string {
