@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/andygrunwald/go-gerrit v0.0.0-20191101112536-3f5e365ccf57
+	github.com/bmatcuk/doublestar v1.3.4
 	github.com/fsnotify/fsnotify v1.4.7
 	github.com/gfleury/go-bitbucket-v1 v0.0.0-20200104105711-ddbafbb02522
 	github.com/go-git/go-git/v5 v5.0.0

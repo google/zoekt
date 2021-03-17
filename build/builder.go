@@ -35,6 +35,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/bmatcuk/doublestar"
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/ctags"
 )
@@ -79,9 +80,10 @@ type Options struct {
 	// Write memory profiles to this file.
 	MemProfile string
 
-	// LargeFiles is a slice of glob patterns where matching file
-	// paths should be indexed regardless of their size. The pattern syntax
-	// can be found here: https://golang.org/pkg/path/filepath/#Match.
+	// LargeFiles is a slice of glob patterns, including ** for any number
+	// of directories, where matching file paths should be indexed
+	// regardless of their size. The full pattern syntax is here:
+	// https://github.com/bmatcuk/doublestar/tree/v1#patterns.
 	LargeFiles []string
 }
 
@@ -244,7 +246,7 @@ func (o *Options) IncrementalSkipIndexing() bool {
 func (o *Options) IgnoreSizeMax(name string) bool {
 	for _, pattern := range o.LargeFiles {
 		pattern = strings.TrimSpace(pattern)
-		m, _ := filepath.Match(pattern, name)
+		m, _ := doublestar.PathMatch(pattern, name)
 		if m {
 			return true
 		}
