@@ -104,6 +104,7 @@ func (d *indexData) calculateStats() {
 		IndexBytes:   int64(d.memoryUse()),
 		ContentBytes: int64(int(last) + int(lastFN)),
 		Documents:    len(d.newlinesIndex) - 1,
+		Shards:       1,
 	}
 	d.repoListEntry = RepoListEntry{
 		Repository:    d.repoMetaData,

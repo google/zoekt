@@ -1087,6 +1087,9 @@ func TestListRepos(t *testing.T) {
 	if len(res.Repos) != 1 || res.Repos[0].Repository.Name != "reponame" {
 		t.Fatalf("got %v, want 1 matches", res)
 	}
+	if got := res.Repos[0].Stats.Shards; got != 1 {
+		t.Fatalf("got %d, want 1 shard", got)
+	}
 	q = &query.Repo{Pattern: "bla"}
 	res, err = searcher.List(context.Background(), q)
 	if err != nil {
