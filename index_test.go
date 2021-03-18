@@ -1103,6 +1103,7 @@ func TestListRepos(t *testing.T) {
 			Stats: RepoStats{
 				Documents:    4,
 				ContentBytes: 68,
+				Shards:       1,
 
 				NewLinesCount:              4,
 				DefaultBranchNewLinesCount: 2,
@@ -1146,6 +1147,9 @@ func TestListReposByContent(t *testing.T) {
 	}
 	if len(res.Repos) != 1 || res.Repos[0].Repository.Name != "reponame" {
 		t.Fatalf("got %v, want 1 matches", res)
+	}
+	if got := res.Repos[0].Stats.Shards; got != 1 {
+		t.Fatalf("got %d, want 1 shard", got)
 	}
 	q = &query.Substring{Pattern: "foo"}
 	res, err = searcher.List(context.Background(), q)
