@@ -169,7 +169,8 @@ func TestNewlines(t *testing.T) {
 				LineEnd:    11,
 				LineNumber: 2,
 			},
-		}}}
+		},
+	}}
 
 	if !reflect.DeepEqual(matches, want) {
 		t.Errorf("got %v, want %v", matches, want)
@@ -689,7 +690,8 @@ func TestBranchLimit(t *testing.T) {
 		for i := 0; i < limit; i++ {
 			s := fmt.Sprintf("b%d", i)
 			r.Branches = append(r.Branches, RepositoryBranch{
-				s, "v-" + s})
+				s, "v-" + s,
+			})
 		}
 		_, err := NewIndexBuilder(r)
 		if limit == 64 && err != nil {
@@ -757,7 +759,8 @@ func TestRegexp(t *testing.T) {
 	b := testIndexBuilder(t, nil,
 		Document{
 			Name:    "f1",
-			Content: content})
+			Content: content,
+		})
 	// ------------------------------01234567890123
 
 	sres := searchForTest(t, b,
@@ -894,7 +897,8 @@ func TestRegexpCaseSensitive(t *testing.T) {
 	content := []byte("bla\nfunc unmarshalGitiles\n")
 	b := testIndexBuilder(t, nil, Document{
 		Name:    "f1",
-		Content: content})
+		Content: content,
+	})
 
 	res := searchForTest(t, b,
 		&query.Regexp{
@@ -1224,10 +1228,11 @@ func TestMatchNewline(t *testing.T) {
 
 func TestSubRepo(t *testing.T) {
 	subRepos := map[string]*Repository{
-		"sub": &Repository{
+		"sub": {
 			Name:                 "sub-name",
 			LineFragmentTemplate: "sub-line",
-		}}
+		},
+	}
 
 	content := []byte("pqr\nalex")
 	// ----------------0123 4567
@@ -1480,7 +1485,8 @@ func TestStartLineAnchor(t *testing.T) {
 			Content: []byte(
 				`hello
 start of middle of line
-`)})
+`),
+		})
 
 	q, err := query.Parse("^start")
 	if err != nil {

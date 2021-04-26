@@ -57,7 +57,7 @@ func TestDirWatcherUnloadOnce(t *testing.T) {
 	}
 
 	shard := filepath.Join(dir, "foo.zoekt")
-	if err := ioutil.WriteFile(shard, []byte("hello"), 0644); err != nil {
+	if err := ioutil.WriteFile(shard, []byte("hello"), 0o644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
@@ -73,7 +73,7 @@ func TestDirWatcherUnloadOnce(t *testing.T) {
 
 	// Must sleep because of FS timestamp resolution.
 	advanceFS()
-	if err := ioutil.WriteFile(shard, []byte("changed"), 0644); err != nil {
+	if err := ioutil.WriteFile(shard, []byte("changed"), 0o644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
@@ -91,7 +91,7 @@ func TestDirWatcherUnloadOnce(t *testing.T) {
 	}
 
 	advanceFS()
-	if err := ioutil.WriteFile(shard+".bla", []byte("changed"), 0644); err != nil {
+	if err := ioutil.WriteFile(shard+".bla", []byte("changed"), 0o644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 

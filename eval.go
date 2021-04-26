@@ -229,7 +229,6 @@ nextFileMatch:
 		for i := range fileMatch.LineMatches {
 			if maxFileScore < fileMatch.LineMatches[i].Score {
 				maxFileScore = fileMatch.LineMatches[i].Score
-
 			}
 
 			// Order by ordering in file.

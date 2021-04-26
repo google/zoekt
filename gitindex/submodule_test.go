@@ -31,7 +31,7 @@ func TestParseGitModules(t *testing.T) {
 	}
 
 	want := map[string]*SubmoduleEntry{
-		"plugins/abc": &SubmoduleEntry{
+		"plugins/abc": {
 			Path:   "plugins/abc",
 			URL:    "../plugins/abc",
 			Branch: ".",

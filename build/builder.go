@@ -529,16 +529,16 @@ func (b *Builder) newShardBuilder() (*zoekt.IndexBuilder, error) {
 
 func (b *Builder) writeShard(fn string, ib *zoekt.IndexBuilder) (*finishedShard, error) {
 	dir := filepath.Dir(fn)
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, err
 	}
 
-	f, err := ioutil.TempFile(dir, filepath.Base(fn) + ".*.tmp")
+	f, err := ioutil.TempFile(dir, filepath.Base(fn)+".*.tmp")
 	if err != nil {
 		return nil, err
 	}
 	if runtime.GOOS != "windows" {
-		if err := f.Chmod(0666 &^ umask); err != nil {
+		if err := f.Chmod(0o666 &^ umask); err != nil {
 			return nil, err
 		}
 	}

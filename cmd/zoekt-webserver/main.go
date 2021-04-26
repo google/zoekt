@@ -94,7 +94,7 @@ func writeTemplates(dir string) error {
 
 	for k, v := range web.TemplateText {
 		nm := filepath.Join(dir, k+templateExtension)
-		if err := ioutil.WriteFile(nm, []byte(v), 0644); err != nil {
+		if err := ioutil.WriteFile(nm, []byte(v), 0o644); err != nil {
 			return err
 		}
 	}
@@ -146,7 +146,7 @@ func main() {
 	// Tune GOMAXPROCS to match Linux container CPU quota.
 	maxprocs.Set()
 
-	if err := os.MkdirAll(*index, 0755); err != nil {
+	if err := os.MkdirAll(*index, 0o755); err != nil {
 		log.Fatal(err)
 	}
 
