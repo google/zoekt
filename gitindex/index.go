@@ -37,7 +37,6 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 
 	git "github.com/go-git/go-git/v5"
-	plumcfg "github.com/go-git/go-git/v5/plumbing/format/config"
 )
 
 // RepoModTime returns the time of last fetch of a git repository.
@@ -178,17 +177,6 @@ func configLookupRemoteURL(cfg *config.Config, key string) string {
 	return rc.URLs[0]
 }
 
-func configLookupString(sec *plumcfg.Section, key string) string {
-	for _, o := range sec.Options {
-		if o.Key != key {
-			continue
-		}
-		return o.Value
-	}
-
-	return ""
-}
-
 func isMissingBranchError(err error) bool {
 	return err != nil && err.Error() == "reference not found"
 }
@@ -206,8 +194,8 @@ func setTemplatesFromConfig(desc *zoekt.Repository, repoDir string) error {
 
 	sec := cfg.Raw.Section("zoekt")
 
-	webURLStr := configLookupString(sec, "web-url")
-	webURLType := configLookupString(sec, "web-url-type")
+	webURLStr := sec.Options.Get("web-url")
+	webURLType := sec.Options.Get("web-url-type")
 
 	if webURLType != "" && webURLStr != "" {
 		webURL, err := url.Parse(webURLStr)
@@ -219,7 +207,7 @@ func setTemplatesFromConfig(desc *zoekt.Repository, repoDir string) error {
 		}
 	}
 
-	name := configLookupString(sec, "name")
+	name := sec.Options.Get("name")
 	if name != "" {
 		desc.Name = name
 	} else {
@@ -248,7 +236,7 @@ func setTemplatesFromConfig(desc *zoekt.Repository, repoDir string) error {
 	// Github:
 	traction := 0
 	for _, s := range []string{"github-stars", "github-forks", "github-watchers", "github-subscribers"} {
-		f, err := strconv.Atoi(configLookupString(sec, s))
+		f, err := strconv.Atoi(sec.Options.Get(s))
 		if err == nil {
 			traction += f
 		}
