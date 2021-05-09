@@ -177,10 +177,6 @@ func configLookupRemoteURL(cfg *config.Config, key string) string {
 	return rc.URLs[0]
 }
 
-func isMissingBranchError(err error) bool {
-	return err != nil && err.Error() == "reference not found"
-}
-
 func setTemplatesFromConfig(desc *zoekt.Repository, repoDir string) error {
 	repo, err := git.PlainOpen(repoDir)
 	if err != nil {
@@ -380,13 +376,14 @@ func IndexGitRepo(opts Options) error {
 	}
 	for _, b := range branches {
 		commit, err := getCommit(repo, opts.BranchPrefix, b)
-		if opts.AllowMissingBranch && isMissingBranchError(err) {
-			continue
-		}
-
 		if err != nil {
+			if opts.AllowMissingBranch && err.Error() == "reference not found" {
+				continue
+			}
+
 			return err
 		}
+
 		opts.BuildOptions.RepositoryDescription.Branches = append(opts.BuildOptions.RepositoryDescription.Branches, zoekt.RepositoryBranch{
 			Name:    b,
 			Version: commit.Hash.String(),
