@@ -45,7 +45,7 @@ func RepoModTime(dir string) (time.Time, error) {
 	refDir := filepath.Join(dir, "refs")
 	if _, err := os.Lstat(refDir); err == nil {
 		if err := filepath.Walk(refDir,
-			func(name string, fi os.FileInfo, err error) error {
+			func(_ string, fi os.FileInfo, _ error) error {
 				if !fi.IsDir() && last.Before(fi.ModTime()) {
 					last = fi.ModTime()
 				}
