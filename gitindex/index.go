@@ -252,7 +252,7 @@ func setTemplatesFromConfig(desc *zoekt.Repository, repoDir string) error {
 	return nil
 }
 
-// SetTemplates fills in templates based on the origin URL.
+// SetTemplatesFromOrigin fills in templates based on the origin URL.
 func SetTemplatesFromOrigin(desc *zoekt.Repository, u *url.URL) error {
 	desc.Name = filepath.Join(u.Host, strings.TrimSuffix(u.Path, ".git"))
 
