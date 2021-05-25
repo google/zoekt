@@ -1,14 +1,14 @@
 module github.com/google/zoekt
 
 require (
+	cloud.google.com/go v0.82.0
 	github.com/andygrunwald/go-gerrit v0.0.0-20191101112536-3f5e365ccf57
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/gfleury/go-bitbucket-v1 v0.0.0-20200312180434-e5170e3280fb
 	github.com/go-git/go-git/v5 v5.0.0
 	github.com/gobwas/glob v0.2.3
-	github.com/golang/protobuf v1.3.5 // indirect
-	github.com/google/go-cmp v0.5.2
+	github.com/google/go-cmp v0.5.5
 	github.com/google/go-github/v27 v27.0.6
 	github.com/google/slothfs v0.0.0-20190417171004-6b42407d9230
 	github.com/hashicorp/go-hclog v0.12.1 // indirect
@@ -25,11 +25,9 @@ require (
 	github.com/uber/jaeger-lib v2.2.0+incompatible
 	github.com/xanzy/go-gitlab v0.28.0
 	go.uber.org/automaxprocs v1.3.0
-	golang.org/x/crypto v0.0.0-20200311171314-f7b00557c8c4 // indirect
-	golang.org/x/net v0.0.0-20200301022130-244492dfa37a
-	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
-	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
-	google.golang.org/appengine v1.6.5 // indirect
+	golang.org/x/net v0.0.0-20210503060351-7fd8e65b6420
+	golang.org/x/oauth2 v0.0.0-20210514164344-f6687ab2804c
+	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	humungus.tedunangst.com/r/gerc v0.1.2
 )
 

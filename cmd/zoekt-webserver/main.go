@@ -36,6 +36,7 @@ import (
 	"syscall"
 	"time"
 
+	"cloud.google.com/go/profiler"
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/build"
 	"github.com/google/zoekt/debugserver"
@@ -138,8 +139,6 @@ func main() {
 	version := flag.Bool("version", false, "Print version number")
 	flag.Parse()
 
-	initializeJaeger()
-
 	if *version {
 		fmt.Printf("zoekt-webserver version %q\n", zoekt.Version)
 		os.Exit(0)
@@ -151,6 +150,9 @@ func main() {
 		}
 		os.Exit(0)
 	}
+
+	initializeJaeger()
+	initializeGoogleCloudProfiler()
 
 	if *logDir != "" {
 		if fi, err := os.Lstat(*logDir); err != nil || !fi.IsDir() {
@@ -463,6 +465,24 @@ func initializeJaeger() {
 		log.Printf("could not initialize jaeger tracer, error: %v", err.Error())
 	}
 	opentracing.SetGlobalTracer(tracer)
+}
+
+func initializeGoogleCloudProfiler() {
+	// Google cloud profiler is opt-in since we only want to run it on
+	// Sourcegraph.com.
+	if os.Getenv("GOOGLE_CLOUD_PROFILER_ENABLED") == "" {
+		return
+	}
+
+	err := profiler.Start(profiler.Config{
+		Service:        "zoekt-webserver",
+		ServiceVersion: zoekt.Version,
+		MutexProfiling: true,
+		AllocForceGC:   true,
+	})
+	if err != nil {
+		log.Printf("could not initialize google cloud profiler: %s", err.Error())
+	}
 }
 
 var (
