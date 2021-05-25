@@ -35,6 +35,7 @@ jobs:
         tags: "latest"
         add_git_labels: "true"
         push: "false"
+        build_args: VERSION=${{ steps.version.outputs.value }}
 
     - name: build-push-webserver
       uses: docker/build-push-action@v1

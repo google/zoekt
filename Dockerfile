@@ -10,7 +10,8 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . ./
-RUN go install ./cmd/...
+ARG VERSION
+RUN go install -ldflags "-X github.com/google/zoekt.Version=$VERSION" ./cmd/...
 
 FROM alpine:3.11 AS ctags
 
