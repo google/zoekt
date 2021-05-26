@@ -513,16 +513,9 @@ func (ss *shardedSearcher) streamSearch(ctx context.Context, proc *process, q qu
 	g.Go(func() error {
 		defer close(feeder)
 		for _, s := range shards {
-			if err := proc.Yield(ctx); err != nil {
-				// We let searchOneShard handle context errors.
-				return nil
-			}
-			select {
-			case feeder <- s:
-			case <-ctx.Done():
-				// We let searchOneShard handle context errors.
-				return nil
-			}
+			// We let searchOneShard handle context errors.
+			_ = proc.Yield(ctx)
+			feeder <- s
 		}
 		return nil
 	})
