@@ -260,7 +260,7 @@ func (d *indexData) readNgrams(toc *indexTOC) (map[ngram]simpleSection, error) {
 	}
 	postingsIndex := toc.postings.relativeIndex()
 
-	ngrams := map[ngram]simpleSection{}
+	ngrams := make(map[ngram]simpleSection, len(textContent)/ngramEncoding)
 	for i := 0; i < len(textContent); i += ngramEncoding {
 		j := i / ngramEncoding
 		ng := ngram(binary.BigEndian.Uint64(textContent[i : i+ngramEncoding]))
@@ -286,7 +286,7 @@ func (d *indexData) readFileNameNgrams(toc *indexTOC) (map[ngram][]uint32, error
 
 	fileNamePostingsIndex := toc.namePostings.relativeIndex()
 
-	fileNameNgrams := map[ngram][]uint32{}
+	fileNameNgrams := make(map[ngram][]uint32, len(nameNgramText)/ngramEncoding)
 	for i := 0; i < len(nameNgramText); i += ngramEncoding {
 		j := i / ngramEncoding
 		off := fileNamePostingsIndex[j]
