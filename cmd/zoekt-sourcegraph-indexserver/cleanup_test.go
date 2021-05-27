@@ -8,9 +8,11 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/google/zoekt"
 )
 
@@ -24,12 +26,12 @@ func TestCleanup(t *testing.T) {
 	}
 	// We don't use getShards so that we have two implementations of the same
 	// thing (ie pick up bugs in one)
-	readdir := func(dir string) []shard {
-		paths, _ := filepath.Glob(filepath.Join(dir, "*"))
+	glob := func(pattern string) []shard {
+		paths, _ := filepath.Glob(pattern)
 		sort.Strings(paths)
 		var shards []shard
 		for _, path := range paths {
-			if filepath.Base(path) == ".trash" {
+			if filepath.Ext(path) != ".zoekt" {
 				continue
 			}
 			name, _ := shardRepoName(path)
@@ -55,6 +57,7 @@ func TestCleanup(t *testing.T) {
 
 		wantIndex []shard
 		wantTrash []shard
+		wantTmps  []string
 	}{{
 		name: "noop",
 	}, {
@@ -93,7 +96,7 @@ func TestCleanup(t *testing.T) {
 			"recent.tmp": recent,
 			"old.tmp":    old,
 		},
-		wantIndex: []shard{{Path: "recent.tmp", ModTime: recent}},
+		wantTmps: []string{"recent.tmp"},
 	}, {
 		name:      "all",
 		repos:     []string{"exists", "trashed"},
@@ -139,11 +142,21 @@ func TestCleanup(t *testing.T) {
 
 			cleanup(dir, tt.repos, now)
 
-			if got, want := readdir(dir), tt.wantIndex; !reflect.DeepEqual(got, want) {
-				t.Errorf("unexpected index\ngot:  %+v\nwant: %+v", got, want)
+			if d := cmp.Diff(tt.wantIndex, glob(filepath.Join(dir, "*.zoekt"))); d != "" {
+				t.Errorf("unexpected index (-want, +got):\n%s", d)
 			}
-			if got, want := readdir(filepath.Join(dir, ".trash")), tt.wantTrash; !reflect.DeepEqual(got, want) {
-				t.Errorf("unexpected trash\ngot:  %+v\nwant: %+v", got, want)
+			if d := cmp.Diff(tt.wantTrash, glob(filepath.Join(dir, ".trash", "*.zoekt"))); d != "" {
+				t.Errorf("unexpected trash (-want, +got):\n%s", d)
+			}
+			if d := cmp.Diff(tt.wantTmps, globBase(filepath.Join(dir, "*.tmp"))); d != "" {
+				t.Errorf("unexpected tmps (-want, +got):\n%s", d)
+			}
+
+			if testing.Verbose() {
+				data, _ := ioutil.ReadFile(filepath.Join(dir, "zoekt-indexserver-shard-log.tsv"))
+				if len(data) > 0 {
+					t.Log("shard log contents:\n" + strings.TrimSpace(string(data)))
+				}
 			}
 		})
 	}
@@ -167,6 +180,15 @@ func createEmptyShard(t *testing.T, repo, path string) {
 	if err := b.Write(f); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func globBase(pattern string) []string {
+	paths, _ := filepath.Glob(pattern)
+	for i := range paths {
+		paths[i] = filepath.Base(paths[i])
+	}
+	sort.Strings(paths)
+	return paths
 }
 
 func TestRemoveIncompleteShards(t *testing.T) {

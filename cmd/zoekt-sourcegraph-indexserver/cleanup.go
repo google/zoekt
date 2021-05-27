@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/zoekt"
+	"github.com/natefinch/lumberjack"
 )
 
 // cleanup trashes shards in indexDir that do not exist in repos. For repos
@@ -59,6 +61,7 @@ func cleanup(indexDir string, repos []string, now time.Time) {
 
 		log.Printf("restoring shards from trash for %s", repo)
 		moveAll(indexDir, shards)
+		shardsLog(indexDir, "restore", shards)
 	}
 
 	// index: Move non-existant repos into trash
@@ -70,6 +73,7 @@ func cleanup(indexDir string, repos []string, now time.Time) {
 		}
 
 		moveAll(trashDir, shards)
+		shardsLog(indexDir, "remove", shards)
 	}
 
 	// Remove old .tmp files from crashed indexer runs-- for example, if
@@ -203,5 +207,23 @@ func moveAll(dstDir string, shards []shard) {
 		}
 		// update path so that partial failure removes the dst path
 		shards[i].Path = dst
+	}
+}
+
+func shardsLog(indexDir, action string, shards []shard) {
+	shardLogger := &lumberjack.Logger{
+		Filename:   filepath.Join(indexDir, "zoekt-indexserver-shard-log.tsv"),
+		MaxSize:    100, // Megabyte
+		MaxBackups: 5,
+	}
+	defer shardLogger.Close()
+
+	for _, s := range shards {
+		shard := filepath.Base(s.Path)
+		var shardSize int64
+		if fi, err := os.Stat(filepath.Join(indexDir, shard)); err == nil {
+			shardSize = fi.Size()
+		}
+		_, _ = fmt.Fprintf(shardLogger, "%d\t%s\t%s\t%d\n", time.Now().UTC().Unix(), action, shard, shardSize)
 	}
 }

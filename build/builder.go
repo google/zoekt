@@ -36,9 +36,11 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/ctags"
+	"github.com/natefinch/lumberjack"
 )
 
 var DefaultDir = filepath.Join(os.Getenv("HOME"), ".zoekt")
@@ -199,6 +201,8 @@ type Builder struct {
 	// temp name => final name for finished shards. We only rename
 	// them once all shards succeed to avoid Frankstein corpuses.
 	finishedShards map[string]string
+
+	shardLogger io.WriteCloser
 }
 
 type finishedShard struct {
@@ -355,6 +359,12 @@ func NewBuilder(opts Options) (*Builder, error) {
 		b.parser = parser
 	}
 
+	b.shardLogger = &lumberjack.Logger{
+		Filename:   filepath.Join(opts.IndexDir, "zoekt-builder-shard-log.tsv"),
+		MaxSize:    100, // Megabyte
+		MaxBackups: 5,
+	}
+
 	if _, err := b.newShardBuilder(); err != nil {
 		return nil, err
 	}
@@ -400,6 +410,8 @@ func (b *Builder) Add(doc zoekt.Document) error {
 // stale shards from previous runs. This should always be called, also
 // in failure cases, to ensure cleanup.
 func (b *Builder) Finish() error {
+	defer b.shardLogger.Close()
+
 	b.flush()
 	b.building.Wait()
 
@@ -415,6 +427,8 @@ func (b *Builder) Finish() error {
 	for tmp, final := range b.finishedShards {
 		if err := os.Rename(tmp, final); err != nil {
 			b.buildError = err
+		} else {
+			b.shardLog("upsert", final)
 		}
 	}
 	b.finishedShards = map[string]string{}
@@ -432,6 +446,8 @@ func (b *Builder) deleteRemainingShards() {
 		name := b.opts.shardName(shard)
 		if err := os.Remove(name); os.IsNotExist(err) {
 			break
+		} else {
+			b.shardLog("remove", name)
 		}
 	}
 }
@@ -489,6 +505,15 @@ func (b *Builder) flush() error {
 	}
 
 	return nil
+}
+
+func (b *Builder) shardLog(action, shard string) {
+	shard = filepath.Base(shard)
+	var shardSize int64
+	if fi, err := os.Stat(filepath.Join(b.opts.IndexDir, shard)); err == nil {
+		shardSize = fi.Size()
+	}
+	_, _ = fmt.Fprintf(b.shardLogger, "%d\t%s\t%s\t%d\n", time.Now().UTC().Unix(), action, shard, shardSize)
 }
 
 var profileNumber int
@@ -620,7 +645,7 @@ func (b *Builder) writeShard(fn string, ib *zoekt.IndexBuilder) (*finishedShard,
 		return nil, err
 	}
 
-	f, err := ioutil.TempFile(dir, filepath.Base(fn) + ".*.tmp")
+	f, err := ioutil.TempFile(dir, filepath.Base(fn)+".*.tmp")
 	if err != nil {
 		return nil, err
 	}

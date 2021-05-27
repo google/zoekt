@@ -267,7 +267,7 @@ func TestDeleteOldShards(t *testing.T) {
 		t.Errorf("Finish: %v", err)
 	}
 
-	glob := filepath.Join(dir, "*")
+	glob := filepath.Join(dir, "*.zoekt")
 	fs, err := filepath.Glob(glob)
 	if err != nil {
 		t.Fatalf("Glob(%s): %v", glob, err)
@@ -467,7 +467,7 @@ func TestEmptyContent(t *testing.T) {
 		t.Errorf("Finish: %v", err)
 	}
 
-	fs, _ := filepath.Glob(dir + "/*")
+	fs, _ := filepath.Glob(dir + "/*.zoekt")
 	if len(fs) != 1 {
 		t.Fatalf("want a shard, got %v", fs)
 	}
