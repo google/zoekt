@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/google/zoekt"
-	"github.com/natefinch/lumberjack"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 // cleanup trashes shards in indexDir that do not exist in repos. For repos

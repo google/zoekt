@@ -40,7 +40,7 @@ import (
 
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/ctags"
-	"github.com/natefinch/lumberjack"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 var DefaultDir = filepath.Join(os.Getenv("HOME"), ".zoekt")
