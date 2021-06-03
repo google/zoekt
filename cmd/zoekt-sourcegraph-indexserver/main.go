@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	"cloud.google.com/go/profiler"
 	"github.com/google/zoekt"
 	"github.com/google/zoekt/debugserver"
 	"go.uber.org/automaxprocs/maxprocs"
@@ -741,6 +742,24 @@ func printShardStats(fn string) error {
 	return zoekt.PrintNgramStats(iFile)
 }
 
+func initializeGoogleCloudProfiler() {
+	// Google cloud profiler is opt-in since we only want to run it on
+	// Sourcegraph.com.
+	if os.Getenv("GOOGLE_CLOUD_PROFILER_ENABLED") == "" {
+		return
+	}
+
+	err := profiler.Start(profiler.Config{
+		Service:        "zoekt-sourcegraph-indexserver",
+		ServiceVersion: zoekt.Version,
+		MutexProfiling: true,
+		AllocForceGC:   true,
+	})
+	if err != nil {
+		log.Printf("could not initialize google cloud profiler: %s", err.Error())
+	}
+}
+
 func main() {
 	defaultIndexDir := os.Getenv("DATA_DIR")
 	if defaultIndexDir == "" {
@@ -845,6 +864,8 @@ func main() {
 		}
 		os.Exit(0)
 	}
+
+	initializeGoogleCloudProfiler()
 
 	queue := &Queue{}
 
