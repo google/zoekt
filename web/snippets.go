@@ -79,7 +79,7 @@ func (s *Server) formatResults(result *zoekt.SearchResult, query string, localPr
 		err := tpl.Execute(&buf, map[string]string{
 			"Branch":  b,
 			"Version": version,
-			"Path":    filename,
+			"Path":    url.QueryEscape(filename),
 		})
 		if err != nil {
 			log.Printf("url template: %v", err)
