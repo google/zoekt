@@ -75,6 +75,13 @@ var TemplateText = map[string]string{
      padding: unset;
      overflow: unset;
   }
+
+  .info-count {
+    margin-bottom: 0.5rem;
+    display: flex;
+    justify-content: space-between;
+  }
+
   :target { background-color: #ccf; }
   table tbody tr td { border: none !important; padding: 2px !important; }
 </style>
@@ -122,15 +129,61 @@ var TemplateText = map[string]string{
           <input class="form-control"
                 placeholder="Search for some code..." role="search"
                 id="navsearchbox" type="text" name="q" autofocus
-                {{if .Query}}
-                value={{.Query}}
+                {{if .Last.Query}}
+                value={{.Last.Query}}
                 {{end}}>
           <div class="input-group">
             <div class="input-group-addon">Max Results</div>
-            <input class="form-control" type="number" id="maxhits" name="num" value="{{.Num}}">
+            <input class="form-control" type="number" id="maxhits" name="num" value="{{.Last.Num}}">
           </div>
-          <button class="btn btn-primary">Search</button>
         </div>
+	    <div class="input-group dropdown">
+		  <button class="btn btn-default dropdown-toggle" type="button" id="dropdownMenu1" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+			Language
+			<span class="caret"></span>
+		  </button>
+		  <ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+			{{range $key, $value := Languages .FileMatches}}
+			  <li><a>
+				<div class="info-count">
+				  <div>
+				  {{if IsLangFilterChecked $.Last.Query $key}}
+				    <input type="checkbox" checked onclick="addFilter('lang:{{$key}}')"/>
+				  {{else}}
+				    <input type="checkbox" onclick="addFilter('lang:{{$key}}')"/>
+				  {{end}}
+				  {{$key}}
+				  </div>
+				  <div class="badge badge-pill">{{$value}}</div>
+				</div>
+			  </a></li>
+			{{end}}
+		  </ul>
+		</div>
+	    <div class="input-group dropdown">
+		  <button class="btn btn-default dropdown-toggle" type="button" id="dropdownMenu1" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+			Repo
+			<span class="caret"></span>
+		  </button>
+		  <ul class="dropdown-menu" aria-labelledby="dropdownMenu2">
+			{{range $key, $value := Repos .FileMatches}}
+			  <li><a>
+				<div class="info-count">
+				  <div>
+				  {{if IsRepoFilterChecked $.Last.Query $key}}
+				    <input type="checkbox" checked onclick="addFilter('r:{{$key}}')"/>
+				  {{else}}
+				    <input type="checkbox" onclick="addFilter('r:{{$key}}')"/>
+				  {{end}}
+				  {{$key}}
+				  </div>
+				  <div class="badge badge-pill">{{$value}}</div>
+				</div>
+			  </a></li>
+			{{end}}
+		  </ul>
+		</div>
+	    <button class="btn btn-primary">Search</button>
       </form>
     </div>
   </div>
@@ -217,49 +270,70 @@ document.onkeydown=function(e){
       window.location.href = "/search?q=" + escape("{{.QueryStr}}" + " " + atom) +
 	  "&" + "num=" + {{.Last.Num}};
   }
-</script>
-<body id="results">
-  {{template "navbar" .Last}}
-  <div class="container-fluid container-results">
-    <h5>
-      {{if .Stats.Crashes}}<br><b>{{.Stats.Crashes}} shards crashed</b><br>{{end}}
-      {{ $fileCount := len .FileMatches }}
-      Found {{.Stats.MatchCount}} results in {{.Stats.FileCount}} files{{if or (lt $fileCount .Stats.FileCount) (or (gt .Stats.ShardsSkipped 0) (gt .Stats.FilesSkipped 0)) }},
-        showing top {{ $fileCount }} files (<a rel="nofollow"
-           href="search?q={{.Last.Query}}&num={{More .Last.Num}}">show more</a>).
-      {{else}}.{{end}}
-    </h5>
-    {{range .FileMatches}}
-    <table class="table table-hover table-condensed">
-      <thead>
-        <tr>
-          <th>
-            {{if .URL}}<a name="{{.ResultID}}" class="result"></a><a href="{{.URL}}" >{{else}}<a name="{{.ResultID}}">{{end}}
-            <small>
-              {{.Repo}}:{{.FileName}}</a>:
-              <span style="font-weight: normal">[ {{if .Branches}}{{range .Branches}}<span class="label label-default">{{.}}</span>,{{end}}{{end}} ]</span>
-              {{if .Language}}<button
-                   title="restrict search to files written in {{.Language}}"
-                   onclick="zoektAddQ('lang:{{.Language}}')" class="label label-primary">language {{.Language}}</button></span>{{end}}
-              {{if .DuplicateID}}<a class="label label-dup" href="#{{.DuplicateID}}">Duplicate result</a>{{end}}
-            </small>
-          </th>
-        </tr>
-      </thead>
-      {{if not .DuplicateID}}
-      <tbody>
-        {{range .Matches}}
-        <tr>
-          <td style="background-color: rgba(238, 238, 255, 0.6);">
-            <pre class="inline-pre"><span class="noselect">{{if .URL}}<a href="{{.URL}}">{{end}}<u>{{.LineNum}}</u>{{if .URL}}</a>{{end}}: </span>{{range .Fragments}}{{LimitPre 100 .Pre}}<b>{{.Match}}</b>{{LimitPost 100 .Post}}{{end}}</pre>
-          </td>
-        </tr>
-        {{end}}
-      </tbody>
-      {{end}}
-    </table>
-    {{end}}
 
+  function addFilter(filter) {
+    var searchBox = document.getElementById("navsearchbox");
+    var search = document.querySelector(".btn.btn-primary");
+
+    var oldQuery = searchBox.value.trim();
+
+    if (oldQuery.includes(filter)) {
+      searchBox.value = oldQuery.replace(filter, '');
+      search.click();
+      return;
+    }
+
+    searchBox.value = (oldQuery + ' ' + filter).trim();
+    search.click();
+  }
+
+</script>
+</style>
+<body id="results">
+  {{template "navbar" .}}
+  <div class="search-main">
+    <div class="container-fluid container-results">
+      <h5>
+        {{if .Stats.Crashes}}<br><b>{{.Stats.Crashes}} shards crashed</b><br>{{end}}
+        {{ $fileCount := len .FileMatches }}
+        Found {{.Stats.MatchCount}} results in {{.Stats.FileCount}} files{{if or (lt $fileCount .Stats.FileCount) (or (gt .Stats.ShardsSkipped 0) (gt .Stats.FilesSkipped 0)) }},
+          showing top {{ $fileCount }} files (<a rel="nofollow"
+            href="search?q={{.Last.Query}}&num={{More .Last.Num}}">show more</a>).
+        {{else}}.{{end}}
+      </h5>
+      {{range .FileMatches}}
+      <table class="table table-hover table-condensed">
+        <thead>
+          <tr>
+            <th>
+              {{if .URL}}<a name="{{.ResultID}}" class="result"></a><a href="{{.URL}}" >{{else}}<a name="{{.ResultID}}">{{end}}
+              <small>
+                {{.Repo}}:{{.FileName}}</a>:
+                <span style="font-weight: normal">[ {{if .Branches}}{{range .Branches}}<span class="label label-default">{{.}}</span>,{{end}}{{end}} ]</span>
+                {{if .Language}}<button
+                    title="restrict search to files written in {{.Language}}"
+                    onclick="zoektAddQ('lang:{{.Language}}')" class="label label-primary">language {{.Language}}</button></span>{{end}}
+                {{if .DuplicateID}}<a class="label label-dup" href="#{{.DuplicateID}}">Duplicate result</a>{{end}}
+              </small>
+            </th>
+          </tr>
+        </thead>
+        {{if not .DuplicateID}}
+        <tbody>
+          {{range .Matches}}
+          <tr>
+            <td style="background-color: rgba(238, 238, 255, 0.6);">
+              <pre class="inline-pre"><span class="noselect">{{if .URL}}<a href="{{.URL}}">{{end}}<u>{{.LineNum}}</u>{{if .URL}}</a>{{end}}: </span>{{range .Fragments}}{{LimitPre 100 .Pre}}<b>{{.Match}}</b>{{LimitPost 100 .Post}}{{end}}</pre>
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+        {{end}}
+      </table>
+      {{end}}
+
+    </div>
+  </div>
   <nav class="navbar navbar-default navbar-bottom">
     <div class="container">
       {{template "footerBoilerplate"}}
@@ -274,18 +348,16 @@ document.onkeydown=function(e){
       </p>
     </div>
   </nav>
-  </div>
   {{ template "jsdep"}}
 </body>
 </html>
 `,
-
 	"repolist": `
 <html>
 {{template "head"}}
 <body id="results">
   <div class="container">
-    {{template "navbar" .Last}}
+    {{template "navbar" .}}
     <div><b>
     Found {{.Stats.Repos}} repositories ({{.Stats.Documents}} files, {{HumanUnit .Stats.ContentBytes}}b content)
     </b></div>
@@ -333,7 +405,7 @@ document.onkeydown=function(e){
   {{template "head"}}
   <title>{{.Repo}}:{{.Name}}</title>
 <body id="results">
-  {{template "navbar" .Last}}
+  {{template "navbar" .}}
   <div class="container-fluid container-results" >
      <div><b>{{.Name}}</b></div>
      <div class="table table-hover table-condensed" style="overflow:auto; background: #eef;">
