@@ -231,9 +231,11 @@ func (r *reader) readIndexData(toc *indexTOC) (*indexData, error) {
 		}
 	}
 
-	var keys []string
+	keys := []string{""}
 	for k := range d.repoMetaData.SubRepoMap {
-		keys = append(keys, k)
+		if k != "" { // we used to marshal "" in SubRepoMap. Prevent adding twice.
+			keys = append(keys, k)
+		}
 	}
 	sort.Strings(keys)
 	d.subRepoPaths = keys

@@ -229,13 +229,14 @@ func (b *IndexBuilder) setRepository(desc *Repository) error {
 	}
 
 	b.repo = *desc
-	repoCopy := *desc
-	repoCopy.SubRepoMap = nil
 
-	if b.repo.SubRepoMap == nil {
-		b.repo.SubRepoMap = map[string]*Repository{}
+	// copy subrepomap without root
+	b.repo.SubRepoMap = map[string]*Repository{}
+	for k, v := range desc.SubRepoMap {
+		if k != "" {
+			b.repo.SubRepoMap[k] = v
+		}
 	}
-	b.repo.SubRepoMap[""] = &repoCopy
 
 	b.populateSubRepoIndices()
 	return nil
@@ -314,7 +315,7 @@ func (b *IndexBuilder) populateSubRepoIndices() {
 	if b.subRepoIndices != nil {
 		return
 	}
-	var paths []string
+	paths := []string{""}
 	for k := range b.repo.SubRepoMap {
 		paths = append(paths, k)
 	}
