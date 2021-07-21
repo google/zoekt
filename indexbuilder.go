@@ -215,15 +215,6 @@ func (b *IndexBuilder) setRepository(desc *Repository) error {
 		return err
 	}
 
-	for _, subrepo := range desc.SubRepoMap {
-		branchEqual := len(subrepo.Branches) == len(desc.Branches)
-		if branchEqual {
-			for i, b := range subrepo.Branches {
-				branchEqual = branchEqual && (b.Name == desc.Branches[i].Name)
-			}
-		}
-	}
-
 	if len(desc.Branches) > 64 {
 		return fmt.Errorf("too many branches")
 	}
