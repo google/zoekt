@@ -6,6 +6,8 @@
 This is a fast text search engine, intended for use with source
 code. (Pronunciation: roughly as you would pronounce "zooked" in English)
 
+**NOTICE:** [github.com/sourcegraph/zoekt](https://github.com/sourcegraph/zoekt) is the active main repository for Zoekt development.
+
 INSTRUCTIONS
 ============
 
