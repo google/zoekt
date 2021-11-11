@@ -9,7 +9,7 @@ Parameters are in the `zoekt` section of the git-config.
 `https://github.com/hanwen/usb`
 
 * `web-url-type`: type of URL, eg. github. Supported are cgit,
-  gitiles, gitweb and cgit.
+  gitiles, gitweb, cgit, and bitbucket-server.
 
 * `github-stars`, `github-forks`, `github-watchers`,
   `github-subscribers`: counters for github interactions
