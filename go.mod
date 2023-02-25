@@ -18,9 +18,9 @@ require (
 	github.com/prometheus/client_golang v1.5.1
 	github.com/xanzy/go-gitlab v0.25.0
 	go.uber.org/automaxprocs v1.3.0
-	golang.org/x/net v0.0.0-20210423184538-5f58ad60dda6
+	golang.org/x/net v0.7.0
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
-	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
+	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 	google.golang.org/appengine v1.6.5 // indirect
 	gopkg.in/yaml.v2 v2.2.8 // indirect
 	humungus.tedunangst.com/r/gerc v0.1.2
