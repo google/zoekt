@@ -1,8 +1,3 @@
-
-    "Zoekt, en gij zult spinazie eten" - Jan Eertink
-
-    ("seek, and ye shall eat spinach" - My primary school teacher)
-
 This is a fast text search engine, intended for use with source
 code. (Pronunciation: roughly as you would pronounce "zooked" in English)
 
